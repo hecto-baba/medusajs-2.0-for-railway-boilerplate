@@ -9,6 +9,7 @@ import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
 import DeleteButton from "@modules/common/components/delete-button"
 import LineItemOptions from "@modules/common/components/line-item-options"
+import LineItemRentalDates from "@modules/common/components/line-item-rental-dates"
 import LineItemPrice from "@modules/common/components/line-item-price"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Thumbnail from "@modules/products/components/thumbnail"
@@ -146,6 +147,10 @@ const CartDropdown = ({
                                   variant={item.variant}
                                   data-testid="cart-item-variant"
                                   data-value={item.variant}
+                                />
+                                <LineItemRentalDates
+                                  metadata={item.metadata}
+                                  data-testid="cart-item-rental-dates"
                                 />
                                 <span
                                   data-testid="cart-item-quantity"

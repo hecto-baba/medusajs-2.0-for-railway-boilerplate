@@ -24,6 +24,11 @@ type MobileActionsProps = {
   error?: string | null
   show: boolean
   optionsDisabled: boolean
+  // The rental gate has to reach the sticky bar as well: its button is the
+  // one a phone shopper actually taps, and the date picker it depends on is
+  // scrolled off screen by the time the bar appears.
+  isRental?: boolean
+  hasRentalSelection?: boolean
 }
 
 const MobileActions: React.FC<MobileActionsProps> = ({
@@ -37,6 +42,8 @@ const MobileActions: React.FC<MobileActionsProps> = ({
   error,
   show,
   optionsDisabled,
+  isRental,
+  hasRentalSelection,
 }) => {
   const { state, open, close } = useToggleState()
 
@@ -121,7 +128,11 @@ const MobileActions: React.FC<MobileActionsProps> = ({
               </Button>
               <Button
                 onClick={handleAddToCart}
-                disabled={!inStock || !variant}
+                disabled={
+                  !inStock ||
+                  !variant ||
+                  (isRental && !hasRentalSelection)
+                }
                 className="w-full"
                 isLoading={isAdding}
                 data-testid="mobile-cart-button"
@@ -130,6 +141,10 @@ const MobileActions: React.FC<MobileActionsProps> = ({
                   ? "Select variant"
                   : !inStock
                   ? "Out of stock"
+                  : isRental && !hasRentalSelection
+                  ? "Select rental dates"
+                  : isRental
+                  ? "Add rental to cart"
                   : "Add to cart"}
               </Button>
             </div>

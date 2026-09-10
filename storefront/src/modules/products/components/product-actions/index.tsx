@@ -13,7 +13,11 @@ import ErrorMessage from "@modules/checkout/components/error-message"
 import MobileActions from "./mobile-actions"
 import ProductPrice from "../product-price"
 import { addToCart } from "@lib/data/cart"
+import { addRentalToCart } from "@lib/data/rentals"
 import { HttpTypes } from "@medusajs/types"
+import { RentalConfiguration, RentalSelection } from "types/rental"
+import RentalDatePicker from "../rental-date-picker"
+import { convertToLocale } from "@lib/util/money"
 
 type ProductActionsProps = {
   product: HttpTypes.StoreProduct
@@ -38,6 +42,10 @@ export default function ProductActions({
   const [options, setOptions] = useState<Record<string, string | undefined>>({})
   const [isAdding, setIsAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [rentalSelection, setRentalSelection] = useState<RentalSelection | null>(
+    null
+  )
+  const [rentalPrice, setRentalPrice] = useState<number | null>(null)
   const countryCode = useParams().countryCode as string
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -93,6 +101,36 @@ export default function ProductActions({
     return false
   }, [selectedVariant])
 
+  // The rental configuration arrives on the product through its linked
+  // module. A product without an active configuration behaves exactly as
+  // before, so the ordinary sale path is untouched.
+  const rentalConfiguration = useMemo(() => {
+    const config = (product as unknown as {
+      rental_configuration?: RentalConfiguration | null
+    }).rental_configuration
+
+    return config?.status === "active" ? config : null
+  }, [product])
+
+  const isRental = !!rentalConfiguration
+
+  // Availability is per variant, so a dates-and-price pair chosen for one
+  // variant must not survive a switch to another. Clearing only on a real
+  // change - rather than on every run including the first - keeps this from
+  // discarding the answer the picker reports for the newly chosen variant.
+  const previousVariantId = useRef<string | undefined>(undefined)
+
+  useEffect(() => {
+    if (previousVariantId.current !== selectedVariant?.id) {
+      if (previousVariantId.current !== undefined) {
+        setRentalSelection(null)
+        setRentalPrice(null)
+      }
+
+      previousVariantId.current = selectedVariant?.id
+    }
+  }, [selectedVariant?.id])
+
   const actionsRef = useRef<HTMLDivElement>(null)
 
   const inView = useIntersection(actionsRef, "0px")
@@ -105,11 +143,29 @@ export default function ProductActions({
     setError(null)
 
     try {
-      await addToCart({
-        variantId: selectedVariant.id,
-        quantity: 1,
-        countryCode,
-      })
+      if (isRental) {
+        // Guarded by the disabled button below, but a rental must never fall
+        // through to the sale path: that would price it as an outright
+        // purchase and create no booking.
+        if (!rentalSelection) {
+          setError("Please choose your rental dates first.")
+          return
+        }
+
+        await addRentalToCart({
+          variantId: selectedVariant.id,
+          countryCode,
+          rentalStartDate: rentalSelection.rental_start_date,
+          rentalEndDate: rentalSelection.rental_end_date,
+          rentalDays: rentalSelection.rental_days,
+        })
+      } else {
+        await addToCart({
+          variantId: selectedVariant.id,
+          quantity: 1,
+          countryCode,
+        })
+      }
 
       // Belt and braces on top of the scoped cache tag the action revalidates.
       // This was added when the cart was uncached and revalidateTag had nothing
@@ -157,9 +213,48 @@ export default function ProductActions({
 
         <ProductPrice product={product} variant={selectedVariant} />
 
+        {isRental && (
+          <>
+            <Divider />
+            <RentalDatePicker
+              productId={product.id}
+              variantId={selectedVariant?.id}
+              rentalConfiguration={rentalConfiguration}
+              currencyCode={region.currency_code}
+              disabled={!!disabled || isAdding || !selectedVariant}
+              onSelectionChange={setRentalSelection}
+              onPriceChange={setRentalPrice}
+            />
+            {rentalPrice !== null && rentalSelection && (
+              <div className="flex items-baseline justify-between">
+                <span className="txt-medium text-ui-fg-subtle">
+                  Total for {rentalSelection.rental_days}{" "}
+                  {rentalSelection.rental_days === 1 ? "day" : "days"}
+                </span>
+                <span
+                  className="text-xl-semi"
+                  data-testid="rental-total-price"
+                >
+                  {convertToLocale({
+                    amount: rentalPrice,
+                    currency_code: region.currency_code,
+                  })}
+                </span>
+              </div>
+            )}
+            <Divider />
+          </>
+        )}
+
         <Button
           onClick={handleAddToCart}
-          disabled={!inStock || !selectedVariant || !!disabled || isAdding}
+          disabled={
+            !inStock ||
+            !selectedVariant ||
+            !!disabled ||
+            isAdding ||
+            (isRental && !rentalSelection)
+          }
           variant="primary"
           className="w-full h-10"
           isLoading={isAdding}
@@ -169,6 +264,10 @@ export default function ProductActions({
             ? "Select variant"
             : !inStock
             ? "Out of stock"
+            : isRental && !rentalSelection
+            ? "Select rental dates"
+            : isRental
+            ? "Add rental to cart"
             : "Add to cart"}
         </Button>
         <ErrorMessage error={error} data-testid="add-product-error-message" />
@@ -183,6 +282,8 @@ export default function ProductActions({
           error={error}
           show={!inView}
           optionsDisabled={!!disabled || isAdding}
+          isRental={isRental}
+          hasRentalSelection={!!rentalSelection}
         />
       </div>
     </>

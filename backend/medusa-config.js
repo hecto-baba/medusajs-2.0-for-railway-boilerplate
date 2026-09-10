@@ -64,6 +64,9 @@ const medusaConfig = {
   },
   modules: [
     {
+      resolve: './src/modules/rental'
+    },
+    {
       key: Modules.FILE,
       resolve: '@medusajs/file',
       options: {

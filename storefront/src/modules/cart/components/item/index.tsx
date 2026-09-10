@@ -8,6 +8,7 @@ import CartItemSelect from "@modules/cart/components/cart-item-select"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import DeleteButton from "@modules/common/components/delete-button"
 import LineItemOptions from "@modules/common/components/line-item-options"
+import LineItemRentalDates from "@modules/common/components/line-item-rental-dates"
 import LineItemPrice from "@modules/common/components/line-item-price"
 import LineItemUnitPrice from "@modules/common/components/line-item-unit-price"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
@@ -80,6 +81,10 @@ const Item = ({ item, type = "full" }: ItemProps) => {
           {item.product_title}
         </Text>
         <LineItemOptions variant={item.variant} data-testid="product-variant" />
+        <LineItemRentalDates
+          metadata={item.metadata}
+          data-testid="product-rental-dates"
+        />
       </Table.Cell>
 
       {type === "full" && (

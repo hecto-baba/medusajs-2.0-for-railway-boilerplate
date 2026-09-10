@@ -404,9 +404,26 @@ export async function placeOrder() {
     throw new Error("No existing cart found when placing an order")
   }
 
-  const cartRes = await sdk.store.cart
-    .complete(cartId, {}, await getAuthHeaders())
-    .then(async (cartRes) => {
+  const cart = await retrieveCart()
+
+  // A cart holding rental items has to complete through the rental route.
+  // The standard complete endpoint creates the order but no rental records,
+  // which would leave the booked dates looking free to every later shopper
+  // and give the activation and cancellation handlers nothing to act on.
+  const hasRentalItems = (cart?.items ?? []).some(
+    (item) =>
+      !!item.metadata?.rental_start_date && !!item.metadata?.rental_end_date
+  )
+
+  const completeCart = hasRentalItems
+    ? sdk.client.fetch<{ type: string; order: HttpTypes.StoreOrder }>(
+        `/store/rentals/${cartId}`,
+        { method: "POST", headers: { ...(await getAuthHeaders()) } }
+      )
+    : sdk.store.cart.complete(cartId, {}, await getAuthHeaders())
+
+  const cartRes = await completeCart
+    .then(async (cartRes: any) => {
       await revalidateCacheTag("carts")
       // The order list is cached now, so a new order has to purge it or the
       // shopper lands on an account page that does not list what they just
