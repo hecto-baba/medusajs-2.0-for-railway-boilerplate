@@ -347,6 +347,11 @@ export async function submitPromotionForm(
 
 // TODO: Pass a POJO instead of a form entity here
 export async function setAddresses(currentState: unknown, formData: FormData) {
+  // Tickets are delivered by email, so such a cart collects a billing address
+  // only and skips the delivery step entirely. Tracked here so the redirect
+  // below, which must sit outside the try, knows where to send the shopper.
+  const isTicketsOnly = formData?.get("tickets_only") === "true"
+
   try {
     if (!formData) {
       throw new Error("No form data found when setting addresses")
@@ -372,11 +377,11 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
       email: formData.get("email"),
     } as any
 
-    const sameAsBilling = formData.get("same_as_billing")
-    if (sameAsBilling === "on") data.billing_address = data.shipping_address
-
-    if (sameAsBilling !== "on")
-      data.billing_address = {
+    // Medusa still wants a shipping address on the cart, so for a ticket cart
+    // the billing address stands in for both rather than leaving the cart
+    // half-addressed.
+    if (isTicketsOnly) {
+      const billingAddress = {
         first_name: formData.get("billing_address.first_name"),
         last_name: formData.get("billing_address.last_name"),
         address_1: formData.get("billing_address.address_1"),
@@ -388,13 +393,43 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
         province: formData.get("billing_address.province"),
         phone: formData.get("billing_address.phone"),
       }
-    await updateCart(data)
+
+      await updateCart({
+        billing_address: billingAddress,
+        shipping_address: billingAddress,
+        email: formData.get("email"),
+      } as any)
+    } else {
+      const sameAsBilling = formData.get("same_as_billing")
+      if (sameAsBilling === "on") data.billing_address = data.shipping_address
+
+      if (sameAsBilling !== "on")
+        data.billing_address = {
+          first_name: formData.get("billing_address.first_name"),
+          last_name: formData.get("billing_address.last_name"),
+          address_1: formData.get("billing_address.address_1"),
+          address_2: "",
+          company: formData.get("billing_address.company"),
+          postal_code: formData.get("billing_address.postal_code"),
+          city: formData.get("billing_address.city"),
+          country_code: formData.get("billing_address.country_code"),
+          province: formData.get("billing_address.province"),
+          phone: formData.get("billing_address.phone"),
+        }
+
+      await updateCart(data)
+    }
   } catch (e: any) {
     return e.message
   }
 
+  // Straight to payment for tickets: there is no delivery step in that
+  // checkout, and sending the shopper to one would strand them on an empty
+  // section.
   redirect(
-    `/${formData.get("shipping_address.country_code")}/checkout?step=delivery`
+    isTicketsOnly
+      ? `/${formData.get("billing_address.country_code")}/checkout?step=payment`
+      : `/${formData.get("shipping_address.country_code")}/checkout?step=delivery`
   )
 }
 

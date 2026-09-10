@@ -14,6 +14,7 @@ import PaymentContainer from "@modules/checkout/components/payment-container"
 import { isStripe as isStripeFunc, paymentInfoMap } from "@lib/constants"
 import { StripeContext } from "@modules/checkout/components/payment-wrapper"
 import { initiatePaymentSession } from "@lib/data/cart"
+import { isTicketLineItem } from "types/ticket"
 
 const Payment = ({
   cart,
@@ -46,8 +47,16 @@ const Payment = ({
   const paidByGiftcard =
     cart?.gift_cards && cart?.gift_cards?.length > 0 && cart?.total === 0
 
+  // Tickets require no shipping, so a ticket-only cart has no shipping method
+  // and would otherwise never count as ready to pay.
+  const items = cart?.items ?? []
+  const isTicketsOnly =
+    items.length > 0 &&
+    items.every((item: any) => isTicketLineItem(item.metadata))
+
   const paymentReady =
-    (activeSession && cart?.shipping_methods.length !== 0) || paidByGiftcard
+    (activeSession && (isTicketsOnly || cart?.shipping_methods.length !== 0)) ||
+    paidByGiftcard
 
   const useOptions: StripeCardElementOptions = useMemo(() => {
     return {
