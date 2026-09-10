@@ -1,5 +1,7 @@
 /dist
 .env
+.env.backup-*
+.env.*.local
 .DS_Store
 /uploads
 /node_modules
