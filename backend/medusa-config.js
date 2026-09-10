@@ -67,6 +67,9 @@ const medusaConfig = {
       resolve: './src/modules/rental'
     },
     {
+      resolve: './src/modules/ticket-booking'
+    },
+    {
       key: Modules.FILE,
       resolve: '@medusajs/file',
       options: {
