@@ -10,6 +10,8 @@ import { HttpTypes } from "@medusajs/types"
 import DeleteButton from "@modules/common/components/delete-button"
 import LineItemOptions from "@modules/common/components/line-item-options"
 import LineItemRentalDates from "@modules/common/components/line-item-rental-dates"
+import LineItemSeatInfo from "@modules/common/components/line-item-seat-info"
+import { isTicketLineItem } from "types/ticket"
 import LineItemPrice from "@modules/common/components/line-item-price"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Thumbnail from "@modules/products/components/thumbnail"
@@ -152,12 +154,20 @@ const CartDropdown = ({
                                   metadata={item.metadata}
                                   data-testid="cart-item-rental-dates"
                                 />
-                                <span
-                                  data-testid="cart-item-quantity"
-                                  data-value={item.quantity}
-                                >
-                                  Quantity: {item.quantity}
-                                </span>
+                                <LineItemSeatInfo
+                                  metadata={item.metadata}
+                                  data-testid="cart-item-seat-info"
+                                />
+                                {/* A ticket line is always one seat, so a
+                                    quantity reads as noise next to it. */}
+                                {!isTicketLineItem(item.metadata) && (
+                                  <span
+                                    data-testid="cart-item-quantity"
+                                    data-value={item.quantity}
+                                  >
+                                    Quantity: {item.quantity}
+                                  </span>
+                                )}
                               </div>
                               <div className="flex justify-end">
                                 <LineItemPrice item={item} style="tight" />

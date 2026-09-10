@@ -415,12 +415,25 @@ export async function placeOrder() {
       !!item.metadata?.rental_start_date && !!item.metadata?.rental_end_date
   )
 
-  const completeCart = hasRentalItems
+  // A cart holding tickets has to complete through the ticket route for the
+  // same reason: the standard endpoint creates the order but no ticket
+  // purchases, so the seats would still look free to the next shopper and the
+  // confirmation email would have no tickets to send.
+  const hasTicketItems = (cart?.items ?? []).some(
+    (item) => !!item.metadata?.seat_number && !!item.metadata?.show_date
+  )
+
+  const completeCart = hasTicketItems
     ? sdk.client.fetch<{ type: string; order: HttpTypes.StoreOrder }>(
-        `/store/rentals/${cartId}`,
+        `/store/carts/${cartId}/complete-tickets`,
         { method: "POST", headers: { ...(await getAuthHeaders()) } }
       )
-    : sdk.store.cart.complete(cartId, {}, await getAuthHeaders())
+    : hasRentalItems
+      ? sdk.client.fetch<{ type: string; order: HttpTypes.StoreOrder }>(
+          `/store/rentals/${cartId}`,
+          { method: "POST", headers: { ...(await getAuthHeaders()) } }
+        )
+      : sdk.store.cart.complete(cartId, {}, await getAuthHeaders())
 
   const cartRes = await completeCart
     .then(async (cartRes: any) => {
@@ -434,8 +447,14 @@ export async function placeOrder() {
     .catch(medusaError)
 
   if (cartRes?.type === "order") {
-    const countryCode =
-      cartRes.order.shipping_address?.country_code?.toLowerCase()
+    // Ticket orders have no shipping address at all, so the billing address is
+    // the fallback here. Without it the redirect used to interpolate
+    // "undefined" as the country code and land on a 404.
+    const countryCode = (
+      cartRes.order.shipping_address?.country_code ??
+      cartRes.order.billing_address?.country_code ??
+      cart?.region?.countries?.[0]?.iso_2
+    )?.toLowerCase()
     await removeCartId()
     redirect(`/${countryCode}/order/confirmed/${cartRes?.order.id}`)
   }
