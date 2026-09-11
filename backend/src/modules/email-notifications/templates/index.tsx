@@ -3,11 +3,13 @@ import { MedusaError } from '@medusajs/framework/utils'
 import { InviteUserEmail, INVITE_USER, isInviteUserData } from './invite-user'
 import { OrderPlacedTemplate, ORDER_PLACED, isOrderPlacedTemplateData } from './order-placed'
 import { ResetPasswordEmail, RESET_PASSWORD, isResetPasswordData } from './reset-password'
+import { TicketOrderPlacedTemplate, TICKET_ORDER_PLACED, isTicketOrderPlacedData } from './ticket-order-placed'
 
 export const EmailTemplates = {
   INVITE_USER,
   ORDER_PLACED,
-  RESET_PASSWORD
+  RESET_PASSWORD,
+  TICKET_ORDER_PLACED
 } as const
 
 export type EmailTemplateType = keyof typeof EmailTemplates
@@ -41,6 +43,15 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
       }
       return <ResetPasswordEmail {...data} />
 
+    case EmailTemplates.TICKET_ORDER_PLACED:
+      if (!isTicketOrderPlacedData(data)) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          `Invalid data for template "${EmailTemplates.TICKET_ORDER_PLACED}"`
+        )
+      }
+      return <TicketOrderPlacedTemplate {...data} />
+
     default:
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
@@ -49,4 +60,4 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
   }
 }
 
-export { InviteUserEmail, OrderPlacedTemplate, ResetPasswordEmail }
+export { InviteUserEmail, OrderPlacedTemplate, ResetPasswordEmail, TicketOrderPlacedTemplate }

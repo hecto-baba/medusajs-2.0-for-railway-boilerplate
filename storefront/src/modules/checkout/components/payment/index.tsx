@@ -14,6 +14,7 @@ import PaymentContainer from "@modules/checkout/components/payment-container"
 import { isStripe as isStripeFunc, paymentInfoMap } from "@lib/constants"
 import { StripeContext } from "@modules/checkout/components/payment-wrapper"
 import { initiatePaymentSession } from "@lib/data/cart"
+import { isTicketLineItem } from "types/ticket"
 
 const Payment = ({
   cart,
@@ -46,8 +47,16 @@ const Payment = ({
   const paidByGiftcard =
     cart?.gift_cards && cart?.gift_cards?.length > 0 && cart?.total === 0
 
+  // Tickets require no shipping, so a ticket-only cart has no shipping method
+  // and would otherwise never count as ready to pay.
+  const items = cart?.items ?? []
+  const isTicketsOnly =
+    items.length > 0 &&
+    items.every((item: any) => isTicketLineItem(item.metadata))
+
   const paymentReady =
-    (activeSession && cart?.shipping_methods.length !== 0) || paidByGiftcard
+    (activeSession && (isTicketsOnly || cart?.shipping_methods.length !== 0)) ||
+    paidByGiftcard
 
   const useOptions: StripeCardElementOptions = useMemo(() => {
     return {
@@ -112,6 +121,35 @@ const Payment = ({
   useEffect(() => {
     setError(null)
   }, [isOpen])
+
+  // Advancing to review is a race that the step can lose. handleSubmit creates
+  // the payment session and then pushes to the review step, but creating the
+  // session revalidates the cart, and that re-render can discard the push. The
+  // session is saved, this step collapses to its summary, and the URL is left
+  // on the payment step - leaving review closed and the shopper with no way to
+  // place the order.
+  //
+  // Recovering here rather than in handleSubmit fixes it whichever side wins:
+  // a session that exists while this step is still open means the push was
+  // lost, so it is reissued.
+  //
+  // Stripe is excluded because it legitimately stays on this step after the
+  // session is created, to collect card details before review.
+  useEffect(() => {
+    if (activeSession && isOpen && !isStripe && !paidByGiftcard) {
+      router.push(pathname + "?" + createQueryString("step", "review"), {
+        scroll: false,
+      })
+    }
+  }, [
+    activeSession,
+    isOpen,
+    isStripe,
+    paidByGiftcard,
+    router,
+    pathname,
+    createQueryString,
+  ])
 
   return (
     <div className="bg-white">

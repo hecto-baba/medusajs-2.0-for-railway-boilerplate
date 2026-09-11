@@ -38,8 +38,10 @@
     "@rokmohar/medusa-plugin-meilisearch": "2.0.0",
     "@tanstack/react-query": "5.64.2",
     "medusajs-launch-utils": "0.0.19",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-router-dom": "7.18.2",
     "resend": "6.25.0"
   },
   "devDependencies": {
@@ -47,6 +49,7 @@
     "@react-email/preview-server": "^5.1.0",
     "@swc/core": "1.16.1",
     "@types/node": "^22.19.1",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.27",
     "@types/react-dom": "^18.3.7",
     "react-email": "^5.1.0",
