@@ -62,6 +62,8 @@ export const completeCartWithTicketsWorkflow = createWorkflow(
         "items.variant_id",
         "items.variant.id",
         "items.variant.product_id",
+        "items.variant.options.value",
+        "items.variant.options.option.title",
         "items.variant.ticket_product_variant.*",
         "items.variant.ticket_product_variant.purchases.*",
       ],

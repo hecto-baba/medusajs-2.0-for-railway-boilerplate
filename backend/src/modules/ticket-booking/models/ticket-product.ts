@@ -21,7 +21,9 @@ export const TicketProduct = model.define("ticket_product", {
   }),
 })
 .indexes([
+  // Venue availability is always checked as "this venue, on these dates", so
+  // the index covers both columns rather than the venue alone.
   {
-    on: ["venue_id"],
+    on: ["venue_id", "dates"],
   },
 ])

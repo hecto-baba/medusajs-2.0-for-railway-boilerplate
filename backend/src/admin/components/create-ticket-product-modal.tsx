@@ -86,6 +86,12 @@ export const CreateTicketProductModal = ({
       const variants = rowTypes
         .map((rowType) => ({
           row_type: rowType,
+          // Seats of this tier to put on sale per performance. Defaults to the
+          // venue's capacity for the tier, which is the common case; the
+          // backend takes it as given so a run can be sold at less than that.
+          seat_count: (selectedVenue?.rows ?? [])
+            .filter((row) => row.row_type === rowType)
+            .reduce((total, row) => total + row.seat_count, 0),
           prices: currencies
             .map((currency) => ({
               currency_code: currency,
