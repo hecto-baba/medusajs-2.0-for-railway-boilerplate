@@ -70,6 +70,9 @@ const medusaConfig = {
       resolve: './src/modules/ticket-booking'
     },
     {
+      resolve: './src/modules/marketplace'
+    },
+    {
       key: Modules.FILE,
       resolve: '@medusajs/file',
       options: {
