@@ -8,6 +8,7 @@ import { PostRentalConfigBodySchema } from "./admin/products/[id]/rental-config/
 import { PostRentalStatusBodySchema } from "./admin/rentals/[id]/route";
 import { GetRentalAvailabilitySchema } from "./store/products/[id]/rental-availability/route";
 import { PostCartItemsRentalsBody } from "./store/carts/[id]/line-items/rentals/route";
+import { PostCartItemsTicketsBody } from "./store/carts/[id]/line-items/tickets/route";
 import { PostVenueBodySchema } from "./admin/venues/route";
 import { PostTicketProductBodySchema } from "./admin/ticket-products/route";
 import { GetTicketProductSeatsSchema } from "./store/ticket-products/[id]/seats/route";
@@ -40,6 +41,13 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(PostCartItemsRentalsBody)
+      ]
+    },
+    {
+      matcher: "/store/carts/:id/line-items/tickets",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostCartItemsTicketsBody)
       ]
     },
     {

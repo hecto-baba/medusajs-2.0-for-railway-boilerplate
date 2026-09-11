@@ -122,6 +122,35 @@ const Payment = ({
     setError(null)
   }, [isOpen])
 
+  // Advancing to review is a race that the step can lose. handleSubmit creates
+  // the payment session and then pushes to the review step, but creating the
+  // session revalidates the cart, and that re-render can discard the push. The
+  // session is saved, this step collapses to its summary, and the URL is left
+  // on the payment step - leaving review closed and the shopper with no way to
+  // place the order.
+  //
+  // Recovering here rather than in handleSubmit fixes it whichever side wins:
+  // a session that exists while this step is still open means the push was
+  // lost, so it is reissued.
+  //
+  // Stripe is excluded because it legitimately stays on this step after the
+  // session is created, to collect card details before review.
+  useEffect(() => {
+    if (activeSession && isOpen && !isStripe && !paidByGiftcard) {
+      router.push(pathname + "?" + createQueryString("step", "review"), {
+        scroll: false,
+      })
+    }
+  }, [
+    activeSession,
+    isOpen,
+    isStripe,
+    paidByGiftcard,
+    router,
+    pathname,
+    createQueryString,
+  ])
+
   return (
     <div className="bg-white">
       <div className="flex flex-row items-center justify-between mb-6">

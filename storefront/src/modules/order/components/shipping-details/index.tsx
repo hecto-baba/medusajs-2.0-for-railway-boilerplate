@@ -9,6 +9,17 @@ type ShippingDetailsProps = {
 }
 
 const ShippingDetails = ({ order }: ShippingDetailsProps) => {
+  // A ticket order is delivered by email and carries no shipping method at
+  // all, so there is no delivery to describe. Rendering the section anyway
+  // crashed the confirmation page: the method block below indexed
+  // shipping_methods[0] unguarded, and reading .total off an empty array threw
+  // before the order could be shown.
+  const shippingMethod = order.shipping_methods?.[0]
+
+  if (!shippingMethod) {
+    return null
+  }
+
   return (
     <div>
       <Heading level="h2" className="flex flex-row text-3xl-regular my-6">
@@ -56,9 +67,9 @@ const ShippingDetails = ({ order }: ShippingDetailsProps) => {
         >
           <Text className="txt-medium-plus text-ui-fg-base mb-1">Method</Text>
           <Text className="txt-medium text-ui-fg-subtle">
-            {(order as any).shipping_methods[0]?.name} (
+            {shippingMethod.name} (
             {convertToLocale({
-              amount: order.shipping_methods?.[0].total ?? 0,
+              amount: shippingMethod.total ?? 0,
               currency_code: order.currency_code,
             })
               .replace(/,/g, "")

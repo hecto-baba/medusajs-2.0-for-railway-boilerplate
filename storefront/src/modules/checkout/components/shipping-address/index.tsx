@@ -9,6 +9,28 @@ import React, { useEffect, useMemo, useState } from "react"
 import AddressSelect from "../address-select"
 import CountrySelect from "../country-select"
 
+/**
+ * Every field defaults to "" rather than being left out, so the inputs below
+ * are controlled from the first render onwards. Starting from an empty object
+ * would hand React `value={undefined}` on mount and make it warn about an
+ * uncontrolled input becoming controlled once the cart arrives.
+ */
+const addressToFormData = (
+  address?: HttpTypes.StoreCartAddress | null,
+  email?: string | null
+) => ({
+  "shipping_address.first_name": address?.first_name || "",
+  "shipping_address.last_name": address?.last_name || "",
+  "shipping_address.address_1": address?.address_1 || "",
+  "shipping_address.company": address?.company || "",
+  "shipping_address.postal_code": address?.postal_code || "",
+  "shipping_address.city": address?.city || "",
+  "shipping_address.country_code": address?.country_code || "",
+  "shipping_address.province": address?.province || "",
+  "shipping_address.phone": address?.phone || "",
+  email: email || "",
+})
+
 const ShippingAddress = ({
   customer,
   cart,
@@ -20,7 +42,9 @@ const ShippingAddress = ({
   checked: boolean
   onChange: () => void
 }) => {
-  const [formData, setFormData] = useState<Record<string, any>>({})
+  const [formData, setFormData] = useState<Record<string, string>>(() =>
+    addressToFormData(cart?.shipping_address, cart?.email || customer?.email)
+  )
 
   const countriesInRegion = useMemo(
     () => cart?.region?.countries?.map((c) => c.iso_2),
@@ -36,29 +60,29 @@ const ShippingAddress = ({
     [customer?.addresses, countriesInRegion]
   )
 
+  // Both arguments are optional and applied independently: the saved-address
+  // picker supplies an address alone, while the effect below can supply just
+  // the customer's email. Each merges into the current state so filling one in
+  // never clears what the shopper already typed into the other.
   const setFormAddress = (
     address?: HttpTypes.StoreCartAddress,
     email?: string
   ) => {
-    address &&
-      setFormData((prevState: Record<string, any>) => ({
-        ...prevState,
-        "shipping_address.first_name": address?.first_name || "",
-        "shipping_address.last_name": address?.last_name || "",
-        "shipping_address.address_1": address?.address_1 || "",
-        "shipping_address.company": address?.company || "",
-        "shipping_address.postal_code": address?.postal_code || "",
-        "shipping_address.city": address?.city || "",
-        "shipping_address.country_code": address?.country_code || "",
-        "shipping_address.province": address?.province || "",
-        "shipping_address.phone": address?.phone || "",
-      }))
+    if (address) {
+      const { email: _, ...addressFields } = addressToFormData(address)
 
-    email &&
-      setFormData((prevState: Record<string, any>) => ({
+      setFormData((prevState) => ({
         ...prevState,
-        email: email,
+        ...addressFields,
       }))
+    }
+
+    if (email) {
+      setFormData((prevState) => ({
+        ...prevState,
+        email,
+      }))
+    }
   }
 
   useEffect(() => {
@@ -90,12 +114,16 @@ const ShippingAddress = ({
           <p className="text-small-regular">
             {`Hi ${customer.first_name}, do you want to use one of your saved addresses?`}
           </p>
+          {/* Only the address fields are carried over into addressInput, so it
+              is not a whole StoreCartAddress - it has no id or timestamps.
+              Matching against the saved addresses is all AddressSelect reads
+              it for, hence the widening cast. */}
           <AddressSelect
             addresses={customer.addresses}
             addressInput={
               mapKeys(formData, (_, key) =>
                 key.replace("shipping_address.", "")
-              ) as HttpTypes.StoreCartAddress
+              ) as unknown as HttpTypes.StoreCartAddress
             }
             onSelect={setFormAddress}
           />

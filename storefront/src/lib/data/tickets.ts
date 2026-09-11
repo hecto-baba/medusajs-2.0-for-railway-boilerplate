@@ -57,9 +57,16 @@ export async function getTicketProductSeats(
 /**
  * Adds one line item per selected seat.
  *
- * Seats are added one at a time rather than batched because the backend's
- * add-to-cart validation reports the first seat that fails by name; a batch
- * would fail as a whole and leave the shopper guessing which seat was gone.
+ * Seats go through the ticket route rather than the standard line items route
+ * because a ticket line has to be created with requires_shipping false. Left to
+ * Medusa to derive, the flag falls back to the line item default of true and
+ * cart completion then refuses the cart for having no shipping method. See the
+ * backend's addTicketsToCartWorkflow.
+ *
+ * The whole selection is sent in one request, so either every seat joins the
+ * cart or none does. Adding them one at a time named the seat that failed, but
+ * left the earlier seats in the cart when a later one was already gone; the
+ * backend reports the failing seat by name in its error either way.
  */
 export async function addTicketsToCart({
   seats,
@@ -77,14 +84,13 @@ export async function addTicketsToCart({
     throw new Error("Error retrieving or creating cart")
   }
 
-  for (const seat of seats) {
-    await sdk.store.cart
-      .createLineItem(
-        cart.id,
-        {
+  await sdk.client
+    .fetch(`/store/carts/${cart.id}/line-items/tickets`, {
+      method: "POST",
+      headers: { ...(await getAuthHeaders()) },
+      body: {
+        items: seats.map((seat) => ({
           variant_id: seat.variant_id,
-          // One seat is one ticket; the backend rejects any other quantity.
-          quantity: 1,
           metadata: {
             seat_number: seat.seat_number,
             row_number: seat.row_number,
@@ -92,12 +98,10 @@ export async function addTicketsToCart({
             show_date: seat.show_date,
             row_type: seat.row_type,
           },
-        },
-        {},
-        await getAuthHeaders()
-      )
-      .catch(medusaError)
-  }
+        })),
+      },
+    })
+    .catch(medusaError)
 
   await revalidateCacheTag("carts")
 }

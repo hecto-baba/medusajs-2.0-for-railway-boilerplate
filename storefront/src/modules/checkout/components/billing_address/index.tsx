@@ -5,21 +5,33 @@ import Input from "@modules/common/components/input"
 import CountrySelect from "../country-select"
 import { HttpTypes } from "@medusajs/types"
 
+/**
+ * Every field defaults to "" rather than being left out, so the inputs below
+ * are controlled from the first render onwards. Starting from an empty object
+ * would hand React `value={undefined}` on mount and make it warn about an
+ * uncontrolled input becoming controlled once the address arrives.
+ */
+const addressToFormData = (
+  address?: HttpTypes.StoreCart["billing_address"]
+) => ({
+  "billing_address.first_name": address?.first_name || "",
+  "billing_address.last_name": address?.last_name || "",
+  "billing_address.address_1": address?.address_1 || "",
+  "billing_address.company": address?.company || "",
+  "billing_address.postal_code": address?.postal_code || "",
+  "billing_address.city": address?.city || "",
+  "billing_address.country_code": address?.country_code || "",
+  "billing_address.province": address?.province || "",
+  "billing_address.phone": address?.phone || "",
+})
+
 const BillingAddress = ({ cart }: { cart: HttpTypes.StoreCart | null }) => {
-  const [formData, setFormData] = useState<any>({})
+  const [formData, setFormData] = useState<Record<string, string>>(() =>
+    addressToFormData(cart?.billing_address)
+  )
 
   useEffect(() => {
-    setFormData({
-      "billing_address.first_name": cart?.billing_address?.first_name || "",
-      "billing_address.last_name": cart?.billing_address?.last_name || "",
-      "billing_address.address_1": cart?.billing_address?.address_1 || "",
-      "billing_address.company": cart?.billing_address?.company || "",
-      "billing_address.postal_code": cart?.billing_address?.postal_code || "",
-      "billing_address.city": cart?.billing_address?.city || "",
-      "billing_address.country_code": cart?.billing_address?.country_code || "",
-      "billing_address.province": cart?.billing_address?.province || "",
-      "billing_address.phone": cart?.billing_address?.phone || "",
-    })
+    setFormData(addressToFormData(cart?.billing_address))
   }, [cart?.billing_address])
 
   const handleChange = (
