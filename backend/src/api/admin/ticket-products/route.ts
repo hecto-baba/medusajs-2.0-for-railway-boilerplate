@@ -21,6 +21,10 @@ export const PostTicketProductBodySchema = z.object({
     .array(
       z.object({
         row_type: z.nativeEnum(RowType),
+        // How many seats of this tier go on sale per performance. Required
+        // rather than derived from the venue's rows so a run can be sold at
+        // less than the venue's full capacity.
+        seat_count: z.number().int().min(1, "Seat count must be at least 1"),
         prices: z
           .array(
             z.object({
@@ -56,10 +60,10 @@ export const POST = async (
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const query = req.scope.resolve("query")
 
+  // See the venues route: the full queryConfig carries filters too.
   const { data: ticket_products, metadata } = await query.graph({
     entity: "ticket_product",
-    fields: req.queryConfig.fields,
-    pagination: req.queryConfig.pagination,
+    ...req.queryConfig,
   })
 
   res.json({

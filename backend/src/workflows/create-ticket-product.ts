@@ -24,6 +24,7 @@ export type CreateTicketProductWorkflowInput = {
   dates: string[]
   variants: {
     row_type: RowType
+    seat_count: number
     prices: PricingTypes.CreateMoneyAmountDTO[]
   }[]
 }
@@ -71,24 +72,16 @@ export const createTicketProductWorkflow = createWorkflow(
       fields: ["id"],
     }).config({ name: "retrieve-shipping-profiles" })
 
-    // One inventory item per (date, row type). Its stocked quantity is the
-    // total seat count of rows of that type, which is what stops a show from
-    // overselling a section.
+    // One inventory item per (date, row type), stocked to the seat count given
+    // for that tier. That is what stops a show from overselling a section.
     const inventoryItemsData = transform(
       { input, venues, stockLocations },
       (data) => {
-        const rows = (data.venues[0]?.rows || []) as {
-          row_type: string
-          seat_count: number
-        }[]
-
         const locationId = data.stockLocations[0]?.id
 
         return data.input.dates.flatMap((date) =>
           data.input.variants.map((variant) => {
-            const seatCount = rows
-              .filter((row) => row.row_type === variant.row_type)
-              .reduce((total, row) => total + row.seat_count, 0)
+            const seatCount = variant.seat_count
 
             return {
               sku: toSku(["TICKET", data.input.name, date, variant.row_type]),

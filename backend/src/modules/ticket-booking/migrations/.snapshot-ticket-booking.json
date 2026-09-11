@@ -276,6 +276,15 @@
           "expression": "CREATE INDEX IF NOT EXISTS \"IDX_ticket_product_deleted_at\" ON \"ticket_product\" (\"deleted_at\") WHERE deleted_at IS NULL"
         },
         {
+          "keyName": "IDX_ticket_product_venue_id_dates",
+          "columnNames": [],
+          "composite": false,
+          "constraint": false,
+          "primary": false,
+          "unique": false,
+          "expression": "CREATE INDEX IF NOT EXISTS \"IDX_ticket_product_venue_id_dates\" ON \"ticket_product\" (\"venue_id\", \"dates\") WHERE deleted_at IS NULL"
+        },
+        {
           "keyName": "ticket_product_pkey",
           "columnNames": [
             "id"
