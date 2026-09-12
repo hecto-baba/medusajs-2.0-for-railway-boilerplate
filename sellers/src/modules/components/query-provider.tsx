@@ -1,6 +1,6 @@
 "use client"
 
-import { TooltipProvider } from "@medusajs/ui"
+import { Toaster, TooltipProvider } from "@medusajs/ui"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { useState } from "react"
 
@@ -28,7 +28,10 @@ export const QueryProvider = ({ children }: { children: React.ReactNode }) => {
   // and take the whole page down with a client-side exception.
   return (
     <QueryClientProvider client={client}>
-      <TooltipProvider>{children}</TooltipProvider>
+      <TooltipProvider>
+        {children}
+        <Toaster />
+      </TooltipProvider>
     </QueryClientProvider>
   )
 }

@@ -78,7 +78,12 @@ export const GET = async (
       "thumbnail",
       "created_at",
       "updated_at",
+      "collection.id",
+      "collection.title",
+      "sales_channels.id",
+      "sales_channels.name",
       "variants.id",
+      "variants.title",
     ],
     filters: {
       id: productIds,

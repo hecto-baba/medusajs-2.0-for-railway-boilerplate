@@ -21,7 +21,7 @@ const BACKEND_URL =
 const forward = async (
   req: NextRequest,
   path: string[],
-  method: "GET" | "POST"
+  method: "GET" | "POST" | "DELETE"
 ) => {
   const token = await getVendorToken()
 
@@ -61,3 +61,8 @@ export const POST = async (
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) => forward(req, (await params).path, "POST")
+
+export const DELETE = async (
+  req: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) => forward(req, (await params).path, "DELETE")

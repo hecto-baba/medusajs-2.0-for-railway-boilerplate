@@ -16,7 +16,7 @@ import { GetTicketProductSeatsSchema } from "./store/ticket-products/[id]/seats/
 import { PostVendorCreateSchema } from "./vendors/route";
 import { GetVendorProductsSchema } from "./vendors/products/route";
 import { GetVendorOrdersSchema } from "./vendors/orders/route";
-import { AdminCreateProduct } from "@medusajs/medusa/api/admin/products/validators";
+import { AdminCreateProduct, AdminUpdateProduct } from "@medusajs/medusa/api/admin/products/validators";
 import multer from "multer";
 import {
   GetTransactionTypesSchema,
@@ -271,6 +271,13 @@ export default defineMiddlewares({
       methods: ["GET"],
       middlewares: [
         validateAndTransformQuery(GetVendorOrdersSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/products/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminUpdateProduct)
       ]
     }
   ]

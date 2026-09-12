@@ -5,6 +5,10 @@
  * directly: the session token is httpOnly, so only the server can attach it.
  */
 export type VendorProduct = {
+  subtitle?: string | null
+  description?: string | null
+  collection?: { id: string; title: string } | null
+  sales_channels?: { id: string; name: string | null }[]
   id: string
   title: string
   handle: string | null
@@ -64,3 +68,44 @@ export const listVendorProducts = (params: {
 
 export const listVendorOrders = (params: { limit: number; offset: number }) =>
   request<ListResponse<{ orders: VendorOrder[] }>>("orders", params)
+
+const mutate = async <T>(
+  path: string,
+  method: "POST" | "DELETE",
+  body?: unknown
+) => {
+  const res = await fetch(`/api/vendors/${path}`, {
+    method,
+    headers: { "content-type": "application/json", accept: "application/json" },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as T
+}
+
+export const getVendorProduct = async (id: string) => {
+  const res = await fetch(`/api/vendors/products/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { product: VendorProduct }
+}
+
+export const createVendorProduct = (body: Record<string, unknown>) =>
+  mutate<{ product: VendorProduct }>("products", "POST", body)
+
+export const updateVendorProduct = (id: string, body: Record<string, unknown>) =>
+  mutate<{ product: VendorProduct }>(`products/${id}`, "POST", body)
+
+export const deleteVendorProduct = (id: string) =>
+  mutate<{ id: string; deleted: boolean }>(`products/${id}`, "DELETE")
