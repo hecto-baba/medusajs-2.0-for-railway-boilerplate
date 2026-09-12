@@ -73,6 +73,9 @@ const medusaConfig = {
       resolve: './src/modules/marketplace'
     },
     {
+      resolve: './src/modules/transaction-type'
+    },
+    {
       key: Modules.FILE,
       resolve: '@medusajs/file',
       options: {
