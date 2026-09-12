@@ -25,11 +25,32 @@ export type CreateVendorWorkflowInput = {
 export const createVendorWorkflow = createWorkflow(
   "create-vendor",
   (input: CreateVendorWorkflowInput) => {
-    const vendor = createVendorStep({
-      name: input.name,
-      handle: input.handle,
-      logo: input.logo,
+    /**
+     * Vendor.handle is a required, unique column, but the route's schema
+     * accepts the field as optional - so a request that omits it used to
+     * reach the ORM as undefined and fail the whole workflow with a bare
+     * validation error. Deriving a slug from the name honours the contract
+     * the route already advertises.
+     *
+     * The timestamp suffix is what keeps the unique constraint satisfied:
+     * two stores legitimately called "Acme" would otherwise collide, and a
+     * collision here surfaces to the vendor as an opaque 500 during signup.
+     */
+    const vendorInput = transform({ input }, (data) => {
+      const slug = (data.input.handle ?? data.input.name)
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+
+      return {
+        name: data.input.name,
+        handle: data.input.handle ?? `${slug || "vendor"}-${Date.now().toString(36)}`,
+        logo: data.input.logo,
+      }
     })
+
+    const vendor = createVendorStep(vendorInput)
 
     const vendorAdminData = transform({ input, vendor }, (data) => ({
       ...data.input.admin,
