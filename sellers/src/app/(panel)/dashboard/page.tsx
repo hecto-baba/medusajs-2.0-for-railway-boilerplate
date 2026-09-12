@@ -1,5 +1,4 @@
 import { requireVendorSession } from "@lib/data/vendor"
-import { VendorLogoutButton } from "@modules/components/vendor-logout-button"
 import { Badge, Container, Heading, Text } from "@medusajs/ui"
 import { Metadata } from "next"
 
@@ -30,7 +29,6 @@ export default async function DashboardPage() {
             Signed in as {displayName}
           </Text>
         </div>
-        <VendorLogoutButton />
       </div>
 
       <Container className="flex flex-col gap-y-4">

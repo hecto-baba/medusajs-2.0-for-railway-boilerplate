@@ -14,6 +14,8 @@ import { PostVenueBodySchema } from "./admin/venues/route";
 import { PostTicketProductBodySchema } from "./admin/ticket-products/route";
 import { GetTicketProductSeatsSchema } from "./store/ticket-products/[id]/seats/route";
 import { PostVendorCreateSchema } from "./vendors/route";
+import { GetVendorProductsSchema } from "./vendors/products/route";
+import { GetVendorOrdersSchema } from "./vendors/orders/route";
 import { AdminCreateProduct } from "@medusajs/medusa/api/admin/products/validators";
 import multer from "multer";
 import {
@@ -251,6 +253,24 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(AdminCreateProduct)
+      ]
+    },
+    // The list routes below are paginated, and their handlers read limit and
+    // offset off validatedQuery. Without these entries that object is never
+    // populated, so both would page by `undefined` and silently return the
+    // schema defaults on every request.
+    {
+      matcher: "/vendors/products",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorProductsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/orders",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorOrdersSchema, {})
       ]
     }
   ]
