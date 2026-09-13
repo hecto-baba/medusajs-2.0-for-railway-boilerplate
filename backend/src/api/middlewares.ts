@@ -16,7 +16,49 @@ import { GetTicketProductSeatsSchema } from "./store/ticket-products/[id]/seats/
 import { PostVendorCreateSchema } from "./vendors/route";
 import { GetVendorProductsSchema } from "./vendors/products/route";
 import { GetVendorOrdersSchema } from "./vendors/orders/route";
+import { GetVendorPromotionsSchema } from "./vendors/promotions/route";
+import { GetVendorCampaignsSchema } from "./vendors/campaigns/route";
+import { PostVendorRentalConfigSchema } from "./vendors/products/[id]/rental-config/route";
+import { PostVendorInventoryLevelSchema } from "./vendors/products/[id]/variants/[variant_id]/inventory-levels/route";
+import { GetVendorReturnReasonsSchema } from "./vendors/return-reasons/route";
+import { GetVendorRefundReasonsSchema } from "./vendors/refund-reasons/route";
+import {
+  AdminCreateReturnReason,
+  AdminUpdateReturnReason
+} from "@medusajs/medusa/api/admin/return-reasons/validators";
+import {
+  AdminCreatePaymentRefundReason,
+  AdminUpdatePaymentRefundReason
+} from "@medusajs/medusa/api/admin/refund-reasons/validators";
+import {
+  AdminBatchUpdateProductVariant,
+  AdminCreateProductVariant,
+  AdminLinkProductOptions,
+  AdminUpdateProductVariant,
+  AdminBatchCreateVariantInventoryItem,
+  AdminBatchDeleteVariantInventoryItem,
+  AdminBatchUpdateVariantInventoryItem,
+  AdminBatchImageVariant,
+  AdminBatchVariantImages,
+  AdminBatchUpdateProduct,
+  AdminCreateVariantInventoryItem,
+  AdminImportProducts,
+  AdminUpdateVariantInventoryItem,
+  CreateProduct,
+  CreateProductVariant
+} from "@medusajs/medusa/api/admin/products/validators";
+import { createBatchBody } from "@medusajs/medusa/api/utils/validators";
 import { AdminCreateProduct, AdminUpdateProduct } from "@medusajs/medusa/api/admin/products/validators";
+import {
+  AdminCreatePromotion,
+  AdminUpdatePromotion,
+  AdminCreatePromotionRule,
+  AdminUpdatePromotionRule
+} from "@medusajs/medusa/api/admin/promotions/validators";
+import {
+  AdminCreateCampaign,
+  AdminUpdateCampaign
+} from "@medusajs/medusa/api/admin/campaigns/validators";
 import multer from "multer";
 import {
   GetTransactionTypesSchema,
@@ -28,6 +70,7 @@ import { GetTransactionTypeActivitiesSchema } from "./admin/transaction-types/[i
 import { PostTransactionTypesReorderSchema } from "./admin/transaction-types/reorder/route";
 import { TRANSACTION_TYPE_FIELDS } from "./admin/transaction-types/helpers";
 import { csvUpload } from "./admin/transaction-types/import/upload-errors";
+import { arrayUpload } from "./vendors/upload-errors";
 
 // Memory storage: the CSV is parsed straight from the buffer and never needs
 // to touch disk.
@@ -59,6 +102,46 @@ const uploadCsv = csvUpload({
     callback(null, true);
   }
 }, "file");
+
+// Product media uploads for the vendor panel.
+//
+// Memory storage to match the admin route: uploadFilesWorkflow takes file
+// contents as base64, so the bytes are needed in hand anyway and writing them
+// to disk first would only add a temp file to clean up.
+//
+// The size cap is what keeps a vendor from exhausting server memory: each
+// buffered file is copied again by toString("base64"), which inflates it by
+// about a third, and several concurrent uploads are held at once.
+const PRODUCT_MEDIA_MAX_BYTES = 10 * 1024 * 1024;
+const PRODUCT_MEDIA_MAX_FILES = 10;
+
+const uploadProductMedia = arrayUpload({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: PRODUCT_MEDIA_MAX_BYTES,
+    files: PRODUCT_MEDIA_MAX_FILES
+  },
+  fileFilter: (_req, file, callback) => {
+    // Images for product media, plus CSV for the product importer, which
+    // uploads its file through this same route before calling
+    // /vendors/products/imports. Anything else is refused: a public-read
+    // bucket would otherwise let a vendor use the store as file hosting.
+    const isImage = /^image\/(jpeg|png|gif|webp|avif|svg\+xml)$/.test(
+      file.mimetype
+    );
+    // Browsers disagree on the mimetype for .csv (text/csv,
+    // application/vnd.ms-excel, sometimes application/octet-stream), so for
+    // those the extension is what is actually enforced.
+    const isCsv = /\.csv$/i.test(file.originalname);
+
+    if (!isImage && !isCsv) {
+      callback(new Error("Only image files and .csv files can be uploaded"));
+      return;
+    }
+
+    callback(null, true);
+  }
+}, "files");
 
 export default defineMiddlewares({
   routes: [
@@ -278,6 +361,249 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(AdminUpdateProduct)
+      ]
+    },
+    // Nested product routes. The "/vendors/*" entry above matches a single
+    // path segment only, so these deeper paths would otherwise reach their
+    // handlers unauthenticated - and every one reads req.auth_context.actor_id,
+    // which only authenticate() populates.
+    {
+      matcher: "/vendors/products/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/uploads",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"]),
+        uploadProductMedia
+      ]
+    },
+    {
+      matcher: "/vendors/products/:id/options/batch",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminLinkProductOptions)
+      ]
+    },
+    {
+      matcher: "/vendors/products/:id/variants",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminCreateProductVariant)
+      ]
+    },
+    {
+      matcher: "/vendors/products/:id/variants/batch",
+      methods: ["POST"],
+      middlewares: [
+        // createBatchBody wraps the two variant validators into the
+        // { create, update, delete } envelope the route expects. Passing the
+        // single-variant validator directly rejects the envelope outright.
+        validateAndTransformBody(
+          createBatchBody(CreateProductVariant, AdminBatchUpdateProductVariant)
+        )
+      ]
+    },
+    {
+      matcher: "/vendors/products/:id/variants/:variant_id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminUpdateProductVariant)
+      ]
+    },
+    {
+      matcher: "/vendors/products/batch",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(
+          createBatchBody(CreateProduct, AdminBatchUpdateProduct)
+        )
+      ]
+    },
+    {
+      matcher: "/vendors/products/:id/variants/:variant_id/inventory-items",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminCreateVariantInventoryItem)
+      ]
+    },
+    {
+      matcher:
+        "/vendors/products/:id/variants/:variant_id/inventory-items/:inventory_item_id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminUpdateVariantInventoryItem)
+      ]
+    },
+    {
+      matcher: "/vendors/products/:id/variants/inventory-items/batch",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(
+          createBatchBody(
+            AdminBatchCreateVariantInventoryItem,
+            AdminBatchUpdateVariantInventoryItem,
+            AdminBatchDeleteVariantInventoryItem
+          )
+        )
+      ]
+    },
+    {
+      matcher: "/vendors/products/:id/variants/:variant_id/images/batch",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminBatchVariantImages)
+      ]
+    },
+    {
+      matcher: "/vendors/products/:id/images/:image_id/variants/batch",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminBatchImageVariant)
+      ]
+    },
+    // Import and its legacy /import spelling share one implementation, so both
+    // paths get the same validator.
+    {
+      matcher: "/vendors/products/import",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminImportProducts)
+      ]
+    },
+    {
+      matcher: "/vendors/products/imports",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminImportProducts)
+      ]
+    },
+    {
+      matcher: "/vendors/products/:id/rental-config",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorRentalConfigSchema)
+      ]
+    },
+    {
+      matcher:
+        "/vendors/products/:id/variants/:variant_id/inventory-levels",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorInventoryLevelSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/promotions",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminCreatePromotion)
+      ]
+    },
+    {
+      matcher: "/vendors/promotions",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorPromotionsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/promotions/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminUpdatePromotion)
+      ]
+    },
+    // Nested promotion routes. The "/vendors/*" entry above matches a single
+    // path segment only, same caveat as products/:id/* below it.
+    {
+      matcher: "/vendors/promotions/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/promotions/:id/target-rules/batch",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(
+          createBatchBody(AdminCreatePromotionRule, AdminUpdatePromotionRule)
+        )
+      ]
+    },
+    {
+      matcher: "/vendors/promotions/:id/buy-rules/batch",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(
+          createBatchBody(AdminCreatePromotionRule, AdminUpdatePromotionRule)
+        )
+      ]
+    },
+    {
+      matcher: "/vendors/campaigns",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminCreateCampaign)
+      ]
+    },
+    {
+      matcher: "/vendors/campaigns",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorCampaignsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/campaigns/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminUpdateCampaign)
+      ]
+    },
+    {
+      matcher: "/vendors/return-reasons",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorReturnReasonsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/return-reasons",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminCreateReturnReason)
+      ]
+    },
+    {
+      matcher: "/vendors/return-reasons/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminUpdateReturnReason)
+      ]
+    },
+    {
+      matcher: "/vendors/refund-reasons",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorRefundReasonsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/refund-reasons",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminCreatePaymentRefundReason)
+      ]
+    },
+    {
+      matcher: "/vendors/refund-reasons/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(AdminUpdatePaymentRefundReason)
       ]
     }
   ]

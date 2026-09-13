@@ -1,6 +1,7 @@
 "use server"
 
 import { sdk } from "@lib/config"
+import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import {
   getVendorAuthHeaders,
@@ -210,6 +211,79 @@ export async function getVendorSession(): Promise<VendorAdmin | null> {
     // session at all so the caller sends the visitor back to sign in.
     return null
   }
+}
+
+export type SettingsFormState = {
+  error: string | null
+  success: boolean
+}
+
+/**
+ * Updates the signed-in vendor's own profile names.
+ *
+ * The backend scopes the write to the token's actor, so nothing identifying is
+ * sent: the form carries only the fields being changed.
+ */
+export async function updateVendorProfile(
+  _currentState: SettingsFormState,
+  formData: FormData
+): Promise<SettingsFormState> {
+  const first_name = (formData.get("first_name") as string)?.trim() ?? ""
+  const last_name = (formData.get("last_name") as string)?.trim() ?? ""
+
+  try {
+    await sdk.client.fetch("/vendors/me", {
+      method: "PATCH",
+      headers: { ...(await getVendorAuthHeaders()) },
+      body: { first_name, last_name },
+    })
+  } catch (error) {
+    return {
+      error: toMessage(error, "Could not save your profile. Please try again."),
+      success: false,
+    }
+  }
+
+  // The layout reads the session on every render to fill the sidebar, so the
+  // whole panel is revalidated rather than just this page.
+  revalidatePath("/", "layout")
+
+  return { error: null, success: true }
+}
+
+/**
+ * Updates the signed-in vendor's store details.
+ *
+ * handle is intentionally absent: it is unique and may already be referenced
+ * elsewhere, so changing it needs a collision check this form does not do.
+ */
+export async function updateVendorStore(
+  _currentState: SettingsFormState,
+  formData: FormData
+): Promise<SettingsFormState> {
+  const name = (formData.get("name") as string)?.trim() ?? ""
+  const logo = (formData.get("logo") as string)?.trim() ?? ""
+
+  if (!name) {
+    return { error: "Store name is required.", success: false }
+  }
+
+  try {
+    await sdk.client.fetch("/vendors/me", {
+      method: "PATCH",
+      headers: { ...(await getVendorAuthHeaders()) },
+      body: { name, logo },
+    })
+  } catch (error) {
+    return {
+      error: toMessage(error, "Could not save your store details. Please try again."),
+      success: false,
+    }
+  }
+
+  revalidatePath("/", "layout")
+
+  return { error: null, success: true }
 }
 
 /**

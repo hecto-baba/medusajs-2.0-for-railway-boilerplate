@@ -11,6 +11,18 @@ export const GetVendorProductsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
   q: z.string().optional(),
+  // Repeated query params arrive as an array, a single one as a string, so
+  // both shapes are accepted and normalised to an array.
+  status: z
+    .union([
+      z.enum(["draft", "proposed", "published", "rejected"]),
+      z.array(z.enum(["draft", "proposed", "published", "rejected"])),
+    ])
+    .optional()
+    .transform((value) =>
+      value === undefined ? undefined : Array.isArray(value) ? value : [value]
+    ),
+  order: z.string().optional(),
 })
 
 export const POST = async (
@@ -45,7 +57,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q } = req.validatedQuery as unknown as z.infer<
+  const { limit, offset, q, status, order } = req.validatedQuery as unknown as z.infer<
     typeof GetVendorProductsSchema
   >
 
@@ -88,11 +100,15 @@ export const GET = async (
     filters: {
       id: productIds,
       ...(q ? { title: { $ilike: `%${q}%` } } : {}),
+      ...(status?.length ? { status } : {}),
     },
     pagination: {
       skip: offset,
       take: limit,
-      order: { created_at: "DESC" },
+      // A leading "-" means descending, matching the admin's ordering syntax.
+      order: order
+        ? { [order.replace(/^-/, "")]: order.startsWith("-") ? "DESC" : "ASC" }
+        : { created_at: "DESC" },
     },
   })
 

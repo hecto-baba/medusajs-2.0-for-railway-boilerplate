@@ -1,9 +1,9 @@
-import { ProductEditor } from "@modules/components/product-editor"
+import { ProductDetail } from "@modules/products"
 import { Metadata } from "next"
 
-export const metadata: Metadata = { title: "Edit product" }
+export const metadata: Metadata = { title: "Product" }
 
-export default async function EditProductPage({
+export default async function ProductDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -12,7 +12,7 @@ export default async function EditProductPage({
 
   return (
     <div className="p-6">
-      <ProductEditor id={id} />
+      <ProductDetail id={id} />
     </div>
   )
 }

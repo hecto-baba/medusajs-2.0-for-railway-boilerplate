@@ -17,7 +17,8 @@
     "baseUrl": "./src",
     "paths": {
       "@lib/*": ["lib/*"],
-      "@modules/*": ["modules/*"]
+      "@modules/*": ["modules/*"],
+      "@i18n/*": ["i18n/*"]
     },
     "plugins": [{ "name": "next" }]
   },

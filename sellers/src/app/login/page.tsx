@@ -1,5 +1,5 @@
 import { getVendorSession } from "@lib/data/vendor"
-import { VendorLoginForm } from "@modules/components/vendor-login-form"
+import { VendorLoginForm } from "@modules/auth"
 import { Metadata } from "next"
 import { redirect } from "next/navigation"
 

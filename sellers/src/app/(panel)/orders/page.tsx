@@ -1,4 +1,4 @@
-import { OrdersTable } from "@modules/components/orders-table"
+import { OrdersTable } from "@modules/orders"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Orders" }

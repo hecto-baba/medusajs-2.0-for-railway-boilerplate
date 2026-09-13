@@ -21,7 +21,7 @@ const BACKEND_URL =
 const forward = async (
   req: NextRequest,
   path: string[],
-  method: "GET" | "POST" | "DELETE"
+  method: "GET" | "POST" | "PATCH" | "DELETE"
 ) => {
   const token = await getVendorToken()
 
@@ -32,13 +32,23 @@ const forward = async (
   const search = req.nextUrl.search
   const url = `${BACKEND_URL}/vendors/${path.join("/")}${search}`
 
+  // File uploads arrive as multipart/form-data with a generated boundary in
+  // the content-type. Forcing application/json on every request would corrupt
+  // them, and re-reading the body as text would lose the binary payload, so a
+  // non-JSON request is streamed through with its original content-type.
+  const contentType = req.headers.get("content-type") ?? "application/json"
+  const isJson = contentType.includes("application/json")
+  const hasBody = method === "POST" || method === "PATCH"
+
   const res = await fetch(url, {
     method,
     headers: {
       authorization: `Bearer ${token}`,
-      "content-type": "application/json",
+      ...(hasBody ? { "content-type": contentType } : {}),
     },
-    ...(method === "POST" ? { body: await req.text() } : {}),
+    ...(hasBody
+      ? { body: isJson ? await req.text() : await req.arrayBuffer() }
+      : {}),
     cache: "no-store",
   })
 
@@ -48,7 +58,9 @@ const forward = async (
   // sees the real error rather than a generic proxy failure.
   return new NextResponse(body, {
     status: res.status,
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": res.headers.get("content-type") ?? "application/json",
+    },
   })
 }
 
@@ -61,6 +73,11 @@ export const POST = async (
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) => forward(req, (await params).path, "POST")
+
+export const PATCH = async (
+  req: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) => forward(req, (await params).path, "PATCH")
 
 export const DELETE = async (
   req: NextRequest,

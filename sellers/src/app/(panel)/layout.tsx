@@ -1,6 +1,6 @@
 import { requireVendorSession } from "@lib/data/vendor"
-import { QueryProvider } from "@modules/components/query-provider"
-import { Sidebar } from "@modules/components/sidebar"
+import { QueryProvider } from "@modules/common"
+import { PanelShell } from "@modules/layout"
 
 /**
  * Shell for every signed-in page.
@@ -18,13 +18,15 @@ export default async function PanelLayout({
 
   return (
     <QueryProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <Sidebar
-          storeName={admin.vendor?.name ?? "Your store"}
-          email={admin.email}
-        />
-        <div className="flex-1 overflow-y-auto">{children}</div>
-      </div>
+      <PanelShell
+        storeName={admin.vendor?.name ?? "Your store"}
+        email={admin.email}
+        name={
+          [admin.first_name, admin.last_name].filter(Boolean).join(" ") || null
+        }
+      >
+        {children}
+      </PanelShell>
     </QueryProvider>
   )
 }
