@@ -69,7 +69,7 @@ export const completeCartWithTicketsWorkflow = createWorkflow(
       ],
       filters: { id: input.cart_id },
       options: { throwIfKeyNotFound: true },
-    })
+    }).config({ name: "retrieve-cart-with-tickets" })
 
     const { data: existingLinks } = useQueryGraphStep({
       entity: ticketPurchaseOrderLink.entryPoint,

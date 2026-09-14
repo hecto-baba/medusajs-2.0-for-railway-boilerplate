@@ -39,12 +39,15 @@ export const POST = async (
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const query = req.scope.resolve("query")
 
-  // Spread the whole queryConfig rather than picking fields and pagination out
-  // of it: it also carries the filters parsed from the query string, so
-  // narrowing it here silently dropped support for filtering the list.
+  // Filters live on req.filterableFields, not req.queryConfig. The query
+  // validator splits the parsed query string in two - fields and pagination
+  // onto queryConfig, every other parameter onto filterableFields - so
+  // spreading queryConfig alone returns the list unfiltered.
   const { data: venues, metadata } = await query.graph({
     entity: "venue",
-    ...req.queryConfig,
+    fields: req.queryConfig.fields,
+    filters: req.filterableFields,
+    pagination: req.queryConfig.pagination,
   })
 
   res.json({

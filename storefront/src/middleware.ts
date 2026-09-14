@@ -1,8 +1,7 @@
 import { HttpTypes } from "@medusajs/types"
-import { notFound } from "next/navigation"
 import { NextRequest, NextResponse } from "next/server"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
+const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
 const PUBLISHABLE_API_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
 // Must be a country the backend actually has a region for. The seed script
 // creates a single "Europe" region covering gb, de, dk, se, fr, es and it, so
@@ -33,29 +32,36 @@ async function getRegionMap() {
     !regionMap.keys().next().value ||
     regionMapUpdated < Date.now() - 3600 * 1000
   ) {
-    // Fetch regions from Medusa. We can't use the JS client here because middleware is running on Edge and the client needs a Node environment.
-    const { regions } = await fetch(`${BACKEND_URL}/store/regions`, {
-      headers: {
-        "x-publishable-api-key": PUBLISHABLE_API_KEY!,
-      },
-      next: {
-        revalidate: 3600,
-        tags: ["regions"],
-      },
-    }).then((res) => res.json())
+    try {
+      const headers: Record<string, string> = {}
+      if (PUBLISHABLE_API_KEY) {
+        headers["x-publishable-api-key"] = PUBLISHABLE_API_KEY
+      }
 
-    if (!regions?.length) {
-      notFound()
-    }
-
-    // Create a map of country codes to regions.
-    regions.forEach((region: HttpTypes.StoreRegion) => {
-      region.countries?.forEach((c) => {
-        regionMapCache.regionMap.set(c.iso_2 ?? "", region)
+      const res = await fetch(`${BACKEND_URL}/store/regions`, {
+        headers,
+        next: {
+          revalidate: 3600,
+          tags: ["regions"],
+        },
       })
-    })
 
-    regionMapCache.regionMapUpdated = Date.now()
+      if (res.ok) {
+        const data = await res.json()
+        const regions = data.regions
+
+        if (Array.isArray(regions)) {
+          regions.forEach((region: HttpTypes.StoreRegion) => {
+            region.countries?.forEach((c) => {
+              regionMapCache.regionMap.set(c.iso_2 ?? "", region)
+            })
+          })
+          regionMapCache.regionMapUpdated = Date.now()
+        }
+      }
+    } catch (err) {
+      console.warn("Middleware: could not load regions from backend:", err)
+    }
   }
 
   return regionMapCache.regionMap
@@ -160,25 +166,31 @@ export async function middleware(request: NextRequest) {
 
   const queryString = request.nextUrl.search ? request.nextUrl.search : ""
 
-  let redirectUrl = request.nextUrl.href
-
-  let response = NextResponse.redirect(redirectUrl, 307)
-
   // If no country code is set, we redirect to the relevant region.
   if (!urlHasCountryCode && countryCode) {
-    redirectUrl = `${request.nextUrl.origin}/${countryCode}${redirectPath}${queryString}`
-    response = NextResponse.redirect(`${redirectUrl}`, 307)
+    const redirectUrl = `${request.nextUrl.origin}/${countryCode}${redirectPath}${queryString}`
+    const response = NextResponse.redirect(redirectUrl, 307)
+    if (!cacheIdCookie) {
+      response.cookies.set("_medusa_cache_id", cacheId, CACHE_ID_COOKIE_OPTIONS)
+    }
+    return response
   }
 
   // If a cart_id is in the params, we set it as a cookie and redirect to the address step.
   if (cartId && !checkoutStep) {
-    redirectUrl = `${redirectUrl}&step=address`
-    response = NextResponse.redirect(`${redirectUrl}`, 307)
+    const redirectUrl = `${request.nextUrl.href}&step=address`
+    const response = NextResponse.redirect(redirectUrl, 307)
     response.cookies.set("_medusa_cart_id", cartId, { maxAge: 60 * 60 * 24 })
+    if (!cacheIdCookie) {
+      response.cookies.set("_medusa_cache_id", cacheId, CACHE_ID_COOKIE_OPTIONS)
+    }
+    return response
   }
 
-  // Set last, because the branches above replace `response` wholesale and a
-  // cookie set on a discarded response is silently lost.
+  const response = NextResponse.next({
+    request: { headers: request.headers },
+  })
+
   if (!cacheIdCookie) {
     response.cookies.set("_medusa_cache_id", cacheId, CACHE_ID_COOKIE_OPTIONS)
   }

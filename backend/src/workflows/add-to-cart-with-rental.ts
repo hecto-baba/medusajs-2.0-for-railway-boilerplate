@@ -33,7 +33,7 @@ export const addToCartWithRentalWorkflow = createWorkflow(
       options: {
         throwIfKeyNotFound: true,
       },
-    })
+    }).config({ name: "retrieve-cart" })
 
     const { data: variants } = useQueryGraphStep({
       entity: "product_variant",

@@ -1,8 +1,40 @@
 import { loadEnv } from '@medusajs/framework/utils'
+import * as path from 'path'
+import * as fs from 'fs'
 
 import { assertValue, warnIfWeakSecret } from 'utils/assert-value'
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
+
+// Parse .env directly if process.env.JWT_SECRET is still unset
+if (!process.env.JWT_SECRET) {
+  const envCandidates = [
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(__dirname, '../../.env'),
+    path.resolve(__dirname, '../../../.env'),
+  ]
+  for (const envPath of envCandidates) {
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8')
+      content.split('\n').forEach((line) => {
+        const trimmed = line.trim()
+        if (trimmed && !trimmed.startsWith('#')) {
+          const eqIdx = trimmed.indexOf('=')
+          if (eqIdx !== -1) {
+            const key = trimmed.slice(0, eqIdx).trim()
+            const val = trimmed.slice(eqIdx + 1).trim().replace(/^['"]|['"]$/g, '')
+            if (key && !(key in process.env)) {
+              process.env[key] = val
+            }
+          }
+        }
+      })
+      break
+    }
+  }
+}
+
+
 
 /**
  * Is development environment

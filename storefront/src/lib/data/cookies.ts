@@ -121,3 +121,5 @@ export const removeCartId = async () => {
   const cookiesStore = await cookies()
   cookiesStore.set("_medusa_cart_id", "", { maxAge: -1 })
 }
+
+
