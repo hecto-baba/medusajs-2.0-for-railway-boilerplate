@@ -1,7 +1,12 @@
 "use client"
 
 import { getVendorProduct } from "@lib/data/vendor-client"
-import { useBreadcrumbTitle } from "@modules/layout"
+import {
+  useBreadcrumbTitle,
+  LayoutComposer,
+  CUSTOMIZE_IDS,
+  CORE_LAYOUT_IDS,
+} from "@modules/layout"
 import { Text } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
 import { AttributesSection, GeneralSection } from "./general-section"
@@ -20,10 +25,6 @@ import { VariantsSection } from "./variants-section"
  * The product detail screen, composed the way the admin composes its own:
  * General, Media, Options and Variants down the main column, with Sales
  * Channels, Organize and Attributes in the sidebar.
- *
- * Fetched client-side so the request carries the session cookie through the
- * /api/vendors proxy, and so a product belonging to another vendor surfaces
- * here as an error state rather than a server-rendered exception.
  */
 export const ProductDetail = ({ id }: { id: string }) => {
   const { data, isLoading, error } = useQuery({
@@ -32,8 +33,6 @@ export const ProductDetail = ({ id }: { id: string }) => {
     retry: false,
   })
 
-  // Hooks cannot run after an early return, so this sits above the loading and
-  // error branches and simply registers nothing until the product arrives.
   useBreadcrumbTitle(data?.product?.title)
 
   if (isLoading) {
@@ -51,22 +50,53 @@ export const ProductDetail = ({ id }: { id: string }) => {
   const product = data.product
 
   return (
-    <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
-      <div className="flex w-full flex-col gap-6 xl:max-w-4xl">
-        <GeneralSection product={product} />
-        <MediaSection product={product} />
-        <OptionsSection product={product} />
-        <VariantsSection product={product} />
-        <MetadataSection product={product} />
-        <JsonSection product={product} />
-        <RentalSection product={product} />
-      </div>
-      <div className="flex w-full flex-col gap-6 xl:max-w-sm">
-        <SalesChannelSection product={product} />
-        <ShippingSection product={product} />
-        <OrganizeSection product={product} />
-        <AttributesSection product={product} />
-      </div>
-    </div>
+    <LayoutComposer
+      widgetsZonePrefix="product.details"
+      preferredLayoutId={CORE_LAYOUT_IDS.TWO_COLUMN}
+      customizeId={CUSTOMIZE_IDS.PAGE}
+      sections={{
+        main: (
+          <>
+            <LayoutComposer.Entry id="ProductGeneralSection">
+              <GeneralSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductMediaSection">
+              <MediaSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductOptionSection">
+              <OptionsSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductVariantSection">
+              <VariantsSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductMetadataSection">
+              <MetadataSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductJsonSection">
+              <JsonSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductRentalSection">
+              <RentalSection product={product} />
+            </LayoutComposer.Entry>
+          </>
+        ),
+        side: (
+          <>
+            <LayoutComposer.Entry id="ProductSalesChannelSection">
+              <SalesChannelSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductShippingSection">
+              <ShippingSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductOrganizeSection">
+              <OrganizeSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductAttributesSection">
+              <AttributesSection product={product} />
+            </LayoutComposer.Entry>
+          </>
+        ),
+      }}
+    />
   )
 }

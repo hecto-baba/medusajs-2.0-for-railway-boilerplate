@@ -3,6 +3,7 @@
 import {
   createVendorVariant,
   deleteVendorVariant,
+  setVendorInventoryLevel,
   updateVendorVariant,
   type VendorProduct,
   type VendorVariant,
@@ -33,6 +34,7 @@ type DraftVariant = {
   sku: string
   prices: Record<string, string>
   manageInventory: boolean
+  inventory: Record<string, string>
   options: Record<string, string>
 }
 
@@ -41,6 +43,7 @@ const emptyDraft = (): DraftVariant => ({
   sku: "",
   prices: {},
   manageInventory: false,
+  inventory: {},
   options: {},
 })
 
@@ -112,6 +115,12 @@ export const VariantsSection = ({ product }: { product: VendorProduct }) => {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["vendor-product", product.id] })
     queryClient.invalidateQueries({ queryKey: ["vendor-products"] })
+    queryClient.invalidateQueries({ queryKey: ["vendor-inventory-items"] })
+    if (editing?.id) {
+      queryClient.invalidateQueries({
+        queryKey: ["vendor-inventory", product.id, editing.id],
+      })
+    }
   }
 
   const { mutateAsync: save, isPending } = useMutation({
@@ -135,9 +144,35 @@ export const VariantsSection = ({ product }: { product: VendorProduct }) => {
         body.options = draft.options
       }
 
-      return editing
-        ? updateVendorVariant(product.id, editing.id, body)
-        : createVendorVariant(product.id, body)
+      const res = editing
+        ? await updateVendorVariant(product.id, editing.id, body)
+        : await createVendorVariant(product.id, body)
+
+      const savedVariantId =
+        editing?.id ??
+        res.product?.variants?.find((v) => v.title === draft.title.trim())?.id ??
+        res.product?.variants?.[res.product.variants.length - 1]?.id
+
+      // If manage inventory is enabled and stock amounts were provided in the drawer, persist them
+      if (
+        draft.manageInventory &&
+        savedVariantId &&
+        Object.keys(draft.inventory).length
+      ) {
+        for (const [locationId, rawQty] of Object.entries(draft.inventory)) {
+          if (rawQty && rawQty.trim() !== "") {
+            const quantity = Number(rawQty)
+            if (Number.isInteger(quantity) && quantity >= 0) {
+              await setVendorInventoryLevel(product.id, savedVariantId, {
+                location_id: locationId,
+                stocked_quantity: quantity,
+              })
+            }
+          }
+        }
+      }
+
+      return res
     },
     onSuccess: refresh,
   })
@@ -160,6 +195,7 @@ export const VariantsSection = ({ product }: { product: VendorProduct }) => {
       sku: variant.sku ?? "",
       prices: pricesOf(variant),
       manageInventory: Boolean(variant.manage_inventory),
+      inventory: {},
       options: {},
     })
     setOpen(true)
@@ -413,9 +449,26 @@ export const VariantsSection = ({ product }: { product: VendorProduct }) => {
             </div>
             {editing ? (
               <>
-                <InventoryFields product={product} variant={editing} />
+                <InventoryFields
+                  product={product}
+                  variant={editing}
+                  manageInventory={draft.manageInventory}
+                  drafts={draft.inventory}
+                  onChangeDrafts={(inv) =>
+                    setDraft((prev) => ({ ...prev, inventory: inv }))
+                  }
+                />
                 <VariantImageFields product={product} variant={editing} />
               </>
+            ) : draft.manageInventory ? (
+              <InventoryFields
+                product={product}
+                manageInventory={draft.manageInventory}
+                drafts={draft.inventory}
+                onChangeDrafts={(inv) =>
+                  setDraft((prev) => ({ ...prev, inventory: inv }))
+                }
+              />
             ) : null}
           </Drawer.Body>
           <Drawer.Footer>

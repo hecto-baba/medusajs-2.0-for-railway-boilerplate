@@ -10,7 +10,12 @@ import CountrySelect from "../country-select"
 import { HttpTypes } from "@medusajs/types"
 import { getStoreName } from "@lib/util/env"
 
-const SideMenuItems = {
+type SideMenuProps = {
+  regions: HttpTypes.StoreRegion[] | null
+  customerInfo?: { first_name?: string | null; email?: string | null } | null
+}
+
+const SideMenuItems: Record<string, string> = {
   Home: "/",
   Store: "/store",
   Search: "/search",
@@ -18,7 +23,10 @@ const SideMenuItems = {
   Cart: "/cart",
 }
 
-const SideMenu = ({ regions }: { regions: HttpTypes.StoreRegion[] | null }) => {
+const SideMenu = ({
+  regions,
+  customerInfo,
+}: SideMenuProps) => {
   const toggleState = useToggleState()
 
   return (
@@ -46,46 +54,53 @@ const SideMenu = ({ regions }: { regions: HttpTypes.StoreRegion[] | null }) => {
                 leaveFrom="opacity-100 backdrop-blur-2xl"
                 leaveTo="opacity-0"
               >
-                {/* z-30 put the panel underneath the nav's own links. On a
-                    phone the panel is full width, so its close button landed
-                    directly on top of the cart link and tapping "close"
-                    navigated to the cart instead of closing the menu. */}
                 <Popover.Panel className="flex flex-col absolute w-full pr-4 sm:pr-0 sm:w-1/3 2xl:w-1/4 sm:min-w-min h-[calc(100vh-1rem)] z-[60] inset-x-0 text-sm text-ui-fg-on-color m-2 backdrop-blur-2xl">
                   <div
                     data-testid="nav-menu-popup"
-                    className="flex flex-col h-full bg-[rgba(3,7,18,0.5)] rounded-rounded justify-between p-6"
+                    className="flex flex-col h-full bg-[rgba(3,7,18,0.7)] rounded-rounded justify-between p-6 overflow-y-auto"
                   >
-                    <div className="flex justify-end" id="xmark">
-                      {/* Icon-only, so without a label it is announced as
-                          just "button". */}
+                    <div className="flex justify-between items-center pb-4 border-b border-white/10" id="xmark">
+                      {customerInfo ? (
+                        <div className="text-xs text-white/80">
+                          Signed in as <span className="font-semibold text-white">{customerInfo.first_name || customerInfo.email}</span>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-white/60 uppercase tracking-wider font-semibold">
+                          Navigation
+                        </div>
+                      )}
+
                       <button
                         type="button"
                         data-testid="close-menu-button"
                         onClick={close}
                         aria-label="Close menu"
+                        className="text-white/80 hover:text-white transition"
                       >
                         <XMark />
                       </button>
                     </div>
-                    <ul className="flex flex-col gap-6 items-start justify-start">
+
+                    <ul className="flex flex-col gap-5 items-start justify-start py-6">
                       {Object.entries(SideMenuItems).map(([name, href]) => {
                         return (
-                          <li key={name}>
+                          <li key={name} className="w-full">
                             <LocalizedClientLink
                               href={href}
-                              className="text-3xl leading-10 hover:text-ui-fg-disabled"
+                              className="text-2xl font-medium leading-9 hover:text-white text-white/90 transition flex items-center justify-between w-full"
                               onClick={close}
-                              data-testid={`${name.toLowerCase()}-link`}
+                              data-testid={`${name.toLowerCase().replace(/\s+/g, "-")}-link`}
                             >
-                              {name}
+                              <span>{name}</span>
                             </LocalizedClientLink>
                           </li>
                         )
                       })}
                     </ul>
-                    <div className="flex flex-col gap-y-6">
+
+                    <div className="flex flex-col gap-y-6 pt-4 border-t border-white/10">
                       <div
-                        className="flex justify-between"
+                        className="flex justify-between items-center"
                         onMouseEnter={toggleState.open}
                         onMouseLeave={toggleState.close}
                       >
@@ -102,7 +117,7 @@ const SideMenu = ({ regions }: { regions: HttpTypes.StoreRegion[] | null }) => {
                           )}
                         />
                       </div>
-                      <Text className="flex justify-between txt-compact-small">
+                      <Text className="flex justify-between txt-compact-small text-white/60">
                         © {new Date().getFullYear()} {getStoreName()}. All rights
                         reserved.
                       </Text>
@@ -119,3 +134,4 @@ const SideMenu = ({ regions }: { regions: HttpTypes.StoreRegion[] | null }) => {
 }
 
 export default SideMenu
+

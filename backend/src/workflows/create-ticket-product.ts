@@ -55,7 +55,7 @@ export const createTicketProductWorkflow = createWorkflow(
       fields: ["id", "name", "address", "rows.*"],
       filters: { id: input.venue_id },
       options: { throwIfKeyNotFound: true },
-    })
+    }).config({ name: "retrieve-venues" })
 
     const { data: stockLocations } = useQueryGraphStep({
       entity: "stock_location",

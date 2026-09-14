@@ -38,7 +38,7 @@ export const createRentalsWorkflow = createWorkflow(
       ],
       filters: { id: cart_id },
       options: { throwIfKeyNotFound: true },
-    })
+    }).config({ name: "retrieve-cart-rentals" })
 
     const rentalItems = transform({ carts }, ({ carts }) => {
       const cart = carts[0]

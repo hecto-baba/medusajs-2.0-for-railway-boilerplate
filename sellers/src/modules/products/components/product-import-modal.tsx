@@ -114,7 +114,9 @@ export const ProductImportModal = () => {
       </FocusModal.Trigger>
       <FocusModal.Content>
         <FocusModal.Header>
-          <Heading level="h2">Import products</Heading>
+          <FocusModal.Title asChild>
+            <Heading level="h2">Import products</Heading>
+          </FocusModal.Title>
         </FocusModal.Header>
         <FocusModal.Body className="flex flex-col items-center p-6">
           <div className="flex w-full max-w-lg flex-col gap-y-4">

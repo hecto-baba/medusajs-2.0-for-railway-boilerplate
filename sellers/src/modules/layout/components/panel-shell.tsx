@@ -6,6 +6,16 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { createContext, useContext, useEffect, useState } from "react"
 import { Sidebar } from "./sidebar"
+import {
+  CustomizerMenu,
+  LayoutComposer,
+  LayoutCustomizerHostProvider,
+  LayoutCustomizerSlot,
+  CUSTOMIZE_IDS,
+  LAYOUT_CONTROLS_LOCATION,
+  CORE_LAYOUT_IDS,
+} from "../layout-composer"
+import { Notifications } from "../notifications"
 
 /**
  * Labels for the fixed segments of a path. Anything not listed - a product id,
@@ -29,24 +39,14 @@ type Crumb = { label: string; href?: string }
 /**
  * Lets a page name the record it is showing, so the breadcrumb can read
  * "Products › Medusa Sweatpants" rather than "Products › prod_01ABC…".
- *
- * A context rather than a prop because the title is only known once the page
- * has fetched its data, which happens well below the shell.
  */
 const TitleContext = createContext<(title: string | null) => void>(() => {})
 
-/**
- * Registers the current record's title with the breadcrumb.
- *
- * Clears on unmount so a stale title cannot leak onto the next page - without
- * that, navigating from one product to another briefly shows the old name.
- */
 export const useBreadcrumbTitle = (title: string | null | undefined) => {
   const setTitle = useContext(TitleContext)
 
   useEffect(() => {
     setTitle(title ?? null)
-
     return () => setTitle(null)
   }, [title, setTitle])
 }
@@ -67,9 +67,6 @@ const Breadcrumbs = ({ recordTitle }: { recordTitle: string | null }) => {
       return { label: known, href }
     }
 
-    // An unrecognised segment is an id. Use the record's title when the page
-    // has supplied one, and fall back to a truncated id rather than showing a
-    // 30-character ULID in the bar.
     return {
       label: recordTitle ?? segment.slice(0, 12) + "…",
       href,
@@ -110,12 +107,8 @@ const Breadcrumbs = ({ recordTitle }: { recordTitle: string | null }) => {
 }
 
 /**
- * The signed-in shell: collapsible sidebar, a top bar with breadcrumbs, and
- * the page below it.
- *
- * Collapsed state is kept in localStorage so it survives navigation and
- * reloads - a sidebar that springs back open on every page change is worse
- * than one that never collapsed.
+ * The signed-in shell: collapsible sidebar, top bar with breadcrumbs,
+ * layout customization controls, notifications feed, and page content.
  */
 export const PanelShell = ({
   storeName,
@@ -131,54 +124,72 @@ export const PanelShell = ({
   const [collapsed, setCollapsed] = useState(false)
   const [recordTitle, setRecordTitle] = useState<string | null>(null)
 
-  // Read after mount rather than in the initial state: the server render has
-  // no localStorage, and seeding from it directly would mismatch on hydration.
   useEffect(() => {
     try {
       setCollapsed(
         window.localStorage.getItem("vendor-sidebar-collapsed") === "true"
       )
     } catch {
-      // Private windows and blocked site data throw on access; the default
-      // (expanded) is the right fallback.
+      // ignore
     }
   }, [])
 
   const toggle = () => {
     setCollapsed((previous) => {
       const next = !previous
-
       try {
         window.localStorage.setItem("vendor-sidebar-collapsed", String(next))
       } catch {
-        // Not being able to remember the choice is not a reason to refuse it.
+        // ignore
       }
-
       return next
     })
   }
 
   return (
-    <TitleContext.Provider value={setRecordTitle}>
-      <div className="flex h-screen w-full overflow-hidden">
-        {collapsed ? null : (
-          <Sidebar storeName={storeName} email={email} name={name} />
-        )}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <header className="border-ui-border-base bg-ui-bg-subtle flex h-12 shrink-0 items-center gap-x-3 border-b px-4">
-            <IconButton
-              size="small"
-              variant="transparent"
-              onClick={toggle}
-              aria-label={collapsed ? "Show sidebar" : "Hide sidebar"}
-            >
-              <SidebarLeft />
-            </IconButton>
-            <Breadcrumbs recordTitle={recordTitle} />
-          </header>
-          <main className="flex-1 overflow-y-auto">{children}</main>
+    <LayoutCustomizerHostProvider>
+      <TitleContext.Provider value={setRecordTitle}>
+        <div className="flex h-screen w-full overflow-hidden">
+          {collapsed ? null : (
+            <Sidebar storeName={storeName} email={email} name={name} />
+          )}
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <header className="border-ui-border-base bg-ui-bg-subtle flex h-12 shrink-0 items-center justify-between border-b px-4">
+              <div className="flex items-center gap-x-3 overflow-hidden">
+                <IconButton
+                  size="small"
+                  variant="transparent"
+                  onClick={toggle}
+                  aria-label={collapsed ? "Show sidebar" : "Hide sidebar"}
+                >
+                  <SidebarLeft />
+                </IconButton>
+                <Breadcrumbs recordTitle={recordTitle} />
+              </div>
+
+              {/* Top-Right Header Tools: Customize Layout & Notifications */}
+              <div className="flex items-center gap-x-2 shrink-0">
+                <CustomizerMenu />
+                <LayoutCustomizerSlot location={LAYOUT_CONTROLS_LOCATION} />
+                <LayoutComposer
+                  widgetsZonePrefix="topbar"
+                  preferredLayoutId={CORE_LAYOUT_IDS.SINGLE_ROW}
+                  customizeId={CUSTOMIZE_IDS.TOPBAR}
+                  controlSize="xsmall"
+                  sections={{
+                    main: (
+                      <LayoutComposer.Entry id="Notifications">
+                        <Notifications />
+                      </LayoutComposer.Entry>
+                    ),
+                  }}
+                />
+              </div>
+            </header>
+            <main className="flex-1 overflow-y-auto">{children}</main>
+          </div>
         </div>
-      </div>
-    </TitleContext.Provider>
+      </TitleContext.Provider>
+    </LayoutCustomizerHostProvider>
   )
 }

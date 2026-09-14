@@ -6,7 +6,9 @@ import { LOGIN_VIEW } from "@modules/account/templates/login-template"
 import Input from "@modules/common/components/input"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import { SubmitButton } from "@modules/checkout/components/submit-button"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { login } from "@lib/data/customer"
+
 
 type Props = {
   setCurrentView: (view: LOGIN_VIEW) => void

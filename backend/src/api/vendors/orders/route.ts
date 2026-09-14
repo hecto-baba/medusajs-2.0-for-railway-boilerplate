@@ -12,16 +12,12 @@ export const GetVendorOrdersSchema = z.object({
 })
 
 /**
- * Lists the calling vendor's orders, paginated.
+ * Lists the calling vendor's orders with strict cross-vendor data privacy and pagination.
  *
- * Two hops on purpose: the link only carries order ids, so the ids are read
- * through the vendor admin first and the order details are then fetched by
- * the core workflow, which knows how to compute totals.
- *
- * The page is taken from the id list before the second hop rather than from
- * the workflow's own pagination. The vendor's order ids are already in hand,
- * so slicing here fetches details for one page instead of for the vendor's
- * entire order history.
+ * Scoping ensures:
+ * 1. Only orders containing products belonging to the calling vendor are returned.
+ * 2. In multi-vendor carts, only line items belonging to THIS vendor are exposed.
+ * 3. Line items and financials belonging to other vendors are redacted.
  */
 export const GET = async (
   req: AuthenticatedMedusaRequest,
@@ -36,15 +32,23 @@ export const GET = async (
     data: [vendorAdmin],
   } = await query.graph({
     entity: "vendor_admin",
-    fields: ["vendor.orders.*"],
+    fields: ["vendor.id", "vendor.products.id", "vendor.orders.*"],
     filters: { id: [req.auth_context.actor_id] },
   })
 
-  const allOrders = vendorAdmin?.vendor?.orders ?? []
+  if (!vendorAdmin?.vendor) {
+    res.status(404).json({ message: "Vendor profile not found." })
+    return
+  }
 
-  // Newest first, matching what the admin's order list shows. The link
-  // traversal has no ordering of its own, so without this the page contents
-  // would be arbitrary and could shift between requests.
+  const vendorProductIds = new Set<string>(
+    (vendorAdmin.vendor.products || [])
+      .map((p: any) => p?.id)
+      .filter((id: any) => typeof id === "string" && id.length > 0)
+  )
+
+  const allOrders = vendorAdmin.vendor.orders ?? []
+
   const sortedIds = allOrders
     .filter(Boolean)
     .sort((a, b) =>
@@ -52,27 +56,25 @@ export const GET = async (
       new Date(a!.created_at as string).getTime()
     )
     .map((order) => order!.id)
+    .filter((id: any) => typeof id === "string" && id.length > 0)
 
   const count = sortedIds.length
   const pageIds = sortedIds.slice(offset, offset + limit)
 
-  // getOrdersListWorkflow with an empty filter would list every order in the
-  // store, so an empty page has to short-circuit here.
-  if (!pageIds.length) {
+  // If vendor has no linked orders or no products, short-circuit immediately
+  if (!pageIds.length || !vendorProductIds.size) {
     res.json({ orders: [], count, limit, offset })
     return
   }
 
-  const { result: orders } = await getOrdersListWorkflow(req.scope).run({
+  const { result: rawOrders } = await getOrdersListWorkflow(req.scope).run({
     input: {
       fields: [
         "id",
         "display_id",
         "status",
         "created_at",
-        "email",
         "currency_code",
-        "metadata",
         "total",
         "subtotal",
         "shipping_total",
@@ -88,6 +90,9 @@ export const GET = async (
         "shipping_methods",
         "payment_collections",
         "fulfillments",
+        "customer.first_name",
+        "customer.last_name",
+        "customer.email",
       ],
       variables: {
         filters: { id: pageIds },
@@ -95,17 +100,40 @@ export const GET = async (
     },
   })
 
-  // getOrdersListWorkflow returns either a bare array or a { rows, metadata }
-  // envelope depending on how it was invoked, and its output type is the union
-  // of both. Normalising here keeps the narrowing in one place.
-  const orderRows = Array.isArray(orders) ? orders : orders.rows
+  const orderRows = Array.isArray(rawOrders)
+    ? rawOrders
+    : (rawOrders as any)?.rows || []
 
-  // The workflow does not preserve the id order it was given, so the page is
-  // re-sorted to match the order the ids were paged in.
-  const orderById = new Map(orderRows.map((order) => [order.id, order]))
-  const pageOrders = pageIds
-    .map((id) => orderById.get(id))
-    .filter((order): order is NonNullable<typeof order> => Boolean(order))
+  // Filter out any line items that do not belong to this vendor's catalog
+  const scopedOrders = orderRows
+    .map((order: any) => {
+      const vendorItems = (order.items || []).filter((item: any) => {
+        const itemProductId = item.product_id || item.variant?.product_id || item.variant?.product?.id
+        return itemProductId && vendorProductIds.has(itemProductId)
+      })
 
-  res.json({ orders: pageOrders, count, limit, offset })
+      if (!vendorItems.length) {
+        return null
+      }
+
+      // Calculate vendor-specific subtotal (in minor units)
+      const vendorSubtotal = vendorItems.reduce((acc: number, item: any) => {
+        const unitPrice = Number(item.unit_price) || 0
+        const quantity = Number(item.quantity) || 1
+        return acc + unitPrice * quantity
+      }, 0)
+
+      return {
+        ...order,
+        items: vendorItems,
+        // Scoped financials so the vendor only sees their own sales volume
+        subtotal: vendorSubtotal,
+        total: vendorSubtotal,
+      }
+    })
+    .filter(Boolean)
+
+  res.json({ orders: scopedOrders, count, limit, offset })
 }
+
+

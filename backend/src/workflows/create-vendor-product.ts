@@ -10,7 +10,7 @@ import {
   createRemoteLinkStep,
   useQueryGraphStep,
 } from "@medusajs/medusa/core-flows"
-import { Modules } from "@medusajs/framework/utils"
+import { Modules, ProductStatus } from "@medusajs/framework/utils"
 import { MARKETPLACE_MODULE } from "../modules/marketplace"
 
 export type CreateVendorProductWorkflowInput = {
@@ -31,16 +31,30 @@ export const createVendorProductWorkflow = createWorkflow(
     const { data: stores } = useQueryGraphStep({
       entity: "store",
       fields: ["default_sales_channel_id"],
-    })
+    }).config({ name: "retrieve-stores" })
 
-    const productData = transform({ input, stores }, (data) => ({
-      products: [
-        {
-          ...data.input.product,
-          sales_channels: [{ id: data.stores[0].default_sales_channel_id }],
-        },
-      ],
-    }))
+    const { data: shippingProfiles } = useQueryGraphStep({
+      entity: "shipping_profile",
+      fields: ["id", "type"],
+    }).config({ name: "retrieve-shipping-profiles" })
+
+    const productData = transform({ input, stores, shippingProfiles }, (data) => {
+      const defaultProfile =
+        data.shippingProfiles?.find((sp: any) => sp.type === "default") ||
+        data.shippingProfiles?.[0]
+
+      return {
+        products: [
+          {
+            ...data.input.product,
+            status: ProductStatus.PUBLISHED,
+            shipping_profile_id:
+              data.input.product.shipping_profile_id ?? defaultProfile?.id,
+            sales_channels: [{ id: data.stores[0].default_sales_channel_id }],
+          },
+        ],
+      }
+    })
 
     const createdProducts = createProductsWorkflow.runAsStep({
       input: productData as CreateProductsWorkflowInput,
@@ -54,15 +68,20 @@ export const createVendorProductWorkflow = createWorkflow(
 
     const linksToCreate = transform(
       { createdProducts, vendorAdmins },
-      (data) =>
-        data.createdProducts.map((product) => ({
+      (data) => {
+        const vendorId = data.vendorAdmins?.[0]?.vendor?.id
+        if (!vendorId) {
+          throw new Error("Cannot link product: Authenticated vendor admin profile does not exist.")
+        }
+        return data.createdProducts.map((product) => ({
           [MARKETPLACE_MODULE]: {
-            vendor_id: data.vendorAdmins[0].vendor.id,
+            vendor_id: vendorId,
           },
           [Modules.PRODUCT]: {
             product_id: product.id,
           },
         }))
+      }
     )
 
     createRemoteLinkStep(linksToCreate)

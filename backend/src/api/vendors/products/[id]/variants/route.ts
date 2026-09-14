@@ -8,7 +8,11 @@ import type {
 } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { createProductVariantsWorkflow } from "@medusajs/medusa/core-flows"
-import { assertOwnership, VENDOR_PRODUCT_DETAIL_FIELDS } from "../../helpers"
+import {
+  assertOwnership,
+  ensureVariantInventoryItem,
+  VENDOR_PRODUCT_DETAIL_FIELDS,
+} from "../../helpers"
 
 /** Lists the variants of one of the vendor's products. */
 export const GET = async (
@@ -71,12 +75,18 @@ export const POST = async (
 
   const { additional_data, ...rest } = req.validatedBody as Record<string, any>
 
-  await createProductVariantsWorkflow(req.scope).run({
+  const { result } = await createProductVariantsWorkflow(req.scope).run({
     input: {
       product_variants: [{ ...rest, product_id: id }] as CreateProductVariantWorkflowInputDTO[],
       additional_data,
     },
   })
+
+  if (rest.manage_inventory === true && result?.length) {
+    for (const v of result) {
+      await ensureVariantInventoryItem(req, v.id)
+    }
+  }
 
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 

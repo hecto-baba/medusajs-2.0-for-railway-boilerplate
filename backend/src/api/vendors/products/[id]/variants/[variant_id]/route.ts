@@ -11,6 +11,7 @@ import {
 import {
   assertOwnership,
   assertVariantBelongsToProduct,
+  ensureVariantInventoryItem,
   VENDOR_PRODUCT_DETAIL_FIELDS,
 } from "../../../helpers"
 
@@ -81,6 +82,10 @@ export const POST = async (
       additional_data,
     },
   })
+
+  if (update.manage_inventory === true) {
+    await ensureVariantInventoryItem(req, variant_id)
+  }
 
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 

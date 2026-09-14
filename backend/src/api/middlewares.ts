@@ -23,6 +23,97 @@ import { PostVendorInventoryLevelSchema } from "./vendors/products/[id]/variants
 import { GetVendorReturnReasonsSchema } from "./vendors/return-reasons/route";
 import { GetVendorRefundReasonsSchema } from "./vendors/refund-reasons/route";
 import {
+  GetVendorInventoryItemsSchema,
+  PostVendorCreateInventoryItemSchema,
+} from "./vendors/inventory-items/route";
+import { PostVendorUpdateInventoryItemSchema } from "./vendors/inventory-items/[id]/route";
+import { PostVendorCreateInventoryLevelSchema } from "./vendors/inventory-items/[id]/location-levels/route";
+import { PostVendorUpdateInventoryLevelSchema } from "./vendors/inventory-items/[id]/location-levels/[location_id]/route";
+import { PostVendorBatchInventoryItemLocationLevelsSchema } from "./vendors/inventory-items/[id]/location-levels/batch/route";
+import { PostVendorBatchInventoryItemsLocationLevelsSchema } from "./vendors/inventory-items/location-levels/batch/route";
+import {
+  GetVendorReservationsSchema,
+  PostVendorCreateReservationSchema,
+} from "./vendors/reservations/route";
+import { PostVendorUpdateReservationSchema } from "./vendors/reservations/[id]/route";
+import {
+  GetVendorCustomersSchema,
+  PostVendorCreateCustomerSchema,
+} from "./vendors/customers/route";
+import { PostVendorUpdateCustomerSchema } from "./vendors/customers/[id]/route";
+import { PostVendorCreateCustomerAddressSchema } from "./vendors/customers/[id]/addresses/route";
+import { PostVendorUpdateCustomerAddressSchema } from "./vendors/customers/[id]/addresses/[address_id]/route";
+import {
+  GetVendorCustomerGroupsSchema,
+  PostVendorCreateCustomerGroupSchema,
+} from "./vendors/customer-groups/route";
+import { PostVendorUpdateCustomerGroupSchema } from "./vendors/customer-groups/[id]/route";
+import { PostVendorCustomerGroupCustomersSchema } from "./vendors/customer-groups/[id]/customers/route";
+import {
+  GetVendorPriceListsSchema,
+  PostVendorCreatePriceListSchema,
+} from "./vendors/price-lists/route";
+import { PostVendorUpdatePriceListSchema } from "./vendors/price-lists/[id]/route";
+import { PostVendorBatchPriceListPricesSchema } from "./vendors/price-lists/[id]/prices/batch/route";
+import { PostVendorRemoveProductsPriceListSchema } from "./vendors/price-lists/[id]/products/route";
+import { PostVendorVenueBodySchema } from "./vendors/venues/route";
+import { UpdateVendorVenueBodySchema } from "./vendors/venues/[id]/route";
+import { PostVendorShowBodySchema } from "./vendors/shows/route";
+import { GetVendorShowSeatsSchema } from "./vendors/shows/[id]/seats/route";
+import {
+  GetVendorCollectionsSchema,
+  CreateVendorCollectionSchema,
+} from "./vendors/collections/route";
+import { UpdateVendorCollectionSchema } from "./vendors/collections/[id]/route";
+import { ManageCollectionProductsSchema } from "./vendors/collections/[id]/products/route";
+import {
+  GetVendorCategoriesSchema,
+  CreateVendorCategorySchema,
+} from "./vendors/categories/route";
+import { UpdateVendorCategorySchema } from "./vendors/categories/[id]/route";
+import { ManageCategoryProductsSchema } from "./vendors/categories/[id]/products/route";
+import {
+  GetVendorProductOptionsSchema,
+  CreateVendorProductOptionSchema,
+} from "./vendors/product-options/route";
+import { UpdateVendorProductOptionSchema } from "./vendors/product-options/[id]/route";
+import {
+  GetVendorDraftOrdersSchema,
+  CreateVendorDraftOrderSchema,
+} from "./vendors/draft-orders/route";
+import {
+  GetVendorTeamSchema,
+  InviteVendorMemberSchema,
+} from "./vendors/team/route";
+import { UpdateVendorMemberSchema } from "./vendors/team/[id]/route";
+import {
+  GetVendorStockLocationsSchema,
+  CreateVendorStockLocationSchema,
+} from "./vendors/stock-locations/route";
+import { UpdateVendorStockLocationSchema } from "./vendors/stock-locations/[id]/route";
+import { CreateVendorShippingProfileSchema } from "./vendors/shipping-profiles/route";
+import {
+  GetVendorSalesChannelsSchema,
+  CreateVendorSalesChannelSchema,
+} from "./vendors/sales-channels/route";
+import { UpdateVendorSalesChannelSchema } from "./vendors/sales-channels/[id]/route";
+import { ManageSalesChannelProductsSchema } from "./vendors/sales-channels/[id]/products/route";
+import {
+  GetVendorProductTypesSchema,
+  CreateVendorProductTypeSchema,
+} from "./vendors/product-types/route";
+import { UpdateVendorProductTypeSchema } from "./vendors/product-types/[id]/route";
+import {
+  GetVendorProductTagsSchema,
+  CreateVendorProductTagSchema,
+} from "./vendors/product-tags/route";
+import { UpdateVendorProductTagSchema } from "./vendors/product-tags/[id]/route";
+import {
+  GetVendorApiKeysSchema,
+  CreateVendorApiKeySchema,
+} from "./vendors/api-keys/route";
+import { UpdateVendorApiKeySchema } from "./vendors/api-keys/[id]/route";
+import {
   AdminCreateReturnReason,
   AdminUpdateReturnReason
 } from "@medusajs/medusa/api/admin/return-reasons/validators";
@@ -604,6 +695,549 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(AdminUpdatePaymentRefundReason)
+      ]
+    },
+    {
+      matcher: "/vendors/inventory-items",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorInventoryItemsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/inventory-items",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorCreateInventoryItemSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/inventory-items/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorUpdateInventoryItemSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/inventory-items/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/inventory-items/:id/location-levels",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorCreateInventoryLevelSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/inventory-items/:id/location-levels/:location_id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorUpdateInventoryLevelSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/inventory-items/:id/location-levels/batch",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorBatchInventoryItemLocationLevelsSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/inventory-items/location-levels/batch",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorBatchInventoryItemsLocationLevelsSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/reservations",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorReservationsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/reservations",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorCreateReservationSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/reservations/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorUpdateReservationSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/reservations/:id/*",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/customers",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorCustomersSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/customers",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorCreateCustomerSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/customers/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorUpdateCustomerSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/customers/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/customers/:id/addresses",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorCreateCustomerAddressSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/customers/:id/addresses/:address_id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorUpdateCustomerAddressSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/customer-groups",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorCustomerGroupsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/customer-groups",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorCreateCustomerGroupSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/customer-groups/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorUpdateCustomerGroupSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/customer-groups/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/customer-groups/:id/customers",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorCustomerGroupCustomersSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/customer-groups/:id/customers/batch",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorCustomerGroupCustomersSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/price-lists",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorPriceListsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/price-lists",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorCreatePriceListSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/price-lists/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorUpdatePriceListSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/price-lists/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/price-lists/:id/prices/batch",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorBatchPriceListPricesSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/price-lists/:id/products",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorRemoveProductsPriceListSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/venues",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorVenueBodySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/venues/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorVenueBodySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/venues/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/shows",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorShowBodySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/shows/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/shows/:id/seats",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorShowSeatsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/collections",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorCollectionsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/collections",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorCollectionSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/collections/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorCollectionSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/collections/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/collections/:id/products",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(ManageCollectionProductsSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/categories",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorCategoriesSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/categories",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorCategorySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/categories/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorCategorySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/categories/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/categories/:id/products",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(ManageCategoryProductsSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/product-options",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorProductOptionsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/product-options",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorProductOptionSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/product-options/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorProductOptionSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/product-options/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/draft-orders",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorDraftOrdersSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/draft-orders",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorDraftOrderSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/draft-orders/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/team",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorTeamSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/team",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(InviteVendorMemberSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/team/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorMemberSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/team/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/stock-locations",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorStockLocationsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/stock-locations",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorStockLocationSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/stock-locations/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorStockLocationSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/stock-locations/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/shipping-profiles",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorShippingProfileSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/sales-channels",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorSalesChannelsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/sales-channels",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorSalesChannelSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/sales-channels/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorSalesChannelSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/sales-channels/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/sales-channels/:id/products",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(ManageSalesChannelProductsSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/product-types",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorProductTypesSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/product-types",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorProductTypeSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/product-types/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorProductTypeSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/product-types/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/product-tags",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorProductTagsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/product-tags",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorProductTagSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/product-tags/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorProductTagSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/product-tags/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/api-keys",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorApiKeysSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/api-keys",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorApiKeySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/api-keys/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorApiKeySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/api-keys/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/admin/vendors*",
+      middlewares: [
+        authenticate("user", ["session", "bearer", "api-key"])
       ]
     }
   ]

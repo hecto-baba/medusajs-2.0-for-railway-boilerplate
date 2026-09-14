@@ -1,5 +1,7 @@
 import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
-import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
+import { ContainerRegistrationKeys, MedusaError, Modules } from "@medusajs/framework/utils"
+import { createInventoryItemsWorkflow } from "@medusajs/medusa/core-flows"
+import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 
 /**
  * Confirms the product behind a URL id belongs to the calling vendor.
@@ -247,3 +249,85 @@ export const VENDOR_PRODUCT_DETAIL_FIELDS = [
   "variants.options.*",
   "variants.prices.*",
 ]
+
+/**
+ * Ensures an inventory item exists for the variant and is linked to both
+ * the variant and the vendor. Returns the inventory item ID.
+ */
+export const ensureVariantInventoryItem = async (
+  req: AuthenticatedMedusaRequest,
+  variantId: string,
+  vendorId?: string
+): Promise<string> => {
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+
+  const {
+    data: [variant],
+  } = await query.graph({
+    entity: "variant",
+    fields: [
+      "id",
+      "title",
+      "sku",
+      "product.id",
+      "product.title",
+      "inventory_items.inventory_item_id",
+    ],
+    filters: { id: [variantId] },
+  })
+
+  if (!variant) {
+    throw new MedusaError(MedusaError.Types.NOT_FOUND, "Variant not found.")
+  }
+
+  const existingItemId = (variant as any).inventory_items?.[0]?.inventory_item_id
+  if (existingItemId) {
+    const vId = vendorId ?? (await getVendorId(req))
+    const remoteLink = req.scope.resolve(ContainerRegistrationKeys.REMOTE_LINK)
+    await remoteLink.create([
+      {
+        [MARKETPLACE_MODULE]: { vendor_id: vId },
+        [Modules.INVENTORY]: { inventory_item_id: existingItemId },
+      },
+    ]).catch(() => {})
+    return existingItemId
+  }
+
+  const itemTitle =
+    variant.title &&
+    variant.title !== "Default" &&
+    variant.title !== "Default Variant"
+      ? `${(variant as any).product?.title || "Product"} - ${variant.title}`
+      : ((variant as any).product?.title || variant.title || "Variant Item")
+
+  const { result } = await createInventoryItemsWorkflow(req.scope).run({
+    input: {
+      items: [
+        {
+          sku: variant.sku || undefined,
+          title: itemTitle,
+          requires_shipping: true,
+        },
+      ],
+    },
+  })
+
+  const newItem = result[0]
+  const vId = vendorId ?? (await getVendorId(req))
+  const remoteLink = req.scope.resolve(ContainerRegistrationKeys.REMOTE_LINK)
+
+  await remoteLink.create([
+    {
+      [MARKETPLACE_MODULE]: { vendor_id: vId },
+      [Modules.INVENTORY]: { inventory_item_id: newItem.id },
+    },
+    {
+      [Modules.PRODUCT]: { variant_id: variantId },
+      [Modules.INVENTORY]: { inventory_item_id: newItem.id },
+      data: { required_quantity: 1 },
+    },
+  ])
+
+  return newItem.id
+}
+

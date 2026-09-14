@@ -11,6 +11,7 @@ import { z } from "@medusajs/framework/zod"
 import {
   assertOwnership,
   assertVariantBelongsToProduct,
+  ensureVariantInventoryItem,
 } from "../../../../helpers"
 
 /**
@@ -113,14 +114,8 @@ export const POST = async (
 
   const { location_id, stocked_quantity } = req.validatedBody
 
-  const inventoryItemIds = await resolveInventoryItemIds(req, variant_id)
-
-  if (!inventoryItemIds.length) {
-    throw new MedusaError(
-      MedusaError.Types.INVALID_DATA,
-      "This variant does not manage inventory, so it has no stock to set."
-    )
-  }
+  // Ensure inventory item exists for this variant and is linked to the vendor
+  const inventoryItemId = await ensureVariantInventoryItem(req, variant_id)
 
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
@@ -139,8 +134,6 @@ export const POST = async (
       "Stock location not found."
     )
   }
-
-  const inventoryItemId = inventoryItemIds[0]
 
   const { data: existing } = await query.graph({
     entity: "inventory_level",

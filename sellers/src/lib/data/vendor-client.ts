@@ -534,9 +534,246 @@ export type VendorInventoryLevel = {
   location_id: string
   stocked_quantity: number
   reserved_quantity: number
+  incoming_quantity?: number
   available_quantity: number
-  stock_locations?: { id: string; name: string }[]
+  stock_locations?: {
+    id: string
+    name: string
+    address?: {
+      city?: string | null
+      country_code?: string | null
+      address_1?: string | null
+    } | null
+  } | {
+    id: string
+    name: string
+    address?: {
+      city?: string | null
+      country_code?: string | null
+      address_1?: string | null
+    } | null
+  }[]
 }
+
+export type VendorInventoryItemVariant = {
+  id: string
+  title: string | null
+  sku?: string | null
+  product?: {
+    id: string
+    title: string
+    thumbnail?: string | null
+  } | null
+  options?: { id: string; value: string }[]
+}
+
+export type VendorInventoryItem = {
+  id: string
+  sku: string | null
+  title: string | null
+  description: string | null
+  hs_code: string | null
+  mid_code: string | null
+  origin_country: string | null
+  material: string | null
+  weight: number | null
+  length: number | null
+  height: number | null
+  width: number | null
+  requires_shipping: boolean
+  thumbnail: string | null
+  metadata: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+  stocked_quantity?: number
+  reserved_quantity?: number
+  location_levels?: VendorInventoryLevel[]
+  variants?: VendorInventoryItemVariant[]
+}
+
+export type VendorReservation = {
+  id: string
+  inventory_item_id: string
+  location_id: string
+  quantity: number
+  description: string | null
+  line_item_id?: string | null
+  metadata?: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+  inventory_item?: {
+    id: string
+    title: string | null
+    sku: string | null
+    thumbnail?: string | null
+  } | null
+}
+
+export const listVendorInventoryItems = (params: {
+  limit: number
+  offset: number
+  q?: string
+  sku?: string[]
+  origin_country?: string
+  location_id?: string
+  order?: string
+}) =>
+  request<ListResponse<{ inventory_items: VendorInventoryItem[] }>>(
+    "inventory-items",
+    params
+  )
+
+export const getVendorInventoryItem = async (id: string) => {
+  const res = await fetch(`/api/vendors/inventory-items/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { inventory_item: VendorInventoryItem }
+}
+
+export const createVendorInventoryItem = (body: Record<string, unknown>) =>
+  mutate<{ inventory_item: VendorInventoryItem }>(
+    "inventory-items",
+    "POST",
+    body
+  )
+
+export const updateVendorInventoryItem = (
+  id: string,
+  body: Record<string, unknown>
+) =>
+  mutate<{ inventory_item: VendorInventoryItem }>(
+    `inventory-items/${id}`,
+    "POST",
+    body
+  )
+
+export const deleteVendorInventoryItem = (id: string) =>
+  mutate<{ id: string; deleted: boolean }>(
+    `inventory-items/${id}`,
+    "DELETE"
+  )
+
+export const listVendorItemLocationLevels = (itemId: string) =>
+  request<{ inventory_levels: VendorInventoryLevel[] }>(
+    `inventory-items/${itemId}/location-levels`,
+    {}
+  )
+
+export const createVendorItemLocationLevel = (
+  itemId: string,
+  body: { location_id: string; stocked_quantity?: number; incoming_quantity?: number }
+) =>
+  mutate<{ inventory_item: VendorInventoryItem }>(
+    `inventory-items/${itemId}/location-levels`,
+    "POST",
+    body
+  )
+
+export const updateVendorItemLocationLevel = (
+  itemId: string,
+  locationId: string,
+  body: { stocked_quantity?: number; incoming_quantity?: number }
+) =>
+  mutate<{ inventory_item: VendorInventoryItem }>(
+    `inventory-items/${itemId}/location-levels/${locationId}`,
+    "POST",
+    body
+  )
+
+export const deleteVendorItemLocationLevel = (
+  itemId: string,
+  locationId: string
+) =>
+  mutate<{ id: string; deleted: boolean }>(
+    `inventory-items/${itemId}/location-levels/${locationId}`,
+    "DELETE"
+  )
+
+export const batchVendorItemLocationLevels = (
+  itemId: string,
+  body: {
+    create?: { location_id: string; stocked_quantity?: number; incoming_quantity?: number }[]
+    update?: { id?: string; location_id: string; stocked_quantity?: number; incoming_quantity?: number }[]
+    delete?: string[]
+  }
+) =>
+  mutate<{ inventory_item: VendorInventoryItem }>(
+    `inventory-items/${itemId}/location-levels/batch`,
+    "POST",
+    body
+  )
+
+export const batchVendorItemsLocationLevels = (body: {
+  create?: { inventory_item_id: string; location_id: string; stocked_quantity?: number; incoming_quantity?: number }[]
+  update?: { id?: string; inventory_item_id: string; location_id: string; stocked_quantity?: number; incoming_quantity?: number }[]
+  delete?: string[]
+}) =>
+  mutate<{ success: boolean; created: number; updated: number; deleted: number }>(
+    "inventory-items/location-levels/batch",
+    "POST",
+    body
+  )
+
+export const exportVendorInventoryItems = () =>
+  mutate<{ csv: string; count: number }>("inventory-items/export", "POST", {})
+
+/* ------------------------------------------------------------- reservations */
+
+export const listVendorReservations = (params: {
+  limit: number
+  offset: number
+  q?: string
+  inventory_item_id?: string | string[]
+  location_id?: string | string[]
+  order?: string
+}) =>
+  request<ListResponse<{ reservations: VendorReservation[] }>>(
+    "reservations",
+    params
+  )
+
+export const getVendorReservation = async (id: string) => {
+  const res = await fetch(`/api/vendors/reservations/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { reservation: VendorReservation }
+}
+
+export const createVendorReservation = (body: {
+  inventory_item_id: string
+  location_id: string
+  quantity: number
+  description?: string | null
+  line_item_id?: string | null
+  metadata?: Record<string, unknown> | null
+}) =>
+  mutate<{ reservation: VendorReservation }>("reservations", "POST", body)
+
+export const updateVendorReservation = (
+  id: string,
+  body: {
+    location_id?: string
+    quantity?: number
+    description?: string | null
+    metadata?: Record<string, unknown> | null
+  }
+) =>
+  mutate<{ reservation: VendorReservation }>(`reservations/${id}`, "POST", body)
+
+export const deleteVendorReservation = (id: string) =>
+  mutate<{ id: string; deleted: boolean }>(`reservations/${id}`, "DELETE")
 
 export const listVendorInventoryLevels = (
   productId: string,
@@ -717,3 +954,1267 @@ export const updateVendorCampaign = (id: string, body: Record<string, unknown>) 
 
 export const deleteVendorCampaign = (id: string) =>
   mutate<{ id: string; deleted: boolean }>(`campaigns/${id}`, "DELETE")
+
+/* ---------------------------------------------------------------- customers */
+
+export type VendorCustomerAddress = {
+  id: string
+  customer_id: string
+  address_name?: string | null
+  is_default_shipping?: boolean
+  is_default_billing?: boolean
+  company?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  address_1?: string | null
+  address_2?: string | null
+  city?: string | null
+  country_code?: string | null
+  province?: string | null
+  postal_code?: string | null
+  phone?: string | null
+  metadata?: Record<string, unknown> | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type VendorCustomerGroup = {
+  id: string
+  name: string
+  metadata?: Record<string, unknown> | null
+  created_at: string
+  updated_at?: string
+  customers_count?: number
+  customers?: VendorCustomer[]
+}
+
+export type VendorCustomer = {
+  id: string
+  email: string
+  first_name?: string | null
+  last_name?: string | null
+  phone?: string | null
+  company_name?: string | null
+  has_account?: boolean
+  metadata?: Record<string, unknown> | null
+  created_at: string
+  updated_at?: string
+  orders_count?: number
+  orders?: {
+    id: string
+    total?: number
+    currency_code?: string
+    created_at: string
+  }[]
+  addresses?: VendorCustomerAddress[]
+  groups?: {
+    id: string
+    name: string
+  }[]
+}
+
+export const listVendorCustomers = (params: {
+  limit: number
+  offset: number
+  q?: string
+  has_account?: boolean | string
+  order?: string
+}) => {
+  const queryParams: Record<string, string | number | string[] | undefined> = {
+    limit: params.limit,
+    offset: params.offset,
+    q: params.q,
+    has_account:
+      typeof params.has_account === "boolean"
+        ? String(params.has_account)
+        : params.has_account,
+    order: params.order,
+  }
+  return request<ListResponse<{ customers: VendorCustomer[] }>>(
+    "customers",
+    queryParams
+  )
+}
+
+export const getVendorCustomer = async (id: string) => {
+  const res = await fetch(`/api/vendors/customers/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { customer: VendorCustomer }
+}
+
+export const createVendorCustomer = (body: Record<string, unknown>) =>
+  mutate<{ customer: VendorCustomer }>("customers", "POST", body)
+
+export const updateVendorCustomer = (
+  id: string,
+  body: Record<string, unknown>
+) => mutate<{ customer: VendorCustomer }>(`customers/${id}`, "POST", body)
+
+export const deleteVendorCustomer = (id: string) =>
+  mutate<{ id: string; object: "customer"; deleted: boolean }>(
+    `customers/${id}`,
+    "DELETE"
+  )
+
+export const listVendorCustomerAddresses = async (customerId: string) => {
+  const res = await fetch(`/api/vendors/customers/${customerId}/addresses`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { addresses: VendorCustomerAddress[]; count: number }
+}
+
+export const createVendorCustomerAddress = (
+  customerId: string,
+  body: Record<string, unknown>
+) =>
+  mutate<{ customer: VendorCustomer }>(
+    `customers/${customerId}/addresses`,
+    "POST",
+    body
+  )
+
+export const updateVendorCustomerAddress = (
+  customerId: string,
+  addressId: string,
+  body: Record<string, unknown>
+) =>
+  mutate<{ customer: VendorCustomer }>(
+    `customers/${customerId}/addresses/${addressId}`,
+    "POST",
+    body
+  )
+
+export const deleteVendorCustomerAddress = (
+  customerId: string,
+  addressId: string
+) =>
+  mutate<{
+    id: string
+    object: "customer_address"
+    deleted: boolean
+    parent?: VendorCustomer
+  }>(`customers/${customerId}/addresses/${addressId}`, "DELETE")
+
+/* --------------------------------------------------------- customer-groups */
+
+export const listVendorCustomerGroups = (params: {
+  limit: number
+  offset: number
+  q?: string
+  order?: string
+}) =>
+  request<ListResponse<{ customer_groups: VendorCustomerGroup[] }>>(
+    "customer-groups",
+    params
+  )
+
+export const getVendorCustomerGroup = async (id: string) => {
+  const res = await fetch(`/api/vendors/customer-groups/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { customer_group: VendorCustomerGroup }
+}
+
+export const createVendorCustomerGroup = (body: Record<string, unknown>) =>
+  mutate<{ customer_group: VendorCustomerGroup }>("customer-groups", "POST", body)
+
+export const updateVendorCustomerGroup = (
+  id: string,
+  body: Record<string, unknown>
+) =>
+  mutate<{ customer_group: VendorCustomerGroup }>(
+    `customer-groups/${id}`,
+    "POST",
+    body
+  )
+
+export const deleteVendorCustomerGroup = (id: string) =>
+  mutate<{ id: string; object: "customer_group"; deleted: boolean }>(
+    `customer-groups/${id}`,
+    "DELETE"
+  )
+
+export const batchVendorCustomerGroupMembers = (
+  groupId: string,
+  body: { add?: string[]; remove?: string[] }
+) =>
+  mutate<{ customer_group: VendorCustomerGroup }>(
+    `customer-groups/${groupId}/customers/batch`,
+    "POST",
+    body
+  )
+
+/* --------------------------------------------------------------- price-lists */
+
+export type VendorPriceListType = "sale" | "override"
+export type VendorPriceListStatus = "active" | "draft"
+
+export type VendorPriceListPrice = {
+  id?: string
+  variant_id?: string
+  currency_code: string
+  amount: number
+  min_quantity?: number | null
+  max_quantity?: number | null
+  rules?: Record<string, string>
+}
+
+export type VendorPriceListVariant = {
+  id: string
+  title: string | null
+  sku?: string | null
+  prices: VendorPriceListPrice[]
+}
+
+export type VendorPriceListProduct = {
+  id: string
+  title: string
+  thumbnail?: string | null
+  variants: VendorPriceListVariant[]
+}
+
+export type VendorPriceList = {
+  id: string
+  title: string
+  description?: string | null
+  type: VendorPriceListType
+  status: VendorPriceListStatus
+  starts_at?: string | null
+  ends_at?: string | null
+  rules?: Record<string, string[]> | null
+  metadata?: Record<string, unknown> | null
+  created_at: string
+  updated_at?: string
+  products_count?: number
+  prices_count?: number
+  products?: VendorPriceListProduct[]
+}
+
+export const listVendorPriceLists = (params: {
+  limit: number
+  offset: number
+  q?: string
+  status?: string | string[]
+  type?: string | string[]
+  order?: string
+}) =>
+  request<ListResponse<{ price_lists: VendorPriceList[] }>>(
+    "price-lists",
+    params as Record<string, string | number | string[] | undefined>
+  )
+
+export const getVendorPriceList = async (id: string) => {
+  const res = await fetch(`/api/vendors/price-lists/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { price_list: VendorPriceList }
+}
+
+export const createVendorPriceList = (body: Record<string, unknown>) =>
+  mutate<{ price_list: VendorPriceList }>("price-lists", "POST", body)
+
+export const updateVendorPriceList = (
+  id: string,
+  body: Record<string, unknown>
+) => mutate<{ price_list: VendorPriceList }>(`price-lists/${id}`, "POST", body)
+
+export const deleteVendorPriceList = (id: string) =>
+  mutate<{ id: string; object: "price_list"; deleted: boolean }>(
+    `price-lists/${id}`,
+    "DELETE"
+  )
+
+export const batchVendorPriceListPrices = (
+  id: string,
+  body: {
+    create?: VendorPriceListPrice[]
+    update?: VendorPriceListPrice[]
+    delete?: string[]
+  }
+) =>
+  mutate<{ price_list: VendorPriceList }>(
+    `price-lists/${id}/prices/batch`,
+    "POST",
+    body
+  )
+
+export const removeProductsFromPriceList = (
+  id: string,
+  productIds: string[]
+) =>
+  mutate<{ price_list: VendorPriceList }>(
+    `price-lists/${id}/products`,
+    "POST",
+    { remove: productIds }
+  )
+
+/* ------------------------------------------------------------------- venues */
+
+export type VendorRowType = "vip" | "premium" | "balcony" | "standard"
+
+export type VendorVenueRow = {
+  id?: string
+  venue_id?: string
+  row_number: string
+  row_type: VendorRowType
+  seat_count: number
+}
+
+export type VendorVenue = {
+  id: string
+  name: string
+  address?: string | null
+  rows_count?: number
+  total_seats?: number
+  tiers?: VendorRowType[]
+  rows: VendorVenueRow[]
+  shows?: {
+    id: string
+    product_id: string
+    dates: string[]
+    product?: { title: string; thumbnail?: string | null }
+  }[]
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorVenues = (params: {
+  limit: number
+  offset: number
+  q?: string
+  order?: string
+}) =>
+  request<ListResponse<{ venues: VendorVenue[] }>>(
+    "venues",
+    params as Record<string, string | number | undefined>
+  )
+
+export const getVendorVenue = async (id: string) => {
+  const res = await fetch(`/api/vendors/venues/${id}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  })
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}))
+    throw new Error(errorData.message || "Failed to fetch venue")
+  }
+  return (await res.json()) as { venue: VendorVenue }
+}
+
+export const createVendorVenue = (body: {
+  name: string
+  address?: string
+  rows: {
+    row_number: string
+    row_type: VendorRowType
+    seat_count: number
+  }[]
+}) => mutate<{ venue: VendorVenue }>("venues", "POST", body)
+
+export const updateVendorVenue = (
+  id: string,
+  body: {
+    name?: string
+    address?: string | null
+    rows?: {
+      id?: string
+      row_number: string
+      row_type: VendorRowType
+      seat_count: number
+    }[]
+  }
+) => mutate<{ venue: VendorVenue }>(`venues/${id}`, "POST", body)
+
+export const deleteVendorVenue = (id: string) =>
+  mutate<{ id: string; object: "venue"; deleted: boolean }>(
+    `venues/${id}`,
+    "DELETE"
+  )
+
+/* -------------------------------------------------------------------- shows */
+
+export type VendorShowVariant = {
+  id: string
+  row_type: VendorRowType
+  product_variant_id: string
+}
+
+export type VendorTicketPurchase = {
+  id: string
+  order_id: string
+  seat_number: string
+  show_date: string
+  status: "pending" | "scanned"
+  venue_row?: {
+    id: string
+    row_number: string
+    row_type: VendorRowType
+  }
+}
+
+export type VendorShowPerformance = {
+  date: string
+  capacity: number
+  sold_count: number
+  available_count: number
+  scanned_count: number
+}
+
+export type VendorShow = {
+  id: string
+  product_id: string
+  venue_id: string
+  dates: string[]
+  dates_count?: number
+  venue_capacity?: number
+  tiers?: VendorRowType[]
+  venue?: Pick<VendorVenue, "id" | "name" | "address"> & { rows?: VendorVenueRow[] }
+  product?: {
+    id: string
+    title: string
+    description?: string | null
+    thumbnail?: string | null
+    status?: string
+    variants?: {
+      id: string
+      title?: string
+      prices?: { currency_code: string; amount: number }[]
+    }[]
+  }
+  variants?: VendorShowVariant[]
+  performances?: VendorShowPerformance[]
+  purchases?: VendorTicketPurchase[]
+  created_at: string
+  updated_at?: string
+}
+
+export type VendorSeatMapSeat = {
+  seat_number: string
+  is_available: boolean
+  purchase_id?: string | null
+  order_id?: string | null
+  status?: "pending" | "scanned" | null
+}
+
+export type VendorSeatMapRow = {
+  venue_row_id: string
+  row_number: string
+  row_type: VendorRowType
+  seat_count: number
+  seats: VendorSeatMapSeat[]
+}
+
+export type VendorSeatMapResponse = {
+  date: string
+  venue: Pick<VendorVenue, "id" | "name" | "address">
+  seat_map: VendorSeatMapRow[]
+}
+
+export const listVendorShows = (params: {
+  limit: number
+  offset: number
+  q?: string
+  order?: string
+}) =>
+  request<ListResponse<{ shows: VendorShow[] }>>(
+    "shows",
+    params as Record<string, string | number | undefined>
+  )
+
+export const getVendorShow = async (id: string) => {
+  const res = await fetch(`/api/vendors/shows/${id}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  })
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}))
+    throw new Error(errorData.message || "Failed to fetch show")
+  }
+  return (await res.json()) as { show: VendorShow }
+}
+
+export const createVendorShow = (body: {
+  name: string
+  description?: string
+  venue_id: string
+  dates: string[]
+  variants: {
+    row_type: VendorRowType
+    seat_count: number
+    prices: {
+      currency_code: string
+      amount: number
+      min_quantity?: number
+      max_quantity?: number
+    }[]
+  }[]
+}) => mutate<{ show: VendorShow }>("shows", "POST", body)
+
+export const deleteVendorShow = (id: string) =>
+  mutate<{ id: string; object: "show"; deleted: boolean }>(
+    `shows/${id}`,
+    "DELETE"
+  )
+
+export const getVendorShowSeats = async (id: string, date: string) => {
+  const res = await fetch(
+    `/api/vendors/shows/${id}/seats?date=${encodeURIComponent(date)}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    }
+  )
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}))
+    throw new Error(errorData.message || "Failed to fetch show seats")
+  }
+  return (await res.json()) as VendorSeatMapResponse
+}
+
+export const scanVendorTicketPurchase = (
+  showId: string,
+  purchaseId: string
+) =>
+  mutate<{ purchase: VendorTicketPurchase; message: string }>(
+    `shows/${showId}/purchases/${purchaseId}/scan`,
+    "POST",
+    {}
+  )
+
+/* ------------------------------------------------------------- collections */
+
+export type VendorCollection = {
+  id: string
+  title: string
+  handle: string
+  metadata?: Record<string, unknown> | null
+  products_count?: number
+  products?: VendorProduct[]
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorCollections = (params: {
+  limit: number
+  offset: number
+  q?: string
+  order?: string
+}) =>
+  request<ListResponse<{ collections: VendorCollection[] }>>(
+    "collections",
+    params as Record<string, string | number | undefined>
+  )
+
+export const getVendorCollection = async (id: string) => {
+  const res = await fetch(`/api/vendors/collections/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { collection: VendorCollection }
+}
+
+export const createVendorCollection = (body: {
+  title: string
+  handle?: string
+  metadata?: Record<string, unknown>
+}) => mutate<{ collection: VendorCollection }>("collections", "POST", body)
+
+export const updateVendorCollection = (
+  id: string,
+  body: {
+    title?: string
+    handle?: string
+    metadata?: Record<string, unknown>
+  }
+) => mutate<{ collection: VendorCollection }>(`collections/${id}`, "POST", body)
+
+export const deleteVendorCollection = (id: string) =>
+  mutate<{ id: string; object: "collection"; deleted: boolean }>(
+    `collections/${id}`,
+    "DELETE"
+  )
+
+export const manageVendorCollectionProducts = (
+  id: string,
+  body: {
+    add?: string[]
+    remove?: string[]
+  }
+) =>
+  mutate<{ success: boolean; updated: number }>(
+    `collections/${id}/products`,
+    "POST",
+    body
+  )
+
+/* -------------------------------------------------------------- categories */
+
+export type VendorCategory = {
+  id: string
+  name: string
+  handle: string
+  description?: string | null
+  is_active?: boolean
+  is_internal?: boolean
+  rank?: number
+  parent_category_id?: string | null
+  parent_category?: { id: string; name: string } | null
+  category_children?: { id: string; name: string; handle?: string }[]
+  products_count?: number
+  is_vendor_owned?: boolean
+  products?: VendorProduct[]
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorCategories = (params: {
+  limit: number
+  offset: number
+  q?: string
+  parent_category_id?: string | null
+  order?: string
+}) =>
+  request<ListResponse<{ categories: VendorCategory[] }>>(
+    "categories",
+    params as Record<string, string | number | undefined>
+  )
+
+export const getVendorCategory = async (id: string) => {
+  const res = await fetch(`/api/vendors/categories/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { category: VendorCategory }
+}
+
+export const createVendorCategory = (body: {
+  name: string
+  handle?: string
+  description?: string
+  is_active?: boolean
+  is_internal?: boolean
+  parent_category_id?: string | null
+  metadata?: Record<string, unknown>
+}) => mutate<{ category: VendorCategory }>("categories", "POST", body)
+
+export const updateVendorCategory = (
+  id: string,
+  body: {
+    name?: string
+    handle?: string
+    description?: string
+    is_active?: boolean
+    is_internal?: boolean
+    parent_category_id?: string | null
+    metadata?: Record<string, unknown>
+  }
+) => mutate<{ category: VendorCategory }>(`categories/${id}`, "POST", body)
+
+export const deleteVendorCategory = (id: string) =>
+  mutate<{ id: string; object: "product_category"; deleted: boolean }>(
+    `categories/${id}`,
+    "DELETE"
+  )
+
+export const manageVendorCategoryProducts = (
+  id: string,
+  body: {
+    add?: string[]
+    remove?: string[]
+  }
+) =>
+  mutate<{ success: boolean; added: number; removed: number }>(
+    `categories/${id}/products`,
+    "POST",
+    body
+  )
+
+/* --------------------------------------------------------- product options */
+
+export type VendorProductOptionItem = {
+  id: string
+  title: string
+  product_id?: string | null
+  product?: {
+    id: string
+    title: string
+    thumbnail?: string | null
+  } | null
+  values?: { id: string; value: string }[]
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorProductOptions = (params: {
+  limit: number
+  offset: number
+  q?: string
+  product_id?: string
+  order?: string
+}) =>
+  request<ListResponse<{ product_options: VendorProductOptionItem[] }>>(
+    "product-options",
+    params as Record<string, string | number | undefined>
+  )
+
+export const getVendorProductOption = async (id: string) => {
+  const res = await fetch(`/api/vendors/product-options/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { product_option: VendorProductOptionItem }
+}
+
+export const createVendorProductOption = (body: {
+  title: string
+  values?: string[]
+  product_id?: string
+}) =>
+  mutate<{ product_option: VendorProductOptionItem }>(
+    "product-options",
+    "POST",
+    body
+  )
+
+export const updateVendorProductOption = (
+  id: string,
+  body: {
+    title?: string
+    values?: string[]
+  }
+) =>
+  mutate<{ product_option: VendorProductOptionItem }>(
+    `product-options/${id}`,
+    "POST",
+    body
+  )
+
+export const deleteVendorProductOption = (id: string) =>
+  mutate<{ id: string; object: "product_option"; deleted: boolean }>(
+    `product-options/${id}`,
+    "DELETE"
+  )
+
+/* ------------------------------------------------------------ draft orders */
+
+export type VendorDraftOrder = {
+  id: string
+  display_id: number
+  status: string
+  is_draft_order: boolean
+  email?: string | null
+  currency_code: string
+  total: number
+  subtotal: number
+  shipping_total: number
+  tax_total: number
+  discount_total: number
+  customer?: {
+    id: string
+    first_name?: string | null
+    last_name?: string | null
+    email: string
+  } | null
+  shipping_address?: Record<string, any> | null
+  billing_address?: Record<string, any> | null
+  items?: any[]
+  shipping_methods?: any[]
+  summary?: any
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorDraftOrders = (params: {
+  limit: number
+  offset: number
+  q?: string
+  order?: string
+}) =>
+  request<ListResponse<{ draft_orders: VendorDraftOrder[] }>>(
+    "draft-orders",
+    params as Record<string, string | number | undefined>
+  )
+
+export const getVendorDraftOrder = async (id: string) => {
+  const res = await fetch(`/api/vendors/draft-orders/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { draft_order: VendorDraftOrder }
+}
+
+export const createVendorDraftOrder = (body: Record<string, unknown>) =>
+  mutate<{ draft_order: VendorDraftOrder }>("draft-orders", "POST", body)
+
+export const convertVendorDraftOrder = (id: string) =>
+  mutate<{ order: any }>(`draft-orders/${id}/convert`, "POST", {})
+
+export const deleteVendorDraftOrder = (id: string) =>
+  mutate<{ id: string; object: "draft_order"; deleted: boolean }>(
+    `draft-orders/${id}`,
+    "DELETE"
+  )
+
+/* ------------------------------------------------------------------- team */
+
+export type VendorTeamMember = {
+  id: string
+  email: string
+  first_name?: string | null
+  last_name?: string | null
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorTeam = (params: {
+  limit: number
+  offset: number
+  q?: string
+}) =>
+  request<ListResponse<{ members: VendorTeamMember[] }>>(
+    "team",
+    params as Record<string, string | number | undefined>
+  )
+
+export const getVendorTeamMember = async (id: string) => {
+  const res = await fetch(`/api/vendors/team/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { member: VendorTeamMember }
+}
+
+export const inviteVendorMember = (body: {
+  email: string
+  first_name?: string
+  last_name?: string
+}) => mutate<{ member: VendorTeamMember }>("team", "POST", body)
+
+export const updateVendorMember = (
+  id: string,
+  body: {
+    first_name?: string
+    last_name?: string
+  }
+) => mutate<{ member: VendorTeamMember }>(`team/${id}`, "POST", body)
+
+export const deleteVendorMember = (id: string) =>
+  mutate<{ id: string; object: "vendor_admin"; deleted: boolean }>(
+    `team/${id}`,
+    "DELETE"
+  )
+
+/* -------------------------------------------------------- stock locations */
+
+export type VendorStockLocation = {
+  id: string
+  name: string
+  address?: {
+    id?: string
+    address_1?: string | null
+    address_2?: string | null
+    city?: string | null
+    country_code?: string | null
+    postal_code?: string | null
+    province?: string | null
+    phone?: string | null
+    company?: string | null
+  } | null
+  fulfillment_sets?: any[]
+  fulfillment_providers?: any[]
+  sales_channels?: any[]
+  metadata?: Record<string, unknown> | null
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorStockLocations = (params: {
+  limit: number
+  offset: number
+  q?: string
+}) =>
+  request<ListResponse<{ stock_locations: VendorStockLocation[] }>>(
+    "stock-locations",
+    params as Record<string, string | number | undefined>
+  )
+
+export const getVendorStockLocation = async (id: string) => {
+  const res = await fetch(`/api/vendors/stock-locations/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { stock_location: VendorStockLocation }
+}
+
+export const createVendorStockLocation = (body: {
+  name: string
+  address?: {
+    address_1?: string
+    address_2?: string
+    city?: string
+    country_code: string
+    postal_code?: string
+    province?: string
+    phone?: string
+    company?: string
+  }
+  metadata?: Record<string, unknown>
+}) =>
+  mutate<{ stock_location: VendorStockLocation }>(
+    "stock-locations",
+    "POST",
+    body
+  )
+
+export const updateVendorStockLocation = (
+  id: string,
+  body: {
+    name?: string
+    address?: Record<string, any>
+    metadata?: Record<string, unknown>
+  }
+) =>
+  mutate<{ stock_location: VendorStockLocation }>(
+    `stock-locations/${id}`,
+    "POST",
+    body
+  )
+
+export const deleteVendorStockLocation = (id: string) =>
+  mutate<{ id: string; object: "stock_location"; deleted: boolean }>(
+    `stock-locations/${id}`,
+    "DELETE"
+  )
+
+/* ------------------------------------------------------ shipping profiles */
+
+export type VendorShippingProfile = {
+  id: string
+  name: string
+  type: string
+  metadata?: Record<string, unknown> | null
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorShippingProfiles = () =>
+  request<{ shipping_profiles: VendorShippingProfile[] }>(
+    "shipping-profiles",
+    {}
+  )
+
+export const createVendorShippingProfile = (body: {
+  name: string
+  type?: string
+  metadata?: Record<string, unknown>
+}) =>
+  mutate<{ shipping_profile: VendorShippingProfile }>(
+    "shipping-profiles",
+    "POST",
+    body
+  )
+
+/* --------------------------------------------------------- sales channels */
+
+export type VendorSalesChannel = {
+  id: string
+  name: string
+  description?: string | null
+  is_disabled: boolean
+  products_count?: number
+  is_vendor_owned?: boolean
+  products?: VendorProduct[]
+  metadata?: Record<string, unknown> | null
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorSalesChannels = (params: {
+  limit: number
+  offset: number
+  q?: string
+}) =>
+  request<ListResponse<{ sales_channels: VendorSalesChannel[] }>>(
+    "sales-channels",
+    params as Record<string, string | number | undefined>
+  )
+
+export const getVendorSalesChannel = async (id: string) => {
+  const res = await fetch(`/api/vendors/sales-channels/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { sales_channel: VendorSalesChannel }
+}
+
+export const createVendorSalesChannel = (body: {
+  name: string
+  description?: string
+  is_disabled?: boolean
+  metadata?: Record<string, unknown>
+}) =>
+  mutate<{ sales_channel: VendorSalesChannel }>(
+    "sales-channels",
+    "POST",
+    body
+  )
+
+export const updateVendorSalesChannel = (
+  id: string,
+  body: {
+    name?: string
+    description?: string
+    is_disabled?: boolean
+    metadata?: Record<string, unknown>
+  }
+) =>
+  mutate<{ sales_channel: VendorSalesChannel }>(
+    `sales-channels/${id}`,
+    "POST",
+    body
+  )
+
+export const deleteVendorSalesChannel = (id: string) =>
+  mutate<{ id: string; object: "sales_channel"; deleted: boolean }>(
+    `sales-channels/${id}`,
+    "DELETE"
+  )
+
+export const manageVendorSalesChannelProducts = (
+  id: string,
+  body: {
+    add?: string[]
+    remove?: string[]
+  }
+) =>
+  mutate<{ success: boolean; added: number; removed: number }>(
+    `sales-channels/${id}/products`,
+    "POST",
+    body
+  )
+
+/* ---------------------------------------------------------- product types */
+
+export type VendorProductTypeItem = {
+  id: string
+  value: string
+  metadata?: Record<string, unknown> | null
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorProductTypes = (params: {
+  limit: number
+  offset: number
+  q?: string
+}) =>
+  request<ListResponse<{ product_types: VendorProductTypeItem[] }>>(
+    "product-types",
+    params as Record<string, string | number | undefined>
+  )
+
+export const createVendorProductType = (body: {
+  value: string
+  metadata?: Record<string, unknown>
+}) =>
+  mutate<{ product_type: VendorProductTypeItem }>(
+    "product-types",
+    "POST",
+    body
+  )
+
+export const updateVendorProductType = (
+  id: string,
+  body: {
+    value?: string
+    metadata?: Record<string, unknown>
+  }
+) =>
+  mutate<{ product_type: VendorProductTypeItem }>(
+    `product-types/${id}`,
+    "POST",
+    body
+  )
+
+export const deleteVendorProductType = (id: string) =>
+  mutate<{ id: string; object: "product_type"; deleted: boolean }>(
+    `product-types/${id}`,
+    "DELETE"
+  )
+
+/* ----------------------------------------------------------- product tags */
+
+export type VendorProductTagItem = {
+  id: string
+  value: string
+  metadata?: Record<string, unknown> | null
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorProductTags = (params: {
+  limit: number
+  offset: number
+  q?: string
+}) =>
+  request<ListResponse<{ product_tags: VendorProductTagItem[] }>>(
+    "product-tags",
+    params as Record<string, string | number | undefined>
+  )
+
+export const createVendorProductTag = (body: {
+  value: string
+  metadata?: Record<string, unknown>
+}) =>
+  mutate<{ product_tag: VendorProductTagItem }>("product-tags", "POST", body)
+
+export const updateVendorProductTag = (
+  id: string,
+  body: {
+    value?: string
+    metadata?: Record<string, unknown>
+  }
+) =>
+  mutate<{ product_tag: VendorProductTagItem }>(
+    `product-tags/${id}`,
+    "POST",
+    body
+  )
+
+export const deleteVendorProductTag = (id: string) =>
+  mutate<{ id: string; object: "product_tag"; deleted: boolean }>(
+    `product-tags/${id}`,
+    "DELETE"
+  )
+
+/* --------------------------------------------------------------- api keys */
+
+export type VendorApiKey = {
+  id: string
+  title: string
+  type: "publishable" | "secret"
+  token: string
+  redacted: string
+  created_at: string
+  updated_at?: string
+  revoked_at?: string | null
+}
+
+export const listVendorApiKeys = (params: {
+  limit: number
+  offset: number
+  type?: "publishable" | "secret"
+  q?: string
+}) =>
+  request<ListResponse<{ api_keys: VendorApiKey[] }>>(
+    "api-keys",
+    params as Record<string, string | number | undefined>
+  )
+
+export const createVendorApiKey = (body: {
+  title: string
+  type: "publishable" | "secret"
+}) => mutate<{ api_key: VendorApiKey }>("api-keys", "POST", body)
+
+export const updateVendorApiKey = (
+  id: string,
+  body: {
+    title?: string
+  }
+) => mutate<{ api_key: VendorApiKey }>(`api-keys/${id}`, "POST", body)
+
+export const revokeVendorApiKey = (id: string) =>
+  mutate<{ api_key: VendorApiKey }>(`api-keys/${id}/revoke`, "POST", {})
+
+export const deleteVendorApiKey = (id: string) =>
+  mutate<{ id: string; object: "api_key"; deleted: boolean }>(
+    `api-keys/${id}`,
+    "DELETE"
+  )
+
+/* ---------------------------------------------------------------- regions */
+
+export type VendorRegion = {
+  id: string
+  name: string
+  currency_code: string
+  countries?: { iso_2: string; display_name: string }[]
+  payment_providers?: { id: string }[]
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorRegions = () =>
+  request<{ regions: VendorRegion[] }>("regions", {})
+
+
+

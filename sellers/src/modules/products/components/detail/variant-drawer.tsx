@@ -79,12 +79,36 @@ export const PriceFields = ({
 export const InventoryFields = ({
   product,
   variant,
+  manageInventory,
+  drafts: externalDrafts,
+  onChangeDrafts,
 }: {
   product: VendorProduct
-  variant: VendorVariant
+  variant?: VendorVariant | null
+  manageInventory?: boolean
+  drafts?: Record<string, string>
+  onChangeDrafts?: (drafts: Record<string, string>) => void
 }) => {
   const queryClient = useQueryClient()
-  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [internalDrafts, setInternalDrafts] = useState<Record<string, string>>({})
+  const drafts = externalDrafts ?? internalDrafts
+  const setDrafts = (
+    updater:
+      | Record<string, string>
+      | ((prev: Record<string, string>) => Record<string, string>)
+  ) => {
+    if (onChangeDrafts) {
+      const next = typeof updater === "function" ? updater(drafts) : updater
+      onChangeDrafts(next)
+    } else {
+      setInternalDrafts(updater)
+    }
+  }
+
+  const isManaged =
+    manageInventory !== undefined
+      ? manageInventory
+      : Boolean(variant?.manage_inventory)
 
   const { data: taxonomy } = useQuery({
     queryKey: ["vendor-taxonomy"],
@@ -93,9 +117,9 @@ export const InventoryFields = ({
   })
 
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-inventory", product.id, variant.id],
-    queryFn: () => listVendorInventoryLevels(product.id, variant.id),
-    enabled: Boolean(variant.manage_inventory),
+    queryKey: ["vendor-inventory", product.id, variant?.id],
+    queryFn: () => listVendorInventoryLevels(product.id, variant!.id),
+    enabled: Boolean(isManaged && variant?.id),
     retry: false,
   })
 
@@ -123,24 +147,39 @@ export const InventoryFields = ({
   }, [levels])
 
   const { mutateAsync: save, isPending } = useMutation({
-    mutationFn: (input: { location_id: string; stocked_quantity: number }) =>
-      setVendorInventoryLevel(product.id, variant.id, input),
+    mutationFn: (input: { location_id: string; stocked_quantity: number }) => {
+      if (!variant?.id) {
+        throw new Error("Variant must be saved before setting location stock.")
+      }
+      return setVendorInventoryLevel(product.id, variant.id, input)
+    },
     onSuccess: () => {
+      if (variant?.id) {
+        queryClient.invalidateQueries({
+          queryKey: ["vendor-inventory", product.id, variant.id],
+        })
+      }
       queryClient.invalidateQueries({
-        queryKey: ["vendor-inventory", product.id, variant.id],
+        queryKey: ["vendor-inventory-items"],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ["vendor-product", product.id],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ["vendor-products"],
       })
     },
   })
 
-  if (!variant.manage_inventory) {
+  if (!isManaged) {
     return (
       <Text size="xsmall" className="text-ui-fg-muted">
-        Turn on "Manage inventory" to track stock for this variant.
+        Turn on &quot;Manage inventory&quot; to track stock for this variant.
       </Text>
     )
   }
 
-  if (isLoading) {
+  if (isLoading && variant?.id) {
     return (
       <Text size="xsmall" className="text-ui-fg-muted">
         Loading stock…
@@ -194,14 +233,16 @@ export const InventoryFields = ({
                     setDrafts({ ...drafts, [location.id]: event.target.value })
                   }
                 />
-                <Button
-                  size="small"
-                  variant="secondary"
-                  isLoading={isPending}
-                  onClick={() => onSave(location.id)}
-                >
-                  Set
-                </Button>
+                {variant?.id ? (
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    isLoading={isPending}
+                    onClick={() => onSave(location.id)}
+                  >
+                    Set
+                  </Button>
+                ) : null}
               </div>
               {level ? (
                 <Text size="xsmall" className="text-ui-fg-muted">
