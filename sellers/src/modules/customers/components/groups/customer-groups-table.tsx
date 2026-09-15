@@ -5,10 +5,9 @@ import {
   listVendorCustomerGroups,
   type VendorCustomerGroup,
 } from "@lib/data/vendor-client"
-import { ActionMenu } from "@modules/common"
 import {
-  Badge,
   Button,
+  Container,
   createDataTableColumnHelper,
   DataTable,
   DataTablePaginationState,
@@ -19,36 +18,33 @@ import {
   useDataTable,
   usePrompt,
 } from "@medusajs/ui"
-import { Eye, PencilSquare, Plus, Trash } from "@medusajs/icons"
+import { PencilSquare, Trash } from "@medusajs/icons"
+import { ActionMenu, DateCell } from "@modules/common"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
+import { CreateGroupModal } from "./create-group-modal"
 import { GroupDrawer } from "./group-drawer"
 
 const columnHelper = createDataTableColumnHelper<VendorCustomerGroup>()
 
 export const CustomerGroupsTable = () => {
-  const router = useRouter()
   const queryClient = useQueryClient()
   const prompt = usePrompt()
+  const router = useRouter()
 
-  const [search, setSearch] = useState("")
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
   })
-
-  // Drawer states
+  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [search, setSearch] = useState<string>("")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [editingGroup, setEditingGroup] = useState<VendorCustomerGroup | null>(
-    null
-  )
+  const [editingGroup, setEditingGroup] = useState<VendorCustomerGroup | null>(null)
 
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
-
   const order = sorting
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
@@ -69,8 +65,10 @@ export const CustomerGroupsTable = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteVendorCustomerGroup(id),
-    onSuccess: () => {
-      toast.success("Customer group deleted successfully")
+    onSuccess: (_, id) => {
+      const deletedGroup = customerGroups.find((g) => g.id === id)
+      const name = deletedGroup?.name || "group"
+      toast.success(`Customer group ${name} was successfully deleted.`)
       queryClient.invalidateQueries({ queryKey: ["vendor-customer-groups"] })
     },
     onError: (err: any) => {
@@ -78,10 +76,13 @@ export const CustomerGroupsTable = () => {
     },
   })
 
-  const handleDelete = async (group: VendorCustomerGroup) => {
+  const handleDelete = useCallback(async (group: VendorCustomerGroup) => {
+    const name = group.name ?? ""
     const confirmed = await prompt({
       title: "Delete Customer Group",
-      description: `Are you sure you want to delete "${group.name}"?`,
+      description: `You are about to delete the customer group ${name}. This action cannot be undone.`,
+      verificationInstruction: "Type to confirm",
+      verificationText: name,
       confirmText: "Delete",
       cancelText: "Cancel",
       variant: "danger",
@@ -90,46 +91,40 @@ export const CustomerGroupsTable = () => {
     if (confirmed) {
       deleteMutation.mutate(group.id)
     }
-  }
+  }, [prompt, deleteMutation])
 
   const columns = useMemo(
     () => [
       columnHelper.accessor("name", {
         header: "Name",
         enableSorting: true,
+        sortAscLabel: "A-Z",
+        sortDescLabel: "Z-A",
         cell: ({ row }) => {
-          const group = row.original
           return (
             <Link
-              href={`/customers/groups/${group.id}`}
-              className="text-ui-fg-base hover:text-ui-fg-interactive font-medium transition-colors"
+              href={`/customers/groups/${row.original.id}`}
+              className="font-medium text-ui-fg-base hover:text-ui-fg-subtle transition-colors"
             >
-              {group.name}
+              {row.original.name}
             </Link>
           )
         },
       }),
-      columnHelper.accessor("customers_count", {
-        header: "Members",
-        cell: ({ getValue }) => {
-          const count = getValue() ?? 0
-          return (
-            <Badge size="small" color="blue">
-              {count} {count === 1 ? "customer" : "customers"}
-            </Badge>
-          )
+      columnHelper.accessor("customers", {
+        header: "Customers",
+        cell: ({ row }) => {
+          const count = row.original.customers?.length ?? 0
+          return <span className="text-ui-fg-subtle text-sm">{count}</span>
         },
       }),
       columnHelper.accessor("created_at", {
         header: "Created",
         enableSorting: true,
-        cell: ({ getValue }) => {
-          const date = getValue()
-          return (
-            <Text size="small" className="text-ui-fg-subtle">
-              {date ? new Date(date).toLocaleDateString() : "-"}
-            </Text>
-          )
+        sortAscLabel: "Oldest first",
+        sortDescLabel: "Newest first",
+        cell: ({ row }) => {
+          return <DateCell date={row.original.created_at} />
         },
       }),
       columnHelper.display({
@@ -141,11 +136,6 @@ export const CustomerGroupsTable = () => {
               groups={[
                 {
                   actions: [
-                    {
-                      label: "View Group",
-                      icon: <Eye className="h-4 w-4" />,
-                      onClick: () => router.push(`/customers/groups/${group.id}`),
-                    },
                     {
                       label: "Edit",
                       icon: <PencilSquare className="h-4 w-4" />,
@@ -164,7 +154,7 @@ export const CustomerGroupsTable = () => {
         },
       }),
     ],
-    [router]
+    [handleDelete]
   )
 
   const table = useDataTable({
@@ -188,37 +178,41 @@ export const CustomerGroupsTable = () => {
   })
 
   return (
-    <div className="flex flex-col gap-y-4">
+    <Container className="overflow-hidden p-0 divide-y">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Heading level="h1">Customer Groups</Heading>
-          <Text size="small" className="text-ui-fg-subtle">
-            Segment your customers into groups for special pricing and promotions.
-          </Text>
-        </div>
-
+      <div className="flex items-center justify-between px-6 py-4">
+        <Heading level="h1">Customer Groups</Heading>
         <Button
-          variant="primary"
+          variant="secondary"
           size="small"
           onClick={() => setIsCreateOpen(true)}
         >
-          <Plus className="h-4 w-4 mr-1" />
-          Create Group
+          Create
         </Button>
       </div>
 
       {/* Data Table */}
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between">
-          <DataTable.Search placeholder="Search group name..." />
+          <DataTable.Search placeholder="Search" />
         </DataTable.Toolbar>
-        <DataTable.Table />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No customer groups",
+              description: "There are no customer groups to display.",
+            },
+            filtered: {
+              heading: "No results",
+              description: "No customer groups match the current filter criteria.",
+            },
+          }}
+        />
         <DataTable.Pagination />
       </DataTable>
 
-      {/* Drawers */}
-      <GroupDrawer
+      {/* Focus Modals & Drawers */}
+      <CreateGroupModal
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
       />
@@ -230,6 +224,6 @@ export const CustomerGroupsTable = () => {
         }}
         group={editingGroup}
       />
-    </div>
+    </Container>
   )
 }

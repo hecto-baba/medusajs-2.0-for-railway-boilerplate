@@ -94,3 +94,106 @@ export const ListSummaryCell = ({
     </div>
   )
 }
+
+/* ------------------------------------------------------------- customer cells */
+
+export const AccountCell = ({ hasAccount }: { hasAccount?: boolean | null }) => {
+  const color = hasAccount ? "green" : "orange"
+  const text = hasAccount ? "Registered" : "Guest"
+
+  return <StatusBadge color={color}>{text}</StatusBadge>
+}
+
+export const AccountHeader = () => (
+  <div className="flex h-full w-full items-center">
+    <span className="truncate">Account</span>
+  </div>
+)
+
+export const EmailCell = ({ email }: { email?: string | null }) => {
+  if (!email) {
+    return <PlaceholderCell />
+  }
+
+  return (
+    <div className="flex h-full w-full items-center overflow-hidden">
+      <span className="truncate">{email}</span>
+    </div>
+  )
+}
+
+export const EmailHeader = () => (
+  <div className="flex h-full w-full items-center">
+    <span className="truncate">Email</span>
+  </div>
+)
+
+export const NameCell = ({
+  firstName,
+  lastName,
+}: {
+  firstName?: string | null
+  lastName?: string | null
+}) => {
+  if (!firstName && !lastName) {
+    return <PlaceholderCell />
+  }
+
+  const name = [firstName, lastName].filter(Boolean).join(" ")
+
+  return (
+    <div className="flex h-full w-full items-center overflow-hidden">
+      <span className="truncate">{name}</span>
+    </div>
+  )
+}
+
+export const NameHeader = () => (
+  <div className="flex h-full w-full items-center">
+    <span className="truncate">Name</span>
+  </div>
+)
+
+export const DateCell = ({ date }: { date?: Date | string | null }) => {
+  if (!date) {
+    return <PlaceholderCell />
+  }
+
+  const d = new Date(date)
+  const shortDate = d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+  const fullDate = d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+  })
+
+  return (
+    <div className="flex h-full w-full items-center overflow-hidden" title={fullDate}>
+      <span className="truncate">{shortDate}</span>
+    </div>
+  )
+}
+
+export const DateHeader = ({ text = "Date" }: { text?: string }) => (
+  <div className="flex h-full w-full items-center">
+    <span className="truncate">{text}</span>
+  </div>
+)
+
+export const FirstSeenCell = ({ createdAt }: { createdAt?: Date | string | null }) => (
+  <DateCell date={createdAt} />
+)
+
+export const FirstSeenHeader = () => (
+  <div className="flex h-full w-full items-center">
+    <span className="truncate">First seen</span>
+  </div>
+)
+

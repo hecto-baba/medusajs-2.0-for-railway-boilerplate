@@ -7,6 +7,9 @@ import {
   type VendorInventoryLevel,
 } from "@lib/data/vendor-client"
 import {
+  Button,
+  Checkbox,
+  Container,
   createDataTableColumnHelper,
   createDataTableCommandHelper,
   createDataTableFilterHelper,
@@ -21,10 +24,11 @@ import {
   useDataTable,
   usePrompt,
 } from "@medusajs/ui"
+import { PencilSquare, Trash } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { PlaceholderCell } from "@modules/common"
 import { InventoryExportButton } from "./inventory-export-button"
 import { EditItemDrawer } from "./forms/edit-item-drawer"
@@ -35,20 +39,6 @@ import { BulkStockModal } from "./forms/bulk-stock-modal"
 const columnHelper = createDataTableColumnHelper<VendorInventoryItem>()
 const filterHelper = createDataTableFilterHelper<VendorInventoryItem>()
 const commandHelper = createDataTableCommandHelper()
-
-const filters = [
-  filterHelper.accessor("origin_country", {
-    label: "Country of Origin",
-    type: "select",
-    options: [
-      { label: "United States (US)", value: "US" },
-      { label: "United Kingdom (GB)", value: "GB" },
-      { label: "Germany (DE)", value: "DE" },
-      { label: "India (IN)", value: "IN" },
-      { label: "China (CN)", value: "CN" },
-    ],
-  }),
-]
 
 export const InventoryTable = () => {
   const router = useRouter()
@@ -79,8 +69,6 @@ export const InventoryTable = () => {
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
 
-  const originCountry = filtering.origin_country as string | undefined
-
   const order = sorting
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
@@ -91,7 +79,6 @@ export const InventoryTable = () => {
       limit,
       offset,
       search,
-      originCountry,
       order,
     ],
     queryFn: () =>
@@ -99,7 +86,6 @@ export const InventoryTable = () => {
         limit,
         offset,
         q: search || undefined,
-        origin_country: originCountry,
         order,
       }),
     placeholderData: (previous) => previous,
@@ -113,18 +99,19 @@ export const InventoryTable = () => {
   })
 
   const handleDelete = async (item: VendorInventoryItem) => {
-    const confirmed = await prompt({
-      title: "Delete inventory item",
-      description: `Are you sure you want to delete "${item.title || item.sku}"? This action cannot be undone.`,
+    const res = await prompt({
+      title: "Are you sure?",
+      description:
+        "You are about to delete an inventory item. This action cannot be undone.",
       confirmText: "Delete",
       cancelText: "Cancel",
     })
 
-    if (!confirmed) return
+    if (!res) return
 
     try {
       await remove(item.id)
-      toast.success(`"${item.title || item.sku}" was deleted.`)
+      toast.success("Inventory item deleted successfully.")
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not delete the inventory item."
@@ -135,158 +122,152 @@ export const InventoryTable = () => {
   const items = data?.inventory_items ?? []
   const totalCount = data?.count ?? 0
 
-  // Calculate summary metrics
-  const totalStocked = items.reduce(
-    (acc, curr) => acc + Number(curr.stocked_quantity ?? 0),
-    0
+  const filters = useMemo(
+    () => [
+      filterHelper.accessor("requires_shipping", {
+        type: "select",
+        options: [
+          { label: "True", value: "true" },
+          { label: "False", value: "false" },
+        ],
+        label: "Requires shipping",
+      }),
+    ],
+    []
   )
-  const totalReserved = items.reduce(
-    (acc, curr) => acc + Number(curr.reserved_quantity ?? 0),
-    0
-  )
-  const outOfStockCount = items.filter(
-    (item) => Number(item.stocked_quantity ?? 0) === 0
-  ).length
 
-  const columns = [
-    columnHelper.accessor("title", {
-      id: "title",
-      header: "Title",
-      enableSorting: true,
-      sortLabel: "Title",
-      sortAscLabel: "A-Z",
-      sortDescLabel: "Z-A",
-      cell: ({ row }) => {
-        const title = row.original.title
-        const sku = row.original.sku
-        return (
-          <div className="flex flex-col py-1">
-            <span className="text-ui-fg-base txt-compact-small-plus truncate font-medium">
-              {title || "Untitled Item"}
-            </span>
-            {sku && (
-              <span className="text-ui-fg-subtle txt-compact-xsmall font-mono">
-                {sku}
-              </span>
-            )}
-          </div>
-        )
-      },
-    }),
-    columnHelper.accessor("sku", {
-      id: "sku",
-      header: "SKU",
-      enableSorting: true,
-      sortLabel: "SKU",
-      cell: ({ row }) =>
-        row.original.sku ? (
-          <span className="bg-ui-bg-subtle text-ui-fg-subtle txt-compact-xsmall rounded px-2 py-0.5 font-mono">
-            {row.original.sku}
-          </span>
-        ) : (
-          <PlaceholderCell />
+  const columns = useMemo(
+    () => [
+      columnHelper.select({
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsSomePageRowsSelected()
+                ? "indeterminate"
+                : table.getIsAllPageRowsSelected()
+            }
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
+          />
         ),
-    }),
-    columnHelper.accessor("reserved_quantity", {
-      id: "reserved_quantity",
-      header: "Reserved",
-      enableSorting: true,
-      sortLabel: "Reserved",
-      cell: ({ row }) => {
-        const item = row.original
-        const count = item.location_levels?.length
-          ? item.location_levels.reduce(
-              (sum, lvl) => sum + Number(lvl.reserved_quantity ?? 0),
-              0
-            )
-          : Number(item.reserved_quantity ?? 0)
-        return (
-          <span className="text-ui-fg-subtle txt-compact-small font-medium">
-            {count}
-          </span>
-        )
-      },
-    }),
-    columnHelper.accessor("stocked_quantity", {
-      id: "stocked_quantity",
-      header: "In Stock",
-      enableSorting: true,
-      sortLabel: "In Stock",
-      cell: ({ row }) => {
-        const item = row.original
-        const stocked = item.location_levels?.length
-          ? item.location_levels.reduce(
-              (sum, lvl) => sum + Number(lvl.stocked_quantity ?? 0),
-              0
-            )
-          : Number(item.stocked_quantity ?? 0)
-        const reserved = item.location_levels?.length
-          ? item.location_levels.reduce(
-              (sum, lvl) => sum + Number(lvl.reserved_quantity ?? 0),
-              0
-            )
-          : Number(item.reserved_quantity ?? 0)
-        const available = stocked - reserved
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ),
+      }),
+      columnHelper.accessor("title", {
+        id: "title",
+        header: "Title",
+        enableSorting: true,
+        sortLabel: "Title",
+        cell: ({ row }) => {
+          const title = row.original.title
+          if (!title) {
+            return <PlaceholderCell />
+          }
+          return (
+            <div className="flex size-full items-center overflow-hidden">
+              <span className="truncate">{title}</span>
+            </div>
+          )
+        },
+      }),
+      columnHelper.accessor("sku", {
+        id: "sku",
+        header: "SKU",
+        enableSorting: true,
+        sortLabel: "SKU",
+        cell: ({ row }) => {
+          const sku = row.original.sku
+          if (!sku) {
+            return <PlaceholderCell />
+          }
+          return (
+            <div className="flex size-full items-center overflow-hidden">
+              <span className="truncate">{sku}</span>
+            </div>
+          )
+        },
+      }),
+      columnHelper.accessor("reserved_quantity", {
+        id: "reserved_quantity",
+        header: "Reserved",
+        enableSorting: true,
+        sortLabel: "Reserved",
+        cell: ({ row }) => {
+          const item = row.original
+          const count = item.location_levels?.length
+            ? item.location_levels.reduce(
+                (sum, lvl) => sum + Number(lvl.reserved_quantity ?? 0),
+                0
+              )
+            : Number(item.reserved_quantity ?? 0)
 
-        return (
-          <div className="flex items-center gap-x-2">
-            <span
-              className={`txt-compact-small-plus rounded-md px-2 py-0.5 ${
-                stocked === 0
-                  ? "bg-ui-tag-red-bg text-ui-tag-red-text"
-                  : available <= 5
-                  ? "bg-ui-tag-orange-bg text-ui-tag-orange-text"
-                  : "bg-ui-tag-green-bg text-ui-tag-green-text"
-              }`}
-            >
-              {stocked} in stock
-            </span>
-            <span className="text-ui-fg-muted txt-compact-xsmall">
-              ({available} available)
-            </span>
-          </div>
-        )
-      },
-    }),
-    columnHelper.action({
-      actions: [
-        {
-          label: "View details",
-          onClick: (ctx) => {
-            router.push(`/inventory/${ctx.row.original.id}`)
-          },
+          if (Number.isNaN(count)) {
+            return <PlaceholderCell />
+          }
+
+          return (
+            <div className="flex size-full items-center overflow-hidden">
+              <span className="truncate">{count}</span>
+            </div>
+          )
         },
-        {
-          label: "Edit general info",
-          onClick: (ctx) => {
-            setEditingItem(ctx.row.original)
-          },
+      }),
+      columnHelper.accessor("stocked_quantity", {
+        id: "stocked_quantity",
+        header: "In Stock",
+        enableSorting: true,
+        sortLabel: "In Stock",
+        cell: ({ row }) => {
+          const item = row.original
+          const stocked = item.location_levels?.length
+            ? item.location_levels.reduce(
+                (sum, lvl) => sum + Number(lvl.stocked_quantity ?? 0),
+                0
+              )
+            : Number(item.stocked_quantity ?? 0)
+
+          if (Number.isNaN(stocked)) {
+            return <PlaceholderCell />
+          }
+
+          return (
+            <div className="flex size-full items-center overflow-hidden">
+              <span className="truncate">{stocked}</span>
+            </div>
+          )
         },
-        {
-          label: "Manage locations",
-          onClick: (ctx) => {
-            setManagingLocationsItem(ctx.row.original)
-          },
-        },
-        {
-          label: "Adjust stock",
-          onClick: (ctx) => {
-            const firstLevel = ctx.row.original.location_levels?.[0] ?? null
-            setAdjustingStockItem(ctx.row.original)
-            setAdjustingLevel(firstLevel)
-          },
-        },
-        {
-          label: "Delete",
-          onClick: (ctx) => handleDelete(ctx.row.original),
-        },
-      ],
-    }),
-  ]
+      }),
+      columnHelper.action({
+        actions: (ctx) => [
+          [
+            {
+              icon: <PencilSquare />,
+              label: "Edit",
+              onClick: () => setEditingItem(ctx.row.original),
+            },
+          ],
+          [
+            {
+              icon: <Trash />,
+              label: "Delete",
+              onClick: () => handleDelete(ctx.row.original),
+            },
+          ],
+        ],
+      }),
+    ],
+    [handleDelete]
+  )
 
   const commands = [
     commandHelper.command({
-      label: "Adjust Stock",
+      label: "Edit stock levels",
       shortcut: "i",
       action: async () => {
         setBulkAdjustOpen(true)
@@ -298,10 +279,10 @@ export const InventoryTable = () => {
       action: async (selection) => {
         const ids = Object.keys(selection)
         const confirmed = await prompt({
-          title: "Delete inventory items",
-          description: `Delete ${ids.length} ${
+          title: "Are you sure?",
+          description: `You are about to delete ${ids.length} ${
             ids.length === 1 ? "inventory item" : "inventory items"
-          }? This cannot be undone.`,
+          }. This action cannot be undone.`,
           confirmText: "Delete",
           cancelText: "Cancel",
         })
@@ -375,80 +356,40 @@ export const InventoryTable = () => {
   const selectedItems = items.filter((item) => !!rowSelection[item.id])
 
   return (
-    <div className="flex flex-col gap-y-4">
-      {/* Metric Cards Banner */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <div className="bg-ui-bg-base shadow-elevation-card-rest border-ui-border-base rounded-lg border p-4">
-          <Text size="xsmall" className="text-ui-fg-subtle uppercase">
-            Total Items
+    <Container className="divide-y p-0">
+      <div className="flex items-center justify-between px-6 py-4">
+        <div>
+          <Heading>Inventory</Heading>
+          <Text className="text-ui-fg-subtle" size="small">
+            Manage your inventory items
           </Text>
-          <Heading level="h3" className="mt-1">
-            {totalCount}
-          </Heading>
         </div>
-        <div className="bg-ui-bg-base shadow-elevation-card-rest border-ui-border-base rounded-lg border p-4">
-          <Text size="xsmall" className="text-ui-fg-subtle uppercase">
-            In Stock Units
-          </Text>
-          <Heading level="h3" className="mt-1 text-ui-fg-interactive">
-            {totalStocked}
-          </Heading>
-        </div>
-        <div className="bg-ui-bg-base shadow-elevation-card-rest border-ui-border-base rounded-lg border p-4">
-          <Text size="xsmall" className="text-ui-fg-subtle uppercase">
-            Reserved Units
-          </Text>
-          <Heading level="h3" className="mt-1 text-ui-fg-muted">
-            {totalReserved}
-          </Heading>
-        </div>
-        <div className="bg-ui-bg-base shadow-elevation-card-rest border-ui-border-base rounded-lg border p-4">
-          <Text size="xsmall" className="text-ui-fg-subtle uppercase">
-            Out of Stock
-          </Text>
-          <Heading
-            level="h3"
-            className={`mt-1 ${
-              outOfStockCount > 0 ? "text-ui-fg-error" : "text-ui-fg-subtle"
-            }`}
-          >
-            {outOfStockCount}
-          </Heading>
+        <div className="flex items-center justify-center gap-x-2">
+          <InventoryExportButton />
+          <Button size="small" variant="secondary" asChild>
+            <Link href="/inventory/new">Create</Link>
+          </Button>
         </div>
       </div>
 
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-          <div>
-            <Heading level="h2">Inventory Items</Heading>
-            <Text size="small" className="text-ui-fg-subtle">
-              Manage stock levels, warehouses, and reservations.
-            </Text>
-          </div>
           <div className="flex items-center gap-x-2">
-            <DataTable.Search placeholder="Search inventory..." />
+            <DataTable.Search placeholder="Search" />
             <DataTable.FilterMenu tooltip="Filter" />
             <DataTable.SortingMenu tooltip="Sort" />
-            <InventoryExportButton />
-            <Link
-              href="/inventory/new"
-              className="bg-ui-button-inverted text-ui-contrast-fg-primary shadow-buttons-inverted txt-compact-small-plus rounded-md px-3 py-1.5 transition-colors"
-            >
-              Create Item
-            </Link>
           </div>
         </DataTable.Toolbar>
         <DataTable.FilterBar />
         <DataTable.Table
           emptyState={{
             empty: {
-              heading: "No inventory items yet",
-              description:
-                "Create your first inventory item or attach one to a product variant.",
+              heading: "No records",
+              description: "There are no records to show",
             },
             filtered: {
-              heading: "No matches found",
-              description: "No inventory items match that search or filter.",
+              heading: "No results",
+              description: "Try changing the filters or search query",
             },
           }}
         />
@@ -499,6 +440,6 @@ export const InventoryTable = () => {
           onOpenChange={setBulkAdjustOpen}
         />
       )}
-    </div>
+    </Container>
   )
 }

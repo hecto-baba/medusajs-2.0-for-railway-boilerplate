@@ -2,23 +2,16 @@
 
 import {
   deleteVendorPriceList,
-  listVendorCustomerGroups,
   listVendorPriceLists,
   type VendorPriceList,
   type VendorPriceListStatus,
   type VendorPriceListType,
 } from "@lib/data/vendor-client"
 import { ActionMenu } from "@modules/common"
+import { PencilSquare, Trash } from "@medusajs/icons"
 import {
-  CurrencyDollar,
-  Eye,
-  PencilSquare,
-  Plus,
-  Trash,
-} from "@medusajs/icons"
-import {
-  Badge,
   Button,
+  Container,
   createDataTableColumnHelper,
   createDataTableFilterHelper,
   DataTable,
@@ -26,6 +19,7 @@ import {
   DataTablePaginationState,
   DataTableSortingState,
   Heading,
+  StatusBadge,
   Text,
   toast,
   useDataTable,
@@ -37,7 +31,30 @@ import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import { PriceListCreateModal } from "./forms/price-list-create-modal"
 import { PriceListEditDrawer } from "./forms/price-list-edit-drawer"
-import { PriceListPricesModal } from "./forms/price-list-prices-modal"
+
+export const getPriceListStatus = (priceList: {
+  status: string
+  starts_at?: string | null
+  ends_at?: string | null
+}) => {
+  const startsAt = priceList.starts_at
+  const endsAt = priceList.ends_at
+
+  const isExpired = endsAt ? new Date(endsAt) < new Date() : false
+  const isScheduled = startsAt ? new Date(startsAt) > new Date() : false
+  const isDraft = priceList.status === "draft"
+
+  if (isDraft) {
+    return { color: "grey" as const, text: "Draft", status: "draft" }
+  }
+  if (isExpired) {
+    return { color: "red" as const, text: "Expired", status: "expired" }
+  }
+  if (isScheduled) {
+    return { color: "orange" as const, text: "Scheduled", status: "scheduled" }
+  }
+  return { color: "green" as const, text: "Active", status: "active" }
+}
 
 const columnHelper = createDataTableColumnHelper<VendorPriceList>()
 const filterHelper = createDataTableFilterHelper<VendorPriceList>()
@@ -58,7 +75,6 @@ export const PriceListsTable = () => {
   // Modal / Drawer states
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [editingPriceList, setEditingPriceList] = useState<VendorPriceList | null>(null)
-  const [managingPricesPriceList, setManagingPricesPriceList] = useState<VendorPriceList | null>(null)
 
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
@@ -86,23 +102,16 @@ export const PriceListsTable = () => {
       }),
   })
 
-  // Fetch customer groups for resolving group names in table
-  const { data: groupsData } = useQuery({
-    queryKey: ["vendor-customer-groups", { limit: 100, offset: 0 }],
-    queryFn: () => listVendorCustomerGroups({ limit: 100, offset: 0 }),
-  })
-  const customerGroups = useMemo(
-    () => groupsData?.customer_groups ?? [],
-    [groupsData]
-  )
-
   const priceLists = data?.price_lists ?? []
   const count = data?.count ?? 0
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteVendorPriceList(id),
-    onSuccess: () => {
-      toast.success("Price list deleted successfully")
+    onSuccess: (_, id) => {
+      const target = priceLists.find((pl) => pl.id === id)
+      toast.success(
+        `Price list "${target?.title || "Price list"}" was successfully deleted.`
+      )
       queryClient.invalidateQueries({ queryKey: ["vendor-price-lists"] })
     },
     onError: (err: any) => {
@@ -112,11 +121,10 @@ export const PriceListsTable = () => {
 
   const handleDelete = async (priceList: VendorPriceList) => {
     const confirmed = await prompt({
-      title: "Delete Price List",
-      description: `Are you sure you want to delete "${priceList.title}"? This action cannot be undone.`,
+      title: "Are you sure?",
+      description: `You are about to delete the price list "${priceList.title}". This action cannot be undone.`,
       confirmText: "Delete",
       cancelText: "Cancel",
-      variant: "danger",
     })
 
     if (confirmed) {
@@ -156,153 +164,28 @@ export const PriceListsTable = () => {
           return (
             <Link
               href={`/pricing/${pl.id}`}
-              className="flex items-center gap-x-3 group"
+              className="font-medium text-ui-fg-base hover:text-ui-fg-interactive transition-colors"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded bg-ui-bg-subtle text-ui-fg-subtle group-hover:text-ui-fg-base group-hover:bg-ui-bg-subtle-hover transition-colors">
-                <CurrencyDollar className="h-4 w-4" />
-              </div>
-              <div className="flex flex-col">
-                <Text
-                  size="small"
-                  weight="plus"
-                  className="group-hover:text-ui-fg-interactive transition-colors"
-                >
-                  {pl.title}
-                </Text>
-                {pl.description && (
-                  <Text size="xsmall" className="text-ui-fg-subtle line-clamp-1">
-                    {pl.description}
-                  </Text>
-                )}
-              </div>
+              {pl.title}
             </Link>
           )
         },
       }),
       columnHelper.accessor("status", {
         header: "Status",
-        cell: ({ getValue }) => {
-          const status = getValue()
-          return (
-            <Badge size="small" color={status === "active" ? "green" : "grey"}>
-              {status === "active" ? "Active" : "Draft"}
-            </Badge>
-          )
-        },
-      }),
-      columnHelper.accessor("type", {
-        header: "Type",
-        cell: ({ getValue }) => {
-          const type = getValue()
-          return (
-            <Badge size="small" color={type === "sale" ? "blue" : "purple"}
-            >
-              {type === "sale" ? "Sale" : "Override"}
-            </Badge>
-          )
+        cell: ({ row }) => {
+          const { color, text } = getPriceListStatus(row.original)
+          return <StatusBadge color={color}>{text}</StatusBadge>
         },
       }),
       columnHelper.display({
-        id: "schedule",
-        header: "Schedule",
+        id: "price_overrides",
+        header: "Price Overrides",
         cell: ({ row }) => {
-          const pl = row.original
-          const now = new Date()
-
-          if (!pl.starts_at && !pl.ends_at) {
-            return (
-              <Text size="small" className="text-ui-fg-subtle">
-                Always active
-              </Text>
-            )
-          }
-
-          if (pl.ends_at && new Date(pl.ends_at) < now) {
-            return (
-              <Badge size="small" color="red">
-                Expired
-              </Badge>
-            )
-          }
-
-          if (pl.starts_at && new Date(pl.starts_at) > now) {
-            return (
-              <Badge size="small" color="orange">
-                Scheduled
-              </Badge>
-            )
-          }
-
-          if (pl.ends_at) {
-            return (
-              <Text size="small" className="text-ui-fg-subtle">
-                Ends {new Date(pl.ends_at).toLocaleDateString()}
-              </Text>
-            )
-          }
-
+          const overrideCount = row.original.prices_count ?? 0
           return (
             <Text size="small" className="text-ui-fg-subtle">
-              Active
-            </Text>
-          )
-        },
-      }),
-      columnHelper.display({
-        id: "customer_groups",
-        header: "Customer Groups",
-        cell: ({ row }) => {
-          const pl = row.original
-          const groupIds = pl.rules?.customer_group_id || []
-
-          if (!groupIds.length) {
-            return (
-              <Text size="small" className="text-ui-fg-subtle">
-                All Customers
-              </Text>
-            )
-          }
-
-          const matched = customerGroups.filter((g) =>
-            groupIds.includes(g.id)
-          )
-
-          return (
-            <div className="flex flex-wrap gap-1">
-              {matched.slice(0, 2).map((g) => (
-                <Badge key={g.id} size="small" color="blue">
-                  {g.name}
-                </Badge>
-              ))}
-              {groupIds.length > 2 && (
-                <Badge size="small" color="grey">
-                  +{groupIds.length - 2} more
-                </Badge>
-              )}
-            </div>
-          )
-        },
-      }),
-      columnHelper.accessor("products_count", {
-        header: "Products",
-        cell: ({ getValue, row }) => {
-          const count =
-            getValue() ?? row.original.products?.length ?? 0
-          return (
-            <Badge size="small" color="grey">
-              {count} {count === 1 ? "product" : "products"}
-            </Badge>
-          )
-        },
-      }),
-      columnHelper.accessor("created_at", {
-        header: "Created",
-        enableSorting: true,
-        cell: ({ getValue }) => {
-          const date = getValue()
-          return (
-            <Text size="small" className="text-ui-fg-subtle">
-              {date ? new Date(date).toLocaleDateString() : "-"}
+              {overrideCount > 0 ? overrideCount.toString() : "-"}
             </Text>
           )
         },
@@ -317,23 +200,17 @@ export const PriceListsTable = () => {
                 {
                   actions: [
                     {
-                      label: "View Details",
-                      icon: <Eye className="h-4 w-4" />,
-                      onClick: () => router.push(`/pricing/${priceList.id}`),
-                    },
-                    {
-                      label: "Edit Details",
-                      icon: <PencilSquare className="h-4 w-4" />,
+                      label: "Edit",
+                      icon: <PencilSquare />,
                       onClick: () => setEditingPriceList(priceList),
                     },
-                    {
-                      label: "Manage Prices",
-                      icon: <CurrencyDollar className="h-4 w-4" />,
-                      onClick: () => setManagingPricesPriceList(priceList),
-                    },
+                  ],
+                },
+                {
+                  actions: [
                     {
                       label: "Delete",
-                      icon: <Trash className="h-4 w-4 text-ui-fg-error" />,
+                      icon: <Trash />,
                       onClick: () => handleDelete(priceList),
                     },
                   ],
@@ -344,7 +221,7 @@ export const PriceListsTable = () => {
         },
       }),
     ],
-    [customerGroups, router]
+    [priceLists]
   )
 
   const table = useDataTable({
@@ -373,22 +250,21 @@ export const PriceListsTable = () => {
   })
 
   return (
-    <div className="flex flex-col gap-y-4">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+    <Container className="divide-y p-0">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4">
         <div>
           <Heading level="h1">Price Lists</Heading>
-          <Text size="small" className="text-ui-fg-subtle mt-1">
-            Manage custom prices, overrides, and sale discounts for your products and customer groups.
+          <Text className="text-ui-fg-subtle" size="small">
+            Create sales or override prices for specific conditions.
           </Text>
         </div>
-        <Button size="small" onClick={() => setIsCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          Create Price List
+        <Button size="small" variant="secondary" onClick={() => setIsCreateOpen(true)}>
+          Create
         </Button>
       </div>
 
-      {/* Medusa DataTable */}
+      {/* DataTable */}
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between">
           <div className="flex items-center gap-x-2">
@@ -406,8 +282,8 @@ export const PriceListsTable = () => {
       <PriceListCreateModal
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["vendor-price-lists"] })
+        onSuccess={(id) => {
+          router.push(`/pricing/${id}`)
         }}
       />
 
@@ -424,20 +300,6 @@ export const PriceListsTable = () => {
           }}
         />
       )}
-
-      {/* Manage Prices Modal */}
-      {managingPricesPriceList && (
-        <PriceListPricesModal
-          open={!!managingPricesPriceList}
-          onOpenChange={(open) => {
-            if (!open) setManagingPricesPriceList(null)
-          }}
-          priceList={managingPricesPriceList}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ["vendor-price-lists"] })
-          }}
-        />
-      )}
-    </div>
+    </Container>
   )
 }

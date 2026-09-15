@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  createVendorCustomerGroup,
   updateVendorCustomerGroup,
   type VendorCustomerGroup,
 } from "@lib/data/vendor-client"
@@ -11,7 +10,6 @@ import {
   Heading,
   Input,
   Label,
-  Text,
   toast,
 } from "@medusajs/ui"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -30,9 +28,7 @@ export const GroupDrawer = ({
   group,
   onSuccess,
 }: GroupDrawerProps) => {
-  const isEditing = Boolean(group)
   const queryClient = useQueryClient()
-
   const [name, setName] = useState("")
 
   useEffect(() => {
@@ -43,24 +39,12 @@ export const GroupDrawer = ({
     }
   }, [group, open])
 
-  const createMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) => createVendorCustomerGroup(data),
-    onSuccess: () => {
-      toast.success("Customer group created successfully")
-      queryClient.invalidateQueries({ queryKey: ["vendor-customer-groups"] })
-      onOpenChange(false)
-      onSuccess?.()
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Failed to create customer group")
-    },
-  })
-
   const updateMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) =>
+    mutationFn: (data: { name: string }) =>
       updateVendorCustomerGroup(group!.id, data),
-    onSuccess: () => {
-      toast.success("Customer group updated successfully")
+    onSuccess: (data) => {
+      const updated = data.customer_group
+      toast.success(`Customer group ${updated.name} was successfully updated.`)
       queryClient.invalidateQueries({ queryKey: ["vendor-customer-groups"] })
       queryClient.invalidateQueries({
         queryKey: ["vendor-customer-group", group?.id],
@@ -73,51 +57,39 @@ export const GroupDrawer = ({
     },
   })
 
-  const isPending = createMutation.isPending || updateMutation.isPending
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (!group) return
+
     if (!name.trim()) {
-      toast.error("Group name is required")
+      toast.error("Name is required")
       return
     }
 
-    const payload = {
-      name: name.trim(),
-    }
-
-    if (isEditing) {
-      updateMutation.mutate(payload)
-    } else {
-      createMutation.mutate(payload)
-    }
+    updateMutation.mutate({ name: name.trim() })
   }
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <Drawer.Content className="max-w-md">
-        <Drawer.Header>
-          <Drawer.Title asChild>
-            <Heading level="h2">
-              {isEditing ? "Edit Customer Group" : "Create Customer Group"}
-            </Heading>
-          </Drawer.Title>
-          <Drawer.Description className="text-ui-fg-subtle text-sm">
-            {isEditing
-              ? "Update the customer group name."
-              : "Create a customer group to organize and segment your buyers."}
-          </Drawer.Description>
-        </Drawer.Header>
+        <form onSubmit={handleSubmit} className="flex flex-1 flex-col justify-between overflow-hidden">
+          <Drawer.Header>
+            <Drawer.Title asChild>
+              <Heading level="h2">Edit Customer Group</Heading>
+            </Drawer.Title>
+            <Drawer.Description className="sr-only">
+              Edit customer group details
+            </Drawer.Description>
+          </Drawer.Header>
 
-        <form onSubmit={handleSubmit} className="flex flex-1 flex-col justify-between">
-          <Drawer.Body className="flex flex-col gap-y-4 p-6">
+          <Drawer.Body className="flex flex-1 flex-col gap-y-4 p-6 overflow-y-auto">
             <div className="flex flex-col gap-y-2">
               <Label size="small" weight="plus">
-                Group Name <span className="text-ui-fg-error">*</span>
+                Name
               </Label>
               <Input
-                placeholder="e.g. VIP Buyers, Wholesale, Early Adopters"
+                size="small"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -126,16 +98,23 @@ export const GroupDrawer = ({
           </Drawer.Body>
 
           <Drawer.Footer className="flex items-center justify-end gap-x-2 border-t p-6">
+            <Drawer.Close asChild>
+              <Button
+                type="button"
+                variant="secondary"
+                size="small"
+                disabled={updateMutation.isPending}
+              >
+                Cancel
+              </Button>
+            </Drawer.Close>
             <Button
-              type="button"
-              variant="secondary"
-              onClick={() => onOpenChange(false)}
-              disabled={isPending}
+              type="submit"
+              size="small"
+              variant="primary"
+              isLoading={updateMutation.isPending}
             >
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={isPending}>
-              {isEditing ? "Save Changes" : "Create Group"}
+              Save
             </Button>
           </Drawer.Footer>
         </form>

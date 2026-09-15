@@ -22,6 +22,7 @@ import {
   CUSTOMIZE_IDS,
   CORE_LAYOUT_IDS,
 } from "../layout-composer"
+import { Searchbar } from "../search"
 
 type NavItem = {
   href: string
@@ -51,16 +52,21 @@ const NAV_ITEMS: NavItem[] = [
     href: "/inventory",
     label: "Inventory",
     icon: BuildingStorefront,
-    items: [{ href: "/inventory/reservations", label: "Reservations" }],
+    items: [{ href: "/reservations", label: "Reservations" }],
   },
   {
     href: "/customers",
     label: "Customers",
     icon: Users,
-    items: [{ href: "/customers/groups", label: "Groups" }],
+    items: [{ href: "/customers/groups", label: "Customer Groups" }],
   },
   { href: "/pricing", label: "Price Lists", icon: CurrencyDollar },
-  { href: "/promotions", label: "Promotions", icon: ReceiptPercent },
+  {
+    href: "/promotions",
+    label: "Promotions",
+    icon: ReceiptPercent,
+    items: [{ href: "/promotions/campaigns", label: "Campaigns" }],
+  },
   { href: "/venues", label: "Venues", icon: Buildings },
   { href: "/shows", label: "Shows", icon: Calendar },
 ]
@@ -80,12 +86,19 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
     "/products": true,
     "/inventory": true,
     "/customers": true,
+    "/promotions": true,
   })
 
   // Automatically keep parent expanded if child route is active
   useEffect(() => {
     NAV_ITEMS.forEach((item) => {
-      if (item.items && pathname.startsWith(item.href)) {
+      if (
+        item.items &&
+        (pathname.startsWith(item.href) ||
+          (item.href === "/inventory" &&
+            (pathname.startsWith("/reservations") ||
+              pathname.startsWith("/inventory/reservations"))))
+      ) {
         setExpanded((prev) => ({ ...prev, [item.href]: true }))
       }
     })
@@ -116,6 +129,9 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
             sections={{
               main: (
                 <>
+                  <LayoutComposer.Entry id="Searchbar">
+                    <Searchbar />
+                  </LayoutComposer.Entry>
                   {NAV_ITEMS.map((item) => {
                     const Icon = item.icon
                     const isExactParentActive =
@@ -137,9 +153,17 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
                         ? pathname === "/customers" ||
                           (pathname.startsWith("/customers/") &&
                             !pathname.startsWith("/customers/groups"))
+                        : item.href === "/promotions"
+                        ? pathname === "/promotions" ||
+                          (pathname.startsWith("/promotions/") &&
+                            !pathname.startsWith("/promotions/campaigns"))
                         : pathname.startsWith(item.href)
 
-                    const isSectionActive = pathname.startsWith(item.href)
+                    const isSectionActive =
+                      pathname.startsWith(item.href) ||
+                      (item.href === "/inventory" &&
+                        (pathname.startsWith("/reservations") ||
+                          pathname.startsWith("/inventory/reservations")))
                     const hasChildren = Boolean(item.items?.length)
                     const isExpanded = expanded[item.href] ?? isSectionActive
 

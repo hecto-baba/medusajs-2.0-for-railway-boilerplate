@@ -10,7 +10,6 @@ import {
   Heading,
   Input,
   Label,
-  Textarea,
   toast,
 } from "@medusajs/ui"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -33,28 +32,25 @@ export const EditItemDrawer = ({
 
   const [title, setTitle] = useState(item.title ?? "")
   const [sku, setSku] = useState(item.sku ?? "")
-  const [description, setDescription] = useState(item.description ?? "")
 
   useEffect(() => {
     if (open) {
       setTitle(item.title ?? "")
       setSku(item.sku ?? "")
-      setDescription(item.description ?? "")
     }
   }, [item, open])
 
   const { mutateAsync: update, isPending } = useMutation({
     mutationFn: (values: {
-      title: string
-      sku: string | null
-      description: string | null
+      title?: string
+      sku?: string
     }) => updateVendorInventoryItem(item.id, values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendor-inventory-items"] })
       queryClient.invalidateQueries({
         queryKey: ["vendor-inventory-item", item.id],
       })
-      toast.success("Inventory item updated.")
+      toast.success("Inventory item updated successfully.")
       onOpenChange(false)
       onSuccess?.()
     },
@@ -67,15 +63,10 @@ export const EditItemDrawer = ({
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim()) {
-      toast.error("Title is required.")
-      return
-    }
 
     await update({
-      title: title.trim(),
-      sku: sku.trim() || null,
-      description: description.trim() || null,
+      title: title.trim() || undefined,
+      sku: sku.trim() || undefined,
     })
   }
 
@@ -84,55 +75,32 @@ export const EditItemDrawer = ({
       <Drawer.Content className="flex flex-col">
         <Drawer.Header>
           <Drawer.Title asChild>
-            <Heading level="h2">Edit General Information</Heading>
+            <Heading level="h2">Edit item details</Heading>
           </Drawer.Title>
-          <Drawer.Description className="text-ui-fg-subtle txt-small">
-            Update the title, SKU, and description of this inventory item.
-          </Drawer.Description>
         </Drawer.Header>
 
         <form
           onSubmit={onSubmit}
           className="flex flex-1 flex-col justify-between overflow-hidden"
         >
-          <Drawer.Body className="flex flex-1 flex-col gap-y-4 overflow-auto p-6">
+          <Drawer.Body className="flex flex-1 flex-col gap-y-8 overflow-auto p-6">
             <div className="flex flex-col gap-y-1.5">
               <Label size="small" weight="plus">
-                Title <span className="text-ui-fg-error">*</span>
+                Title
               </Label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Cotton T-Shirt - Black / M"
               />
             </div>
 
             <div className="flex flex-col gap-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label size="small" weight="plus">
-                  SKU
-                </Label>
-                <span className="text-ui-fg-muted txt-compact-xsmall">Optional</span>
-              </div>
+              <Label size="small" weight="plus">
+                SKU
+              </Label>
               <Input
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
-                placeholder="e.g. TSHIRT-BLK-M"
-              />
-            </div>
-
-            <div className="flex flex-col gap-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label size="small" weight="plus">
-                  Description
-                </Label>
-                <span className="text-ui-fg-muted txt-compact-xsmall">Optional</span>
-              </div>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Item description..."
-                rows={4}
               />
             </div>
           </Drawer.Body>

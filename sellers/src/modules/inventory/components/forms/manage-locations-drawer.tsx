@@ -7,10 +7,10 @@ import {
 } from "@lib/data/vendor-client"
 import {
   Button,
-  Checkbox,
   Drawer,
   Heading,
   Input,
+  Switch,
   Text,
   toast,
 } from "@medusajs/ui"
@@ -48,7 +48,6 @@ export const ManageLocationsDrawer = ({
     () => new Set(existingLocationLevels)
   )
 
-  // Keep state updated if drawer re-opens with new item data
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) {
       setSelectedLocationIds(
@@ -81,7 +80,7 @@ export const ManageLocationsDrawer = ({
       queryClient.invalidateQueries({
         queryKey: ["vendor-inventory-item", item.id],
       })
-      toast.success("Stock locations updated.")
+      toast.success("Locations updated successfully.")
       onOpenChange(false)
       onSuccess?.()
     },
@@ -99,34 +98,35 @@ export const ManageLocationsDrawer = ({
       .filter((id) => !existingLocationLevels.has(id))
       .map((location_id) => ({ location_id, stocked_quantity: 0 }))
 
-    const toDeleteLevels = (item.location_levels ?? [])
-      .filter((lvl) => !selectedLocationIds.has(lvl.location_id))
-      .map((lvl) => lvl.id)
+    const toDelete = Array.from(existingLocationLevels).filter(
+      (id) => !selectedLocationIds.has(id)
+    )
+
+    if (toCreate.length === 0 && toDelete.length === 0) {
+      onOpenChange(false)
+      return
+    }
 
     await batchUpdate({
-      create: toCreate.length ? toCreate : undefined,
-      delete: toDeleteLevels.length ? toDeleteLevels : undefined,
+      create: toCreate.length > 0 ? toCreate : undefined,
+      delete: toDelete.length > 0 ? toDelete : undefined,
     })
   }
 
-  const filteredLocations = useMemo(() => {
-    const list = taxonomy?.stock_locations ?? []
-    if (!search) return list
-    return list.filter((loc) =>
-      loc.name.toLowerCase().includes(search.toLowerCase())
-    )
-  }, [taxonomy?.stock_locations, search])
+  const allLocations = taxonomy?.stock_locations ?? []
+  const filteredLocations = search.trim()
+    ? allLocations.filter((loc) =>
+        loc.name.toLowerCase().includes(search.toLowerCase())
+      )
+    : allLocations
 
   return (
     <Drawer open={open} onOpenChange={handleOpenChange}>
       <Drawer.Content className="flex flex-col">
         <Drawer.Header>
           <Drawer.Title asChild>
-            <Heading level="h2">Manage Stock Locations</Heading>
+            <Heading level="h2">Manage locations</Heading>
           </Drawer.Title>
-          <Drawer.Description className="text-ui-fg-subtle txt-small">
-            Select the warehouse and fulfillment locations where this item is stocked.
-          </Drawer.Description>
         </Drawer.Header>
 
         <form
@@ -134,67 +134,63 @@ export const ManageLocationsDrawer = ({
           className="flex flex-1 flex-col justify-between overflow-hidden"
         >
           <Drawer.Body className="flex flex-1 flex-col gap-y-4 overflow-auto p-6">
-            <div className="bg-ui-bg-subtle border-ui-border-base flex items-center justify-between rounded-lg border px-3 py-2">
-              <Text size="small" className="text-ui-fg-subtle">
-                Selected Locations
-              </Text>
-              <Text size="small" weight="plus">
-                {selectedLocationIds.size} of{" "}
-                {taxonomy?.stock_locations?.length ?? 0}
-              </Text>
-            </div>
-
             <Input
-              placeholder="Search locations..."
+              type="search"
+              placeholder="Search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
 
-            <div className="border-ui-border-base divide-ui-border-base divide-y rounded-lg border">
-              {isLoadingTaxonomy ? (
-                <div className="p-4 text-center">
-                  <Text size="small" className="text-ui-fg-subtle">
-                    Loading locations...
-                  </Text>
-                </div>
-              ) : filteredLocations.length === 0 ? (
-                <div className="p-4 text-center">
-                  <Text size="small" className="text-ui-fg-subtle">
-                    No locations found.
-                  </Text>
-                </div>
-              ) : (
-                filteredLocations.map((loc) => {
+            {isLoadingTaxonomy ? (
+              <Text size="small" className="text-ui-fg-subtle py-4 text-center">
+                Loading locations...
+              </Text>
+            ) : filteredLocations.length === 0 ? (
+              <Text size="small" className="text-ui-fg-subtle py-4 text-center">
+                No locations found.
+              </Text>
+            ) : (
+              <div className="border-ui-border-base divide-ui-border-base divide-y rounded-lg border">
+                {filteredLocations.map((loc) => {
                   const isChecked = selectedLocationIds.has(loc.id)
-                  return (
-                    <label
-                      key={loc.id}
-                      className="hover:bg-ui-bg-base-hover flex cursor-pointer items-center justify-between p-3 transition-colors"
-                    >
-                      <div className="flex items-center gap-x-3">
-                        <Checkbox
-                          checked={isChecked}
-                          onCheckedChange={() => toggleLocation(loc.id)}
-                        />
-                        <div>
-                          <Text size="small" weight="plus">
-                            {loc.name}
-                          </Text>
-                          <Text size="xsmall" className="text-ui-fg-subtle">
-                            ID: {loc.id}
-                          </Text>
-                        </div>
-                      </div>
-                      {isChecked && (
-                        <span className="bg-ui-tag-neutral-bg text-ui-tag-neutral-text txt-compact-xsmall-plus rounded px-2 py-0.5">
-                          Active
-                        </span>
-                      )}
-                    </label>
+                  const existing = item.location_levels?.find(
+                    (l) => l.location_id === loc.id
                   )
-                })
-              )}
-            </div>
+                  const hasStockOrReserved =
+                    existing &&
+                    (Number(existing.stocked_quantity ?? 0) > 0 ||
+                      Number(existing.reserved_quantity ?? 0) > 0)
+
+                  return (
+                    <div
+                      key={loc.id}
+                      className="hover:bg-ui-bg-subtle flex items-center justify-between p-3.5 transition-colors"
+                    >
+                      <div className="flex flex-col">
+                        <Text size="small" weight="plus">
+                          {loc.name}
+                        </Text>
+                        {(loc as any).address && (
+                          <Text size="xsmall" className="text-ui-fg-subtle">
+                            {[
+                              (loc as any).address.city,
+                              (loc as any).address.country_code?.toUpperCase(),
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}
+                          </Text>
+                        )}
+                      </div>
+                      <Switch
+                        checked={isChecked}
+                        onCheckedChange={() => toggleLocation(loc.id)}
+                        disabled={isChecked && !!hasStockOrReserved}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </Drawer.Body>
 
           <Drawer.Footer className="border-ui-border-base flex items-center justify-end gap-x-2 border-t p-4">
@@ -207,7 +203,7 @@ export const ManageLocationsDrawer = ({
               Cancel
             </Button>
             <Button type="submit" size="small" isLoading={isPending}>
-              Save Locations
+              Save
             </Button>
           </Drawer.Footer>
         </form>

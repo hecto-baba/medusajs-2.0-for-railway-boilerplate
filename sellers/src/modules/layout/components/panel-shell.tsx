@@ -6,6 +6,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { createContext, useContext, useEffect, useState } from "react"
 import { Sidebar } from "./sidebar"
+import { SettingsSidebar } from "./settings-sidebar"
 import {
   CustomizerMenu,
   LayoutComposer,
@@ -16,6 +17,7 @@ import {
   CORE_LAYOUT_IDS,
 } from "../layout-composer"
 import { Notifications } from "../notifications"
+import { SearchProvider } from "../search"
 
 /**
  * Labels for the fixed segments of a path. Anything not listed - a product id,
@@ -146,50 +148,57 @@ export const PanelShell = ({
     })
   }
 
-  return (
-    <LayoutCustomizerHostProvider>
-      <TitleContext.Provider value={setRecordTitle}>
-        <div className="flex h-screen w-full overflow-hidden">
-          {collapsed ? null : (
-            <Sidebar storeName={storeName} email={email} name={name} />
-          )}
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <header className="border-ui-border-base bg-ui-bg-subtle flex h-12 shrink-0 items-center justify-between border-b px-4">
-              <div className="flex items-center gap-x-3 overflow-hidden">
-                <IconButton
-                  size="small"
-                  variant="transparent"
-                  onClick={toggle}
-                  aria-label={collapsed ? "Show sidebar" : "Hide sidebar"}
-                >
-                  <SidebarLeft />
-                </IconButton>
-                <Breadcrumbs recordTitle={recordTitle} />
-              </div>
+  const pathname = usePathname()
+  const isSettings = pathname.startsWith("/settings")
 
-              {/* Top-Right Header Tools: Customize Layout & Notifications */}
-              <div className="flex items-center gap-x-2 shrink-0">
-                <CustomizerMenu />
-                <LayoutCustomizerSlot location={LAYOUT_CONTROLS_LOCATION} />
-                <LayoutComposer
-                  widgetsZonePrefix="topbar"
-                  preferredLayoutId={CORE_LAYOUT_IDS.SINGLE_ROW}
-                  customizeId={CUSTOMIZE_IDS.TOPBAR}
-                  controlSize="xsmall"
-                  sections={{
-                    main: (
-                      <LayoutComposer.Entry id="Notifications">
-                        <Notifications />
-                      </LayoutComposer.Entry>
-                    ),
-                  }}
-                />
-              </div>
-            </header>
-            <main className="flex-1 overflow-y-auto">{children}</main>
+  return (
+    <SearchProvider>
+      <LayoutCustomizerHostProvider>
+        <TitleContext.Provider value={setRecordTitle}>
+          <div className="flex h-screen w-full overflow-hidden">
+            {collapsed ? null : isSettings ? (
+              <SettingsSidebar email={email} name={name} />
+            ) : (
+              <Sidebar storeName={storeName} email={email} name={name} />
+            )}
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <header className="border-ui-border-base bg-ui-bg-subtle flex h-12 shrink-0 items-center justify-between border-b px-4">
+                <div className="flex items-center gap-x-3 overflow-hidden">
+                  <IconButton
+                    size="small"
+                    variant="transparent"
+                    onClick={toggle}
+                    aria-label={collapsed ? "Show sidebar" : "Hide sidebar"}
+                  >
+                    <SidebarLeft />
+                  </IconButton>
+                  <Breadcrumbs recordTitle={recordTitle} />
+                </div>
+
+                {/* Top-Right Header Tools: Customize Layout & Notifications */}
+                <div className="flex items-center gap-x-2 shrink-0">
+                  <CustomizerMenu />
+                  <LayoutCustomizerSlot location={LAYOUT_CONTROLS_LOCATION} />
+                  <LayoutComposer
+                    widgetsZonePrefix="topbar"
+                    preferredLayoutId={CORE_LAYOUT_IDS.SINGLE_ROW}
+                    customizeId={CUSTOMIZE_IDS.TOPBAR}
+                    controlSize="xsmall"
+                    sections={{
+                      main: (
+                        <LayoutComposer.Entry id="Notifications">
+                          <Notifications />
+                        </LayoutComposer.Entry>
+                      ),
+                    }}
+                  />
+                </div>
+              </header>
+              <main className="flex-1 overflow-y-auto">{children}</main>
+            </div>
           </div>
-        </div>
-      </TitleContext.Provider>
-    </LayoutCustomizerHostProvider>
+        </TitleContext.Provider>
+      </LayoutCustomizerHostProvider>
+    </SearchProvider>
   )
 }

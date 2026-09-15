@@ -2,25 +2,24 @@
 
 import {
   deleteVendorReservation,
+  getVendorTaxonomy,
   listVendorReservations,
   type VendorInventoryItem,
   type VendorReservation,
 } from "@lib/data/vendor-client"
-import { ActionMenu } from "@modules/common"
+import { ActionMenu, PlaceholderCell } from "@modules/common"
 import {
   Button,
   Container,
   Heading,
   Table,
-  Text,
   toast,
   usePrompt,
 } from "@medusajs/ui"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useState } from "react"
-import { ReservationDrawer } from "../forms/reservation-drawer"
-
 import { PencilSquare, Trash } from "@medusajs/icons"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMemo, useState } from "react"
+import { ReservationDrawer } from "../forms/reservation-drawer"
 
 export const ReservationsSection = ({
   item,
@@ -33,6 +32,19 @@ export const ReservationsSection = ({
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [editingReservation, setEditingReservation] =
     useState<VendorReservation | null>(null)
+
+  const { data: taxonomy } = useQuery({
+    queryKey: ["vendor-taxonomy"],
+    queryFn: getVendorTaxonomy,
+  })
+
+  const locationMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const loc of taxonomy?.stock_locations ?? []) {
+      map.set(loc.id, loc.name)
+    }
+    return map
+  }, [taxonomy?.stock_locations])
 
   const { data, isLoading } = useQuery({
     queryKey: ["vendor-reservations", item.id],
@@ -54,7 +66,7 @@ export const ReservationsSection = ({
       queryClient.invalidateQueries({
         queryKey: ["vendor-reservations", item.id],
       })
-      toast.success("Reservation deleted.")
+      toast.success("Reservation was successfully deleted.")
     },
     onError: (error) => {
       toast.error(
@@ -65,8 +77,9 @@ export const ReservationsSection = ({
 
   const handleDelete = async (res: VendorReservation) => {
     const confirmed = await prompt({
-      title: "Delete reservation",
-      description: `Are you sure you want to delete this reservation of ${res.quantity} units? This will release the units back to available stock.`,
+      title: "Are you sure?",
+      description:
+        "You are about to delete a reservation. This action cannot be undone.",
       confirmText: "Delete",
       cancelText: "Cancel",
     })
@@ -80,100 +93,103 @@ export const ReservationsSection = ({
 
   return (
     <>
-      <Container className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <Heading level="h2">Reservations</Heading>
-            <Text size="small" className="text-ui-fg-subtle">
-              Allocated stock holds for pending orders and manual holds.
-            </Text>
-          </div>
+      <Container className="divide-y p-0">
+        <div className="flex items-center justify-between px-6 py-4">
+          <Heading level="h2">Reservations</Heading>
           <Button
             size="small"
             variant="secondary"
             onClick={() => setIsCreateOpen(true)}
           >
-            Create Reservation
+            Create
           </Button>
         </div>
 
         {isLoading ? (
-          <Text size="small" className="text-ui-fg-subtle">
-            Loading reservations...
-          </Text>
+          <div className="p-6 text-center">
+            <span className="text-ui-fg-subtle txt-compact-small">
+              Loading...
+            </span>
+          </div>
         ) : reservations.length === 0 ? (
-          <div className="border-ui-border-base bg-ui-bg-subtle flex flex-col items-center justify-center rounded-lg border py-8 text-center">
-            <Text size="small" className="text-ui-fg-subtle">
-              No active reservations on this item.
-            </Text>
+          <div className="p-6 text-center">
+            <span className="text-ui-fg-subtle txt-compact-small">
+              No records
+            </span>
           </div>
         ) : (
-          <div className="border-ui-border-base overflow-hidden rounded-lg border">
-            <Table>
-              <Table.Header>
-                <Table.Row>
-                  <Table.HeaderCell>Description / Reference</Table.HeaderCell>
-                  <Table.HeaderCell>Location ID</Table.HeaderCell>
-                  <Table.HeaderCell className="text-right">
-                    Quantity
-                  </Table.HeaderCell>
-                  <Table.HeaderCell>Created</Table.HeaderCell>
-                  <Table.HeaderCell className="w-12 text-right">
-                    Actions
-                  </Table.HeaderCell>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {reservations.map((res) => {
-                  const actionGroups = [
-                    {
-                      actions: [
-                        {
-                          icon: <PencilSquare />,
-                          label: "Edit reservation",
-                          onClick: () => setEditingReservation(res),
-                        },
-                        {
-                          icon: <Trash />,
-                          label: "Delete reservation",
-                          onClick: () => handleDelete(res),
-                        },
-                      ],
-                    },
-                  ]
+          <Table>
+            <Table.Header>
+              <Table.Row>
+                <Table.HeaderCell>SKU</Table.HeaderCell>
+                <Table.HeaderCell>Description</Table.HeaderCell>
+                <Table.HeaderCell>Location</Table.HeaderCell>
+                <Table.HeaderCell>Created</Table.HeaderCell>
+                <Table.HeaderCell className="text-right">Quantity</Table.HeaderCell>
+                <Table.HeaderCell className="w-12 text-right" />
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {reservations.map((res) => {
+                const locName = locationMap.get(res.location_id) || res.location_id
+                const actions = [
+                  {
+                    actions: [
+                      {
+                        icon: <PencilSquare />,
+                        label: "Edit",
+                        onClick: () => setEditingReservation(res),
+                      },
+                      {
+                        icon: <Trash />,
+                        label: "Delete",
+                        onClick: () => handleDelete(res),
+                      },
+                    ],
+                  },
+                ]
 
-                  return (
-                    <Table.Row key={res.id}>
-                      <Table.Cell>
-                        <span className="font-medium text-ui-fg-base">
-                          {res.description || res.id}
-                        </span>
-                      </Table.Cell>
-                      <Table.Cell className="text-ui-fg-subtle font-mono txt-compact-xsmall">
-                        {res.location_id}
-                      </Table.Cell>
-                      <Table.Cell className="text-right font-medium">
-                        {res.quantity}
-                      </Table.Cell>
-                      <Table.Cell className="text-ui-fg-subtle txt-compact-small">
-                        {new Date(res.created_at).toLocaleDateString(
-                          undefined,
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          }
+                return (
+                  <Table.Row key={res.id}>
+                    <Table.Cell>
+                      <div className="flex size-full items-center overflow-hidden">
+                        <span className="truncate">{item.sku || "-"}</span>
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <div className="flex size-full items-center overflow-hidden">
+                        {res.description ? (
+                          <span className="truncate">{res.description}</span>
+                        ) : (
+                          <PlaceholderCell />
                         )}
-                      </Table.Cell>
-                      <Table.Cell className="text-right">
-                        <ActionMenu groups={actionGroups} />
-                      </Table.Cell>
-                    </Table.Row>
-                  )
-                })}
-              </Table.Body>
-            </Table>
-          </div>
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <div className="flex size-full items-center overflow-hidden">
+                        <span className="truncate">{locName}</span>
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <span className="text-ui-fg-subtle txt-compact-small">
+                        {new Date(res.created_at).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </Table.Cell>
+                    <Table.Cell className="text-right">
+                      <span className="truncate">{res.quantity}</span>
+                    </Table.Cell>
+                    <Table.Cell className="text-right">
+                      <ActionMenu groups={actions} />
+                    </Table.Cell>
+                  </Table.Row>
+                )
+              })}
+            </Table.Body>
+          </Table>
         )}
       </Container>
 
