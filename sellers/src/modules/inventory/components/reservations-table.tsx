@@ -8,6 +8,7 @@ import {
 } from "@lib/data/vendor-client"
 import {
   Button,
+  Container,
   createDataTableColumnHelper,
   createDataTableCommandHelper,
   createDataTableFilterHelper,
@@ -22,8 +23,8 @@ import {
   useDataTable,
   usePrompt,
 } from "@medusajs/ui"
+import { PencilSquare, Trash } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import { PlaceholderCell } from "@modules/common"
@@ -67,27 +68,26 @@ export const ReservationsTable = () => {
     queryFn: getVendorTaxonomy,
   })
 
-  const locations = taxonomy?.stock_locations ?? []
   const locationMap = useMemo(() => {
     const map = new Map<string, string>()
-    for (const loc of locations) {
+    for (const loc of taxonomy?.stock_locations ?? []) {
       map.set(loc.id, loc.name)
     }
     return map
-  }, [locations])
+  }, [taxonomy?.stock_locations])
 
   const filters = useMemo(
     () => [
       filterHelper.accessor("location_id", {
-        label: "Stock Location",
+        label: "Location",
         type: "select",
-        options: locations.map((loc) => ({
+        options: (taxonomy?.stock_locations ?? []).map((loc) => ({
           label: loc.name,
           value: loc.id,
         })),
       }),
     ],
-    [locations]
+    [taxonomy?.stock_locations]
   )
 
   const { data, isLoading } = useQuery({
@@ -119,18 +119,19 @@ export const ReservationsTable = () => {
   })
 
   const handleDelete = async (reservation: VendorReservation) => {
-    const confirmed = await prompt({
-      title: "Delete reservation",
-      description: `Are you sure you want to delete and release this reservation of ${reservation.quantity} unit(s)? This cannot be undone.`,
+    const res = await prompt({
+      title: "Are you sure?",
+      description:
+        "You are about to delete a reservation. This action cannot be undone.",
       confirmText: "Delete",
       cancelText: "Cancel",
     })
 
-    if (!confirmed) return
+    if (!res) return
 
     try {
       await remove(reservation.id)
-      toast.success("Reservation deleted and stock released.")
+      toast.success("Reservation was successfully deleted.")
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete reservation."
@@ -141,126 +142,116 @@ export const ReservationsTable = () => {
   const reservations = data?.reservations ?? []
   const totalCount = data?.count ?? 0
 
-  const totalReservedUnits = reservations.reduce(
-    (sum, r) => sum + Number(r.quantity ?? 0),
-    0
-  )
-
-  const columns = [
-    columnHelper.accessor("inventory_item.title", {
-      id: "inventory_item",
-      header: "Item",
-      enableSorting: false,
-      cell: ({ row }) => {
-        const item = row.original.inventory_item
-        const itemId = row.original.inventory_item_id
-
-        return (
-          <Link
-            href={`/inventory/${itemId}`}
-            className="flex items-center gap-x-3 py-1 hover:opacity-80 transition-opacity"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {item?.thumbnail ? (
-              <img
-                src={item.thumbnail}
-                alt={item.title || "Item thumbnail"}
-                className="h-8 w-8 rounded object-cover border border-ui-border-base"
-              />
-            ) : (
-              <div className="bg-ui-bg-subtle border-ui-border-base text-ui-fg-muted flex h-8 w-8 items-center justify-center rounded border text-xs font-semibold">
-                {(item?.title || "I")[0]?.toUpperCase()}
-              </div>
-            )}
-            <div className="flex flex-col">
-              <span className="text-ui-fg-base txt-compact-small-plus truncate font-medium">
-                {item?.title || "Untitled Item"}
-              </span>
-              {item?.sku ? (
-                <span className="text-ui-fg-subtle txt-compact-xsmall font-mono">
-                  {item.sku}
-                </span>
-              ) : null}
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("inventory_item.sku", {
+        id: "sku",
+        header: "SKU",
+        enableSorting: true,
+        sortLabel: "SKU",
+        cell: ({ row }) => {
+          const sku = row.original.inventory_item?.sku
+          if (!sku) {
+            return <PlaceholderCell />
+          }
+          return (
+            <div className="flex size-full items-center overflow-hidden">
+              <span className="truncate">{sku}</span>
             </div>
-          </Link>
-        )
-      },
-    }),
-    columnHelper.accessor("description", {
-      id: "description",
-      header: "Description / Reference",
-      enableSorting: true,
-      sortLabel: "Description",
-      cell: ({ row }) =>
-        row.original.description ? (
-          <span className="text-ui-fg-subtle txt-compact-small line-clamp-1">
-            {row.original.description}
-          </span>
-        ) : (
-          <PlaceholderCell />
+          )
+        },
+      }),
+      columnHelper.accessor("description", {
+        id: "description",
+        header: "Description",
+        enableSorting: true,
+        sortLabel: "Description",
+        cell: ({ row }) => {
+          const description = row.original.description
+          if (!description) {
+            return <PlaceholderCell />
+          }
+          return (
+            <div className="flex size-full items-center overflow-hidden">
+              <span className="truncate">{description}</span>
+            </div>
+          )
+        },
+      }),
+      columnHelper.accessor("location_id", {
+        id: "location_id",
+        header: "Location",
+        enableSorting: true,
+        sortLabel: "Location",
+        cell: ({ row }) => {
+          const locName = locationMap.get(row.original.location_id)
+          if (!locName) {
+            return <PlaceholderCell />
+          }
+          return (
+            <div className="flex size-full items-center overflow-hidden">
+              <span className="truncate">{locName}</span>
+            </div>
+          )
+        },
+      }),
+      columnHelper.accessor("created_at", {
+        id: "created_at",
+        header: "Created",
+        enableSorting: true,
+        sortLabel: "Created",
+        cell: ({ row }) => {
+          const created = row.original.created_at
+          if (!created) {
+            return <PlaceholderCell />
+          }
+          return (
+            <span className="text-ui-fg-subtle txt-compact-small">
+              {new Date(created).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+          )
+        },
+      }),
+      columnHelper.accessor("quantity", {
+        id: "quantity",
+        header: () => (
+          <div className="flex size-full items-center justify-end overflow-hidden text-right">
+            <span className="truncate">Quantity</span>
+          </div>
         ),
-    }),
-    columnHelper.accessor("location_id", {
-      id: "location_id",
-      header: "Location",
-      enableSorting: true,
-      sortLabel: "Location",
-      cell: ({ row }) => {
-        const locName = locationMap.get(row.original.location_id) || "Stock Location"
-        return (
-          <span className="text-ui-fg-subtle txt-compact-small font-medium">
-            {locName}
-          </span>
-        )
-      },
-    }),
-    columnHelper.accessor("quantity", {
-      id: "quantity",
-      header: "Quantity",
-      enableSorting: true,
-      sortLabel: "Quantity",
-      cell: ({ row }) => (
-        <span className="bg-ui-bg-subtle text-ui-fg-base border-ui-border-base txt-compact-small-plus rounded-md border px-2.5 py-0.5 font-medium">
-          {row.original.quantity} units
-        </span>
-      ),
-    }),
-    columnHelper.accessor("created_at", {
-      id: "created_at",
-      header: "Created",
-      enableSorting: true,
-      sortLabel: "Created",
-      cell: ({ row }) => (
-        <span className="text-ui-fg-muted txt-compact-xsmall">
-          {new Date(row.original.created_at).toLocaleDateString(undefined, {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-          })}
-        </span>
-      ),
-    }),
-    columnHelper.action({
-      actions: [
-        {
-          label: "View inventory item",
-          onClick: (ctx) => {
-            router.push(`/inventory/${ctx.row.original.inventory_item_id}`)
-          },
-        },
-        {
-          label: "Edit reservation",
-          onClick: (ctx) => {
-            setEditingReservation(ctx.row.original)
-          },
-        },
-        {
-          label: "Delete / Release",
-          onClick: (ctx) => handleDelete(ctx.row.original),
-        },
-      ],
-    }),
-  ]
+        enableSorting: true,
+        sortLabel: "Quantity",
+        cell: ({ row }) => (
+          <div className="flex size-full items-center justify-end overflow-hidden text-right">
+            <span className="truncate">{row.original.quantity}</span>
+          </div>
+        ),
+      }),
+      columnHelper.action({
+        actions: (ctx) => [
+          [
+            {
+              icon: <PencilSquare />,
+              label: "Edit",
+              onClick: () => setEditingReservation(ctx.row.original),
+            },
+          ],
+          [
+            {
+              icon: <Trash />,
+              label: "Delete",
+              onClick: () => handleDelete(ctx.row.original),
+            },
+          ],
+        ],
+      }),
+    ],
+    [locationMap, handleDelete]
+  )
 
   const commands = [
     commandHelper.command({
@@ -268,16 +259,16 @@ export const ReservationsTable = () => {
       shortcut: "d",
       action: async (selection) => {
         const ids = Object.keys(selection)
-        const confirmed = await prompt({
-          title: "Delete reservations",
-          description: `Delete and release ${ids.length} ${
+        const res = await prompt({
+          title: "Are you sure?",
+          description: `You are about to delete ${ids.length} ${
             ids.length === 1 ? "reservation" : "reservations"
-          }? This cannot be undone.`,
+          }. This action cannot be undone.`,
           confirmText: "Delete",
           cancelText: "Cancel",
         })
 
-        if (!confirmed) return
+        if (!res) return
 
         const failures: string[] = []
         for (const id of ids) {
@@ -310,6 +301,7 @@ export const ReservationsTable = () => {
     getRowId: (r) => r.id,
     rowCount: totalCount,
     isLoading,
+    onRowClick: (_event, row) => router.push(`/reservations/${row.id}`),
     search: {
       state: search,
       onSearchChange: (value) => {
@@ -341,58 +333,41 @@ export const ReservationsTable = () => {
   })
 
   return (
-    <div className="flex flex-col gap-y-4">
-      {/* Metric Cards Banner */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-ui-bg-base shadow-elevation-card-rest border-ui-border-base rounded-lg border p-4">
-          <Text size="xsmall" className="text-ui-fg-subtle uppercase">
-            Total Reservations
+    <Container className="divide-y p-0">
+      <div className="flex items-center justify-between px-6 py-4">
+        <div>
+          <Heading>Reservations</Heading>
+          <Text className="text-ui-fg-subtle" size="small">
+            Manage the reserved quantity of inventory items.
           </Text>
-          <Heading level="h3" className="mt-1">
-            {totalCount}
-          </Heading>
         </div>
-        <div className="bg-ui-bg-base shadow-elevation-card-rest border-ui-border-base rounded-lg border p-4">
-          <Text size="xsmall" className="text-ui-fg-subtle uppercase">
-            Total Units Reserved
-          </Text>
-          <Heading level="h3" className="mt-1 text-ui-fg-muted">
-            {totalReservedUnits}
-          </Heading>
-        </div>
+        <Button
+          size="small"
+          variant="secondary"
+          onClick={() => setIsCreateOpen(true)}
+        >
+          Create
+        </Button>
       </div>
 
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-          <div>
-            <Heading level="h2">Reservations</Heading>
-            <Text size="small" className="text-ui-fg-subtle">
-              Manage inventory holds and order allocations.
-            </Text>
-          </div>
           <div className="flex items-center gap-x-2">
-            <DataTable.Search placeholder="Search reservations..." />
+            <DataTable.Search placeholder="Search" />
             <DataTable.FilterMenu tooltip="Filter" />
             <DataTable.SortingMenu tooltip="Sort" />
-            <Button
-              size="small"
-              variant="secondary"
-              onClick={() => setIsCreateOpen(true)}
-            >
-              + Create Reservation
-            </Button>
           </div>
         </DataTable.Toolbar>
         <DataTable.FilterBar />
         <DataTable.Table
           emptyState={{
             empty: {
-              heading: "No reservations yet",
-              description: "Create your first reservation to hold stock for an order or customer.",
+              heading: "No records",
+              description: "There are no records to show",
             },
             filtered: {
-              heading: "No matches found",
-              description: "Try adjusting your search or filters.",
+              heading: "No results",
+              description: "Try changing the filters or search query",
             },
           }}
         />
@@ -415,6 +390,6 @@ export const ReservationsTable = () => {
           }}
         />
       )}
-    </div>
+    </Container>
   )
 }

@@ -5,12 +5,11 @@ import {
   type VendorInventoryItem,
 } from "@lib/data/vendor-client"
 import { ActionMenu, SectionRow } from "@modules/common"
-import { Container, Heading, Text, toast, usePrompt } from "@medusajs/ui"
+import { Container, Heading, toast, usePrompt } from "@medusajs/ui"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { EditItemDrawer } from "../forms/edit-item-drawer"
-
 import { PencilSquare, Trash } from "@medusajs/icons"
 
 export const GeneralSection = ({ item }: { item: VendorInventoryItem }) => {
@@ -19,11 +18,11 @@ export const GeneralSection = ({ item }: { item: VendorInventoryItem }) => {
   const prompt = usePrompt()
   const [isEditOpen, setIsEditOpen] = useState(false)
 
-  const { mutateAsync: remove, isPending: isDeleting } = useMutation({
+  const { mutateAsync: remove } = useMutation({
     mutationFn: () => deleteVendorInventoryItem(item.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendor-inventory-items"] })
-      toast.success("Inventory item deleted.")
+      toast.success("Inventory item deleted successfully.")
       router.push("/inventory")
     },
     onError: (error) => {
@@ -34,14 +33,15 @@ export const GeneralSection = ({ item }: { item: VendorInventoryItem }) => {
   })
 
   const handleDelete = async () => {
-    const confirmed = await prompt({
-      title: "Delete inventory item",
-      description: `Are you sure you want to delete "${item.title || item.sku}"? This action cannot be undone.`,
+    const res = await prompt({
+      title: "Are you sure?",
+      description:
+        "You are about to delete an inventory item. This action cannot be undone.",
       confirmText: "Delete",
       cancelText: "Cancel",
     })
 
-    if (confirmed) {
+    if (res) {
       await remove()
     }
   }
@@ -51,94 +51,56 @@ export const GeneralSection = ({ item }: { item: VendorInventoryItem }) => {
       actions: [
         {
           icon: <PencilSquare />,
-          label: "Edit general info",
+          label: "Edit",
           onClick: () => setIsEditOpen(true),
         },
         {
           icon: <Trash />,
-          label: "Delete item",
+          label: "Delete",
           onClick: handleDelete,
         },
       ],
     },
   ]
 
-  const totalStocked = item.location_levels?.length
+  const locationCount = item.location_levels?.length ?? 0
+
+  const getQuantityFormat = (quantity: number | undefined | null) => {
+    if (quantity !== undefined && quantity !== null && !isNaN(quantity)) {
+      return `${quantity} across ${locationCount} locations`
+    }
+    return "-"
+  }
+
+  const stocked = item.location_levels?.length
     ? item.location_levels.reduce(
         (sum, lvl) => sum + Number(lvl.stocked_quantity ?? 0),
         0
       )
     : Number(item.stocked_quantity ?? 0)
-  const totalReserved = item.location_levels?.length
+
+  const reserved = item.location_levels?.length
     ? item.location_levels.reduce(
         (sum, lvl) => sum + Number(lvl.reserved_quantity ?? 0),
         0
       )
     : Number(item.reserved_quantity ?? 0)
-  const available = totalStocked - totalReserved
+
+  const available = stocked - reserved
 
   return (
     <>
-      <Container className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex flex-col gap-y-1">
-            <div className="flex items-center gap-x-3">
-              <Heading level="h1" className="text-xl font-semibold">
-                {item.title || "Untitled Item"}
-              </Heading>
-              <span
-                className={`txt-compact-xsmall-plus rounded px-2 py-0.5 ${
-                  totalStocked === 0
-                    ? "bg-ui-tag-red-bg text-ui-tag-red-text"
-                    : available <= 5
-                    ? "bg-ui-tag-orange-bg text-ui-tag-orange-text"
-                    : "bg-ui-tag-green-bg text-ui-tag-green-text"
-                }`}
-              >
-                {totalStocked === 0
-                  ? "Out of stock"
-                  : available <= 5
-                  ? "Low stock"
-                  : "In stock"}
-              </span>
-            </div>
-            {item.sku && (
-              <Text size="small" className="text-ui-fg-subtle font-mono">
-                SKU: {item.sku}
-              </Text>
-            )}
-          </div>
+      <Container className="divide-y p-0">
+        <div className="flex items-center justify-between px-6 py-4">
+          <Heading>
+            {item.title ?? item.sku} Details
+          </Heading>
           <ActionMenu groups={actions} />
         </div>
-
-        {item.description && (
-          <Text size="small" className="text-ui-fg-subtle mt-4">
-            {item.description}
-          </Text>
-        )}
-
-        <div className="border-ui-border-base mt-6 border-t pt-4">
-          <SectionRow
-            title="Created"
-            value={new Date(item.created_at).toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          />
-          <SectionRow
-            title="Last updated"
-            value={new Date(item.updated_at).toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          />
-        </div>
+        <SectionRow title="SKU" value={item.sku ?? "-"} />
+        <SectionRow title="In Stock" value={getQuantityFormat(stocked)} />
+        <SectionRow title="Reserved" value={getQuantityFormat(reserved)} />
+        <SectionRow title="Available" value={getQuantityFormat(available)} />
       </Container>
 
       <EditItemDrawer

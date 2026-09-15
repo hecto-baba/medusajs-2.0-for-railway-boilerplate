@@ -10,8 +10,7 @@ import {
   Heading,
   Input,
   Label,
-  Switch,
-  Text,
+  Select,
   toast,
 } from "@medusajs/ui"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -24,6 +23,21 @@ type EditAttributesDrawerProps = {
   onSuccess?: () => void
 }
 
+const COUNTRIES = [
+  { label: "United States", value: "US" },
+  { label: "United Kingdom", value: "GB" },
+  { label: "Germany", value: "DE" },
+  { label: "France", value: "FR" },
+  { label: "India", value: "IN" },
+  { label: "China", value: "CN" },
+  { label: "Japan", value: "JP" },
+  { label: "Canada", value: "CA" },
+  { label: "Australia", value: "AU" },
+  { label: "Italy", value: "IT" },
+  { label: "Spain", value: "ES" },
+  { label: "Netherlands", value: "NL" },
+]
+
 export const EditAttributesDrawer = ({
   item,
   open,
@@ -32,7 +46,6 @@ export const EditAttributesDrawer = ({
 }: EditAttributesDrawerProps) => {
   const queryClient = useQueryClient()
 
-  const [requiresShipping, setRequiresShipping] = useState(true)
   const [width, setWidth] = useState("")
   const [length, setLength] = useState("")
   const [height, setHeight] = useState("")
@@ -44,7 +57,6 @@ export const EditAttributesDrawer = ({
 
   useEffect(() => {
     if (open) {
-      setRequiresShipping(item.requires_shipping ?? true)
       setWidth(item.width?.toString() ?? "")
       setLength(item.length?.toString() ?? "")
       setHeight(item.height?.toString() ?? "")
@@ -64,7 +76,7 @@ export const EditAttributesDrawer = ({
       queryClient.invalidateQueries({
         queryKey: ["vendor-inventory-item", item.id],
       })
-      toast.success("Attributes updated.")
+      toast.success("Inventory item updated successfully.")
       onOpenChange(false)
       onSuccess?.()
     },
@@ -90,7 +102,6 @@ export const EditAttributesDrawer = ({
       material: txt(material),
       hs_code: txt(hsCode),
       origin_country: txt(originCountry),
-      requires_shipping: requiresShipping,
     })
   }
 
@@ -101,128 +112,114 @@ export const EditAttributesDrawer = ({
           <Drawer.Title asChild>
             <Heading level="h2">Edit Attributes</Heading>
           </Drawer.Title>
-          <Drawer.Description className="text-ui-fg-subtle txt-small">
-            Manage dimensions, shipping, and customs details.
-          </Drawer.Description>
         </Drawer.Header>
 
         <form
           onSubmit={onSubmit}
           className="flex flex-1 flex-col justify-between overflow-hidden"
         >
-          <Drawer.Body className="flex flex-1 flex-col gap-y-6 overflow-auto p-6">
-            <div className="bg-ui-bg-subtle border-ui-border-base flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <Text size="small" weight="plus">
-                  Requires Shipping
-                </Text>
-                <Text size="xsmall" className="text-ui-fg-subtle">
-                  Toggle whether this item requires physical delivery.
-                </Text>
+          <Drawer.Body className="flex flex-1 flex-col gap-y-4 overflow-auto p-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-y-1.5">
+                <Label size="small" weight="plus">
+                  Height
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={height}
+                  onChange={(e) => setHeight(e.target.value)}
+                />
               </div>
-              <Switch
-                checked={requiresShipping}
-                onCheckedChange={setRequiresShipping}
+
+              <div className="flex flex-col gap-y-1.5">
+                <Label size="small" weight="plus">
+                  Width
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={width}
+                  onChange={(e) => setWidth(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-y-1.5">
+                <Label size="small" weight="plus">
+                  Length
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={length}
+                  onChange={(e) => setLength(e.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-col gap-y-1.5">
+                <Label size="small" weight="plus">
+                  Weight
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-y-1.5">
+              <Label size="small" weight="plus">
+                MID Code
+              </Label>
+              <Input
+                value={midCode}
+                onChange={(e) => setMidCode(e.target.value)}
               />
             </div>
 
-            <div className="flex flex-col gap-y-3">
-              <Heading
-                level="h3"
-                className="txt-compact-small-plus text-ui-fg-subtle uppercase"
-              >
-                Dimensions
-              </Heading>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-y-1.5">
-                  <Label size="small">Width (cm)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={width}
-                    onChange={(e) => setWidth(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-                <div className="flex flex-col gap-y-1.5">
-                  <Label size="small">Length (cm)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={length}
-                    onChange={(e) => setLength(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-                <div className="flex flex-col gap-y-1.5">
-                  <Label size="small">Height (cm)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={height}
-                    onChange={(e) => setHeight(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-                <div className="flex flex-col gap-y-1.5">
-                  <Label size="small">Weight (g)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-              </div>
+            <div className="flex flex-col gap-y-1.5">
+              <Label size="small" weight="plus">
+                Material
+              </Label>
+              <Input
+                value={material}
+                onChange={(e) => setMaterial(e.target.value)}
+              />
             </div>
 
-            <div className="flex flex-col gap-y-3">
-              <Heading
-                level="h3"
-                className="txt-compact-small-plus text-ui-fg-subtle uppercase"
+            <div className="flex flex-col gap-y-1.5">
+              <Label size="small" weight="plus">
+                HS Code
+              </Label>
+              <Input
+                value={hsCode}
+                onChange={(e) => setHsCode(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-y-1.5">
+              <Label size="small" weight="plus">
+                Country of origin
+              </Label>
+              <Select
+                value={originCountry}
+                onValueChange={setOriginCountry}
               >
-                Customs & Origin
-              </Heading>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-y-1.5">
-                  <Label size="small">Country of Origin</Label>
-                  <Input
-                    value={originCountry}
-                    onChange={(e) => setOriginCountry(e.target.value)}
-                    placeholder="e.g. US, IN, CN"
-                    maxLength={2}
-                  />
-                </div>
-                <div className="flex flex-col gap-y-1.5">
-                  <Label size="small">Material</Label>
-                  <Input
-                    value={material}
-                    onChange={(e) => setMaterial(e.target.value)}
-                    placeholder="e.g. 100% Cotton"
-                  />
-                </div>
-                <div className="flex flex-col gap-y-1.5">
-                  <Label size="small">HS Code</Label>
-                  <Input
-                    value={hsCode}
-                    onChange={(e) => setHsCode(e.target.value)}
-                    placeholder="e.g. 6109.10.00"
-                  />
-                </div>
-                <div className="flex flex-col gap-y-1.5">
-                  <Label size="small">MID Code</Label>
-                  <Input
-                    value={midCode}
-                    onChange={(e) => setMidCode(e.target.value)}
-                    placeholder="e.g. US12345"
-                  />
-                </div>
-              </div>
+                <Select.Trigger>
+                  <Select.Value placeholder="Select a country" />
+                </Select.Trigger>
+                <Select.Content>
+                  {COUNTRIES.map((c) => (
+                    <Select.Item key={c.value} value={c.value}>
+                      {c.label}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select>
             </div>
           </Drawer.Body>
 

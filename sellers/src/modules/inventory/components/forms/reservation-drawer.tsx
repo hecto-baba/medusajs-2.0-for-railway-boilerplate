@@ -12,6 +12,7 @@ import {
   Drawer,
   Heading,
   Input,
+  Label,
   Select,
   Text,
   Textarea,
@@ -28,6 +29,25 @@ type ReservationDrawerProps = {
   onSuccess?: () => void
 }
 
+const AttributeGridRow = ({
+  title,
+  value,
+}: {
+  title: string
+  value: string | number
+}) => {
+  return (
+    <div className="grid grid-cols-2 divide-x">
+      <Text className="px-2 py-1.5" size="small" leading="compact">
+        {title}
+      </Text>
+      <Text className="px-2 py-1.5" size="small" leading="compact">
+        {value}
+      </Text>
+    </div>
+  )
+}
+
 export const ReservationDrawer = ({
   item: initialItem,
   reservation,
@@ -39,11 +59,11 @@ export const ReservationDrawer = ({
 
   const isEdit = !!reservation
 
-  // For global creation mode without pre-passed item
+  // Fetch items for selection when creating globally
   const { data: inventoryData, isLoading: isLoadingItems } = useQuery({
     queryKey: ["vendor-inventory-items", 100, 0],
     queryFn: () => listVendorInventoryItems({ limit: 100, offset: 0 }),
-    enabled: open && !initialItem,
+    enabled: open && !initialItem && !isEdit,
   })
 
   const allItems = useMemo(
@@ -53,7 +73,7 @@ export const ReservationDrawer = ({
 
   const [selectedItemId, setSelectedItemId] = useState<string>("")
   const [locationId, setLocationId] = useState<string>("")
-  const [quantity, setQuantity] = useState<number>(1)
+  const [quantity, setQuantity] = useState<number | "">(1)
   const [description, setDescription] = useState<string>("")
 
   const activeItem = useMemo(() => {
@@ -69,6 +89,11 @@ export const ReservationDrawer = ({
     [activeItem]
   )
 
+  const selectedLevel = useMemo(() => {
+    if (!locationId || !activeLevels.length) return null
+    return activeLevels.find((l) => l.location_id === locationId) ?? null
+  }, [locationId, activeLevels])
+
   useEffect(() => {
     if (open) {
       if (reservation) {
@@ -79,10 +104,12 @@ export const ReservationDrawer = ({
       } else {
         if (initialItem) {
           setSelectedItemId(initialItem.id)
-          setLocationId(initialItem.location_levels?.[0]?.location_id ?? "")
+          const firstLoc = initialItem.location_levels?.[0]?.location_id ?? ""
+          setLocationId(firstLoc)
         } else if (allItems.length > 0) {
           setSelectedItemId(allItems[0].id)
-          setLocationId(allItems[0].location_levels?.[0]?.location_id ?? "")
+          const firstLoc = allItems[0].location_levels?.[0]?.location_id ?? ""
+          setLocationId(firstLoc)
         } else {
           setSelectedItemId("")
           setLocationId("")
@@ -93,73 +120,106 @@ export const ReservationDrawer = ({
     }
   }, [reservation, open, initialItem, allItems])
 
-  // When selected item changes in create mode, pick its first location
   const handleItemChange = (itemId: string) => {
     setSelectedItemId(itemId)
     const itm = allItems.find((i) => i.id === itemId)
-    setLocationId(itm?.location_levels?.[0]?.location_id ?? "")
+    const firstLoc = itm?.location_levels?.[0]?.location_id ?? ""
+    setLocationId(firstLoc)
   }
 
-  const { mutateAsync: saveReservation, isPending } = useMutation({
-    mutationFn: async () => {
-      const targetItemId = activeItem?.id || reservation?.inventory_item_id
-      if (!targetItemId) {
-        throw new Error("Please select an inventory item.")
-      }
-
-      if (isEdit && reservation) {
-        return updateVendorReservation(reservation.id, {
-          location_id: locationId,
-          quantity: Number(quantity),
-          description: description || null,
-        })
-      } else {
-        return createVendorReservation({
-          inventory_item_id: targetItemId,
-          location_id: locationId,
-          quantity: Number(quantity),
-          description: description || null,
-        })
-      }
-    },
+  const { mutateAsync: createRes, isPending: isCreating } = useMutation({
+    mutationFn: (payload: {
+      inventory_item_id: string
+      location_id: string
+      quantity: number
+      description?: string
+    }) => createVendorReservation(payload),
     onSuccess: () => {
-      const targetItemId = activeItem?.id || reservation?.inventory_item_id
+      queryClient.invalidateQueries({ queryKey: ["vendor-reservations"] })
       queryClient.invalidateQueries({ queryKey: ["vendor-inventory-items"] })
-      if (targetItemId) {
+      if (activeItem) {
         queryClient.invalidateQueries({
-          queryKey: ["vendor-inventory-item", targetItemId],
+          queryKey: ["vendor-inventory-item", activeItem.id],
         })
       }
-      queryClient.invalidateQueries({ queryKey: ["vendor-reservations"] })
-      toast.success(
-        isEdit ? "Reservation updated." : "Reservation created successfully."
-      )
+      toast.success("Reservation was successfully created.")
       onOpenChange(false)
       onSuccess?.()
     },
     onError: (error) => {
       toast.error(
-        error instanceof Error ? error.message : "Failed to save reservation."
+        error instanceof Error ? error.message : "Failed to create reservation."
+      )
+    },
+  })
+
+  const { mutateAsync: updateRes, isPending: isUpdating } = useMutation({
+    mutationFn: (payload: {
+      location_id?: string
+      quantity?: number
+      description?: string | null
+    }) => updateVendorReservation(reservation!.id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vendor-reservations"] })
+      queryClient.invalidateQueries({
+        queryKey: ["vendor-reservation", reservation!.id],
+      })
+      queryClient.invalidateQueries({ queryKey: ["vendor-inventory-items"] })
+      if (activeItem) {
+        queryClient.invalidateQueries({
+          queryKey: ["vendor-inventory-item", activeItem.id],
+        })
+      }
+      toast.success("Reservation was successfully updated.")
+      onOpenChange(false)
+      onSuccess?.()
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update reservation."
       )
     },
   })
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!activeItem && !isEdit) {
-      toast.error("Please select an inventory item.")
+
+    const qtyNum = typeof quantity === "number" ? quantity : parseInt(quantity)
+    if (!selectedItemId) {
+      toast.error("Please select an item to reserve.")
       return
     }
     if (!locationId) {
-      toast.error("Please select a stock location.")
+      toast.error("Please select a location.")
       return
     }
-    if (quantity < 1) {
+    if (isNaN(qtyNum) || qtyNum < 1) {
       toast.error("Quantity must be at least 1.")
       return
     }
-    await saveReservation()
+
+    if (isEdit) {
+      await updateRes({
+        location_id: locationId,
+        quantity: qtyNum,
+        description: description.trim() || null,
+      })
+    } else {
+      await createRes({
+        inventory_item_id: selectedItemId,
+        location_id: locationId,
+        quantity: qtyNum,
+        description: description.trim() || undefined,
+      })
+    }
   }
+
+  const isPending = isCreating || isUpdating
+
+  const availableQuantity = selectedLevel
+    ? Number(selectedLevel.stocked_quantity ?? 0) -
+      Number(selectedLevel.reserved_quantity ?? 0)
+    : "-"
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -167,114 +227,129 @@ export const ReservationDrawer = ({
         <Drawer.Header>
           <Drawer.Title asChild>
             <Heading level="h2">
-              {isEdit ? "Edit Reservation" : "Create Reservation"}
+              {isEdit ? "Edit reservation" : "Create reservation"}
             </Heading>
           </Drawer.Title>
-          <Drawer.Description className="text-ui-fg-subtle txt-small">
-            Reserve inventory units for holds, manual allocations, or drafts.
-          </Drawer.Description>
         </Drawer.Header>
 
         <form
           onSubmit={onSubmit}
           className="flex flex-1 flex-col justify-between overflow-hidden"
         >
-          <Drawer.Body className="flex flex-1 flex-col gap-y-4 overflow-auto p-6">
+          <Drawer.Body className="flex flex-1 flex-col gap-y-6 overflow-auto p-6">
             {!initialItem && !isEdit && (
               <div className="flex flex-col gap-y-1.5">
-                <label className="text-ui-fg-base txt-compact-small-plus">
-                  Inventory Item
-                </label>
+                <Label size="small" weight="plus">
+                  Item to reserve
+                </Label>
                 {isLoadingItems ? (
-                  <Text size="small" className="text-ui-fg-muted">
-                    Loading inventory items…
+                  <Text size="small" className="text-ui-fg-subtle">
+                    Loading items...
                   </Text>
-                ) : allItems.length > 0 ? (
+                ) : (
                   <Select
                     value={selectedItemId}
                     onValueChange={handleItemChange}
                   >
                     <Select.Trigger>
-                      <Select.Value placeholder="Select an inventory item" />
+                      <Select.Value placeholder="Select an item" />
                     </Select.Trigger>
                     <Select.Content>
                       {allItems.map((itm) => (
                         <Select.Item key={itm.id} value={itm.id}>
-                          {itm.title || itm.sku || "Untitled Item"}
-                          {itm.sku ? ` (${itm.sku})` : ""}
+                          {itm.title || itm.sku}
                         </Select.Item>
                       ))}
                     </Select.Content>
                   </Select>
-                ) : (
-                  <Text size="small" className="text-ui-fg-error">
-                    No inventory items found. Please create an inventory item first.
-                  </Text>
                 )}
               </div>
             )}
 
             <div className="flex flex-col gap-y-1.5">
-              <label className="text-ui-fg-base txt-compact-small-plus">
-                Stock Location
-              </label>
-              {activeLevels.length > 0 ? (
+              <Label size="small" weight="plus">
+                Location
+              </Label>
+              {activeLevels.length === 0 ? (
+                <Text size="small" className="text-ui-fg-muted">
+                  No warehouse locations assigned to this item.
+                </Text>
+              ) : (
                 <Select
                   value={locationId}
                   onValueChange={setLocationId}
-                  disabled={isEdit}
                 >
                   <Select.Trigger>
                     <Select.Value placeholder="Select location" />
                   </Select.Trigger>
                   <Select.Content>
                     {activeLevels.map((lvl) => {
-                      const name = Array.isArray(lvl.stock_locations)
+                      const locName = Array.isArray(lvl.stock_locations)
                         ? lvl.stock_locations[0]?.name
                         : lvl.stock_locations?.name || lvl.location_id
                       return (
                         <Select.Item key={lvl.location_id} value={lvl.location_id}>
-                          {name} ({lvl.available_quantity ?? (Number(lvl.stocked_quantity ?? 0) - Number(lvl.reserved_quantity ?? 0))} available)
+                          {locName}
                         </Select.Item>
                       )
                     })}
                   </Select.Content>
                 </Select>
-              ) : activeItem ? (
-                <Text size="small" className="text-ui-fg-error">
-                  This item is not stocked at any location yet. Please manage locations first.
-                </Text>
-              ) : (
-                <Text size="small" className="text-ui-fg-subtle">
-                  Select an inventory item first.
-                </Text>
               )}
             </div>
 
-            <div className="flex flex-col gap-y-1.5">
-              <label className="text-ui-fg-base txt-compact-small-plus">
-                Reserved Quantity
-              </label>
-              <Input
-                type="number"
-                min={1}
-                value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+            {/* Summary Card */}
+            <div className="text-ui-fg-subtle shadow-elevation-card-rest border-ui-border-base grid grid-rows-4 divide-y rounded-lg border">
+              <AttributeGridRow
+                title="Title"
+                value={activeItem?.title ?? activeItem?.sku ?? "-"}
               />
-              <Text size="xsmall" className="text-ui-fg-subtle">
-                Number of units to lock from available stock.
-              </Text>
+              <AttributeGridRow
+                title="SKU"
+                value={activeItem?.sku ?? "-"}
+              />
+              <AttributeGridRow
+                title="In Stock"
+                value={selectedLevel?.stocked_quantity ?? "-"}
+              />
+              <AttributeGridRow
+                title="Available"
+                value={availableQuantity}
+              />
             </div>
 
             <div className="flex flex-col gap-y-1.5">
-              <label className="text-ui-fg-base txt-compact-small-plus">
-                Description (Optional)
-              </label>
+              <Label size="small" weight="plus">
+                Reserve amount
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="How much do you want to reserve?"
+                value={quantity}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setQuantity(val === "" ? "" : parseInt(val))
+                }}
+                disabled={!selectedItemId || !locationId}
+              />
+            </div>
+
+            <div className="flex flex-col gap-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label size="small" weight="plus">
+                  Description
+                </Label>
+                <span className="text-ui-fg-muted txt-compact-xsmall">
+                  Optional
+                </span>
+              </div>
               <Textarea
-                placeholder="Reason or reference for reservation..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                placeholder="What type of reservation is this?"
                 rows={3}
+                disabled={!selectedItemId || !locationId}
               />
             </div>
           </Drawer.Body>
@@ -288,13 +363,8 @@ export const ReservationDrawer = ({
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              size="small"
-              isLoading={isPending}
-              disabled={activeLevels.length === 0 && !isEdit}
-            >
-              {isEdit ? "Update Reservation" : "Create Reservation"}
+            <Button type="submit" size="small" isLoading={isPending}>
+              {isEdit ? "Save" : "Create"}
             </Button>
           </Drawer.Footer>
         </form>

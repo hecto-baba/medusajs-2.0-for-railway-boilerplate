@@ -1002,6 +1002,10 @@ export type VendorCustomer = {
   orders_count?: number
   orders?: {
     id: string
+    display_id?: number
+    status?: string
+    payment_status?: string
+    fulfillment_status?: string
     total?: number
     currency_code?: string
     created_at: string
@@ -1010,6 +1014,9 @@ export type VendorCustomer = {
   groups?: {
     id: string
     name: string
+    created_at?: string
+    updated_at?: string
+    customers_count?: number
   }[]
 }
 
@@ -1061,6 +1068,16 @@ export const deleteVendorCustomer = (id: string) =>
   mutate<{ id: string; object: "customer"; deleted: boolean }>(
     `customers/${id}`,
     "DELETE"
+  )
+
+export const batchVendorCustomerGroups = (
+  customerId: string,
+  body: { add?: string[]; remove?: string[] }
+) =>
+  mutate<{ customer: VendorCustomer }>(
+    `customers/${customerId}/customer-groups`,
+    "POST",
+    body
   )
 
 export const listVendorCustomerAddresses = async (customerId: string) => {
@@ -2215,6 +2232,25 @@ export type VendorRegion = {
 
 export const listVendorRegions = () =>
   request<{ regions: VendorRegion[] }>("regions", {})
+
+/* ---------------------------------------------------------------- search */
+
+export type VendorSearchResultGroup = {
+  entity: string
+  count: number
+  data: any[]
+}
+
+export type VendorSearchResponse = {
+  results: VendorSearchResultGroup[]
+}
+
+export const searchVendor = (params: {
+  q?: string
+  limit?: number
+  entity?: string | string[]
+}) => request<VendorSearchResponse>("search", params)
+
 
 
 

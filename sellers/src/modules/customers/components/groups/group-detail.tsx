@@ -3,10 +3,18 @@
 import {
   deleteVendorCustomerGroup,
   getVendorCustomerGroup,
+  type VendorCustomerGroup,
 } from "@lib/data/vendor-client"
-import { ActionMenu, SectionRow } from "@modules/common"
+import { ActionMenu } from "@modules/common"
 import { ArrowLeft, PencilSquare, Trash } from "@medusajs/icons"
-import { Badge, Button, Container, Heading, Text, toast, usePrompt } from "@medusajs/ui"
+import {
+  Button,
+  Container,
+  Heading,
+  Text,
+  toast,
+  usePrompt,
+} from "@medusajs/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -36,7 +44,7 @@ export const CustomerGroupDetail = ({ id }: CustomerGroupDetailProps) => {
   const deleteMutation = useMutation({
     mutationFn: (groupId: string) => deleteVendorCustomerGroup(groupId),
     onSuccess: () => {
-      toast.success("Customer group deleted successfully")
+      toast.success(`Customer group ${group?.name || "group"} was successfully deleted.`)
       queryClient.invalidateQueries({ queryKey: ["vendor-customer-groups"] })
       router.push("/customers/groups")
     },
@@ -48,9 +56,12 @@ export const CustomerGroupDetail = ({ id }: CustomerGroupDetailProps) => {
   const handleDelete = async () => {
     if (!group) return
 
+    const name = group.name ?? ""
     const confirmed = await prompt({
       title: "Delete Customer Group",
-      description: `Are you sure you want to delete "${group.name}"?`,
+      description: `You are about to delete the customer group ${name}. This action cannot be undone.`,
+      verificationInstruction: "Type to confirm",
+      verificationText: name,
       confirmText: "Delete",
       cancelText: "Cancel",
       variant: "danger",
@@ -87,79 +98,49 @@ export const CustomerGroupDetail = ({ id }: CustomerGroupDetailProps) => {
     )
   }
 
+  const customerCount = group.customers_count ?? group.customers?.length ?? 0
+
   return (
     <>
-      <div className="flex flex-col gap-y-6 pb-12">
-        {/* Top Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-x-3">
-            <Link href="/customers/groups">
-              <Button variant="secondary" size="small">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <div>
-              <Heading level="h1">{group.name}</Heading>
-              <Text size="xsmall" className="text-ui-fg-subtle font-mono">
-                ID: {group.id}
-              </Text>
-            </div>
+      <div className="flex flex-col gap-y-3">
+        {/* CustomerGroupGeneralSection */}
+        <Container className="divide-y p-0">
+          <div className="flex items-center justify-between px-6 py-4">
+            <Heading level="h1">{group.name}</Heading>
+            <ActionMenu
+              groups={[
+                {
+                  actions: [
+                    {
+                      label: "Edit",
+                      icon: <PencilSquare className="h-4 w-4" />,
+                      onClick: () => setIsEditOpen(true),
+                    },
+                    {
+                      label: "Delete",
+                      icon: <Trash className="h-4 w-4" />,
+                      onClick: handleDelete,
+                    },
+                  ],
+                },
+              ]}
+            />
           </div>
 
-          <ActionMenu
-            groups={[
-              {
-                actions: [
-                  {
-                    label: "Edit Group",
-                    icon: <PencilSquare className="h-4 w-4" />,
-                    onClick: () => setIsEditOpen(true),
-                  },
-                  {
-                    label: "Delete Group",
-                    icon: <Trash className="h-4 w-4" />,
-                    onClick: handleDelete,
-                  },
-                ],
-              },
-            ]}
-          />
-        </div>
-
-        {/* Group Details Card */}
-        <Container className="p-6">
-          <div className="border-b pb-4 mb-2">
-            <Heading level="h2">Group Details</Heading>
-          </div>
-          <div className="flex flex-col divide-y">
-            <SectionRow title="Group Name" value={group.name} />
-            <SectionRow
-              title="Total Members"
-              value={
-                <Badge size="small" color="blue">
-                  {group.customers_count ?? group.customers?.length ?? 0} customers
-                </Badge>
-              }
-            />
-            <SectionRow
-              title="Created Date"
-              value={
-                group.created_at
-                  ? new Date(group.created_at).toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })
-                  : "-"
-              }
-            />
+          <div className="text-ui-fg-subtle grid grid-cols-2 items-center px-6 py-4">
+            <Text size="small" leading="compact" weight="plus">
+              Customers
+            </Text>
+            <Text size="small" leading="compact">
+              {customerCount || "-"}
+            </Text>
           </div>
         </Container>
 
-        {/* Members Management */}
+        {/* CustomerGroupCustomerSection */}
         <GroupMembersSection group={group} />
 
-        {/* Metadata */}
+        {/* MetadataSection */}
         <MetadataSection metadata={group.metadata} />
       </div>
 

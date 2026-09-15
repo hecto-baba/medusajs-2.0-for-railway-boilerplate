@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  createVendorCustomer,
   updateVendorCustomer,
   type VendorCustomer,
 } from "@lib/data/vendor-client"
@@ -12,6 +11,7 @@ import {
   Input,
   Label,
   Text,
+  Tooltip,
   toast,
 } from "@medusajs/ui"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -30,7 +30,6 @@ export const CustomerDrawer = ({
   customer,
   onSuccess,
 }: CustomerDrawerProps) => {
-  const isEditing = Boolean(customer)
   const queryClient = useQueryClient()
 
   const [email, setEmail] = useState("")
@@ -55,24 +54,12 @@ export const CustomerDrawer = ({
     }
   }, [customer, open])
 
-  const createMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) => createVendorCustomer(data),
-    onSuccess: () => {
-      toast.success("Customer created successfully")
-      queryClient.invalidateQueries({ queryKey: ["vendor-customers"] })
-      onOpenChange(false)
-      onSuccess?.()
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Failed to create customer")
-    },
-  })
-
   const updateMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
       updateVendorCustomer(customer!.id, data),
-    onSuccess: () => {
-      toast.success("Customer updated successfully")
+    onSuccess: (data) => {
+      const updated = data.customer
+      toast.success(`Customer ${updated.email} was successfully updated.`)
       queryClient.invalidateQueries({ queryKey: ["vendor-customers"] })
       queryClient.invalidateQueries({
         queryKey: ["vendor-customer", customer?.id],
@@ -85,90 +72,120 @@ export const CustomerDrawer = ({
     },
   })
 
-  const isPending = createMutation.isPending || updateMutation.isPending
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!email.trim()) {
-      toast.error("Email is required")
-      return
-    }
+    if (!customer) return
 
-    const payload: Record<string, unknown> = {
-      email: email.trim(),
+    updateMutation.mutate({
+      email: customer.has_account ? undefined : email.trim(),
       first_name: firstName.trim() || null,
       last_name: lastName.trim() || null,
       phone: phone.trim() || null,
       company_name: companyName.trim() || null,
-    }
-
-    if (isEditing) {
-      updateMutation.mutate(payload)
-    } else {
-      createMutation.mutate(payload)
-    }
+    })
   }
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <Drawer.Content className="max-w-md">
-        <Drawer.Header>
-          <Drawer.Title asChild>
-            <Heading level="h2">
-              {isEditing ? "Edit Customer" : "Create Customer"}
-            </Heading>
-          </Drawer.Title>
-          <Drawer.Description className="text-ui-fg-subtle text-sm">
-            {isEditing
-              ? "Update the customer's personal and contact information."
-              : "Add a new customer to your store."}
-          </Drawer.Description>
-        </Drawer.Header>
+        <form onSubmit={handleSubmit} className="flex flex-1 flex-col justify-between overflow-hidden">
+          <Drawer.Header>
+            <Drawer.Title asChild>
+              <Heading level="h2">Edit Customer</Heading>
+            </Drawer.Title>
+            <Drawer.Description className="sr-only">
+              Edit customer details
+            </Drawer.Description>
+          </Drawer.Header>
 
-        <form onSubmit={handleSubmit} className="flex flex-1 flex-col justify-between">
-          <Drawer.Body className="flex flex-col gap-y-4 p-6">
+          <Drawer.Body className="flex flex-1 flex-col gap-y-4 p-6 overflow-y-auto">
             <div className="flex flex-col gap-y-2">
               <Label size="small" weight="plus">
-                Email <span className="text-ui-fg-error">*</span>
+                Email
               </Label>
+              {customer?.has_account ? (
+                <Tooltip
+                  content="The email address cannot be changed for registered customers."
+                  side="top"
+                >
+                  <div>
+                    <Input
+                      type="email"
+                      value={email}
+                      disabled
+                      className="cursor-not-allowed opacity-60"
+                    />
+                  </div>
+                </Tooltip>
+              ) : (
+                <Input
+                  type="email"
+                  placeholder="customer@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              )}
+            </div>
+
+            <div className="flex flex-col gap-y-2">
+              <div className="flex items-center justify-between">
+                <Label size="small" weight="plus">
+                  First name
+                </Label>
+                <Text size="xsmall" className="text-ui-fg-muted">
+                  Optional
+                </Text>
+              </div>
               <Input
-                type="email"
-                placeholder="customer@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+                placeholder="First name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-x-4">
-              <div className="flex flex-col gap-y-2">
+            <div className="flex flex-col gap-y-2">
+              <div className="flex items-center justify-between">
                 <Label size="small" weight="plus">
-                  First Name
+                  Last name
                 </Label>
-                <Input
-                  placeholder="John"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                />
+                <Text size="xsmall" className="text-ui-fg-muted">
+                  Optional
+                </Text>
               </div>
-
-              <div className="flex flex-col gap-y-2">
-                <Label size="small" weight="plus">
-                  Last Name
-                </Label>
-                <Input
-                  placeholder="Doe"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                />
-              </div>
+              <Input
+                placeholder="Last name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+              />
             </div>
 
             <div className="flex flex-col gap-y-2">
-              <Label size="small" weight="plus">
-                Phone Number
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label size="small" weight="plus">
+                  Company
+                </Label>
+                <Text size="xsmall" className="text-ui-fg-muted">
+                  Optional
+                </Text>
+              </div>
+              <Input
+                placeholder="Acme Corp"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-y-2">
+              <div className="flex items-center justify-between">
+                <Label size="small" weight="plus">
+                  Phone
+                </Label>
+                <Text size="xsmall" className="text-ui-fg-muted">
+                  Optional
+                </Text>
+              </div>
               <Input
                 type="tel"
                 placeholder="+1 (555) 000-0000"
@@ -176,30 +193,26 @@ export const CustomerDrawer = ({
                 onChange={(e) => setPhone(e.target.value)}
               />
             </div>
-
-            <div className="flex flex-col gap-y-2">
-              <Label size="small" weight="plus">
-                Company Name
-              </Label>
-              <Input
-                placeholder="Acme Corp"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-              />
-            </div>
           </Drawer.Body>
 
           <Drawer.Footer className="flex items-center justify-end gap-x-2 border-t p-6">
+            <Drawer.Close asChild>
+              <Button
+                type="button"
+                variant="secondary"
+                size="small"
+                disabled={updateMutation.isPending}
+              >
+                Cancel
+              </Button>
+            </Drawer.Close>
             <Button
-              type="button"
-              variant="secondary"
-              onClick={() => onOpenChange(false)}
-              disabled={isPending}
+              type="submit"
+              size="small"
+              variant="primary"
+              isLoading={updateMutation.isPending}
             >
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={isPending}>
-              {isEditing ? "Save Changes" : "Create Customer"}
+              Save
             </Button>
           </Drawer.Footer>
         </form>

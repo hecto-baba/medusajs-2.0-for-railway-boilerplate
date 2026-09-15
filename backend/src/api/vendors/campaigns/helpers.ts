@@ -41,4 +41,6 @@ export const VENDOR_CAMPAIGN_FIELDS = [
   "created_at",
   "updated_at",
   "budget.*",
+  "promotions.*",
+  "promotions.application_method.*",
 ]

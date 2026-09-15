@@ -21,6 +21,7 @@ import { GetVendorCampaignsSchema } from "./vendors/campaigns/route";
 import { PostVendorRentalConfigSchema } from "./vendors/products/[id]/rental-config/route";
 import { PostVendorInventoryLevelSchema } from "./vendors/products/[id]/variants/[variant_id]/inventory-levels/route";
 import { GetVendorReturnReasonsSchema } from "./vendors/return-reasons/route";
+import { GetVendorSearchSchema } from "./vendors/search/route";
 import { GetVendorRefundReasonsSchema } from "./vendors/refund-reasons/route";
 import {
   GetVendorInventoryItemsSchema,
@@ -445,6 +446,13 @@ export default defineMiddlewares({
       methods: ["GET"],
       middlewares: [
         validateAndTransformQuery(GetVendorOrdersSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/search",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorSearchSchema, {})
       ]
     },
     {

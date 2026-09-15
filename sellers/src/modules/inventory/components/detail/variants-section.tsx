@@ -2,78 +2,71 @@
 
 import { type VendorInventoryItem } from "@lib/data/vendor-client"
 import { Thumbnail } from "@modules/common"
-import { Container, Heading, Text } from "@medusajs/ui"
+import { Container, Heading } from "@medusajs/ui"
+import { TriangleRightMini } from "@medusajs/icons"
 import Link from "next/link"
 
 export const VariantsSection = ({ item }: { item: VendorInventoryItem }) => {
   const variants = item.variants ?? []
 
+  if (!variants.length) {
+    return null
+  }
+
   return (
-    <Container className="p-6">
-      <div className="mb-4">
-        <Heading level="h2">Linked Variants</Heading>
-        <Text size="small" className="text-ui-fg-subtle">
-          Product variants that consume stock from this inventory item.
-        </Text>
+    <Container className="p-0">
+      <div className="flex items-center justify-between px-6 py-4">
+        <Heading level="h2">Associated variants</Heading>
       </div>
 
-      {variants.length === 0 ? (
-        <div className="border-ui-border-base bg-ui-bg-subtle flex flex-col items-center justify-center rounded-lg border py-6 text-center">
-          <Text size="small" className="text-ui-fg-subtle">
-            No product variants currently linked.
-          </Text>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-y-3">
-          {variants.map((variant) => {
-            const product = variant.product
-            const productTitle = product?.title || "Product"
-            const variantTitle = variant.title || "Default Variant"
-            const productId = product?.id
+      <div className="txt-small flex flex-col gap-2 px-2 pb-2">
+        {variants.map((variant) => {
+          const link = variant.product
+            ? `/products/${variant.product.id}`
+            : null
 
-            return (
-              <div
-                key={variant.id}
-                className="border-ui-border-base hover:bg-ui-bg-base-hover flex items-center justify-between rounded-lg border p-3 transition-colors"
-              >
-                <div className="flex items-center gap-x-3">
-                  <Thumbnail src={product?.thumbnail} />
-                  <div className="flex flex-col">
-                    <Text size="small" weight="plus">
-                      {productTitle}
-                    </Text>
-                    <Text size="xsmall" className="text-ui-fg-subtle">
-                      Variant: {variantTitle}
-                      {variant.sku ? ` (${variant.sku})` : ""}
-                    </Text>
-                  </div>
+          const optionsString = variant.options
+            ? (variant.options as any[]).map((o) => o.value || o).join(" ⋅ ")
+            : variant.sku || ""
+
+          const Inner = (
+            <div className="shadow-elevation-card-rest bg-ui-bg-component hover:bg-ui-bg-component-hover rounded-md px-4 py-2 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="shadow-elevation-card-rest rounded-md">
+                  <Thumbnail src={variant.product?.thumbnail} />
                 </div>
-
-                {productId && (
-                  <ButtonLink href={`/products/${productId}`}>
-                    View Product
-                  </ButtonLink>
-                )}
+                <div className="flex flex-1 flex-col">
+                  <span className="text-ui-fg-base font-medium">
+                    {variant.title || "Default Variant"}
+                  </span>
+                  {optionsString && (
+                    <span className="text-ui-fg-subtle text-xs">
+                      {optionsString}
+                    </span>
+                  )}
+                </div>
+                <div className="flex size-7 items-center justify-center">
+                  <TriangleRightMini className="text-ui-fg-muted rtl:rotate-180" />
+                </div>
               </div>
-            )
-          })}
-        </div>
-      )}
+            </div>
+          )
+
+          if (!link) {
+            return <div key={variant.id}>{Inner}</div>
+          }
+
+          return (
+            <Link
+              href={link}
+              key={variant.id}
+              className="focus-within:shadow-borders-interactive-with-focus rounded-md outline-none"
+            >
+              {Inner}
+            </Link>
+          )
+        })}
+      </div>
     </Container>
   )
 }
-
-const ButtonLink = ({
-  href,
-  children,
-}: {
-  href: string
-  children: React.ReactNode
-}) => (
-  <Link
-    href={href}
-    className="border-ui-border-base bg-ui-button-secondary hover:bg-ui-button-secondary-hover text-ui-fg-base txt-compact-small-plus rounded-md border px-2.5 py-1 transition-colors"
-  >
-    {children}
-  </Link>
-)

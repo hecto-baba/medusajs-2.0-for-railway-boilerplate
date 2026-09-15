@@ -103,7 +103,7 @@ export const BulkStockModal = ({
                 stocked_quantity: newQty,
               })
             }
-          } else if (newQty > 0) {
+          } else {
             creates.push({
               inventory_item_id: item.id,
               location_id: locId,
@@ -113,30 +113,24 @@ export const BulkStockModal = ({
         }
       }
 
-      if (!updates.length && !creates.length) {
-        return { success: true, created: 0, updated: 0, deleted: 0 }
+      if (updates.length === 0 && creates.length === 0) {
+        return
       }
 
       return batchVendorItemsLocationLevels({
-        create: creates.length ? creates : undefined,
-        update: updates.length ? updates : undefined,
+        create: creates.length > 0 ? creates : undefined,
+        update: updates.length > 0 ? updates : undefined,
       })
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendor-inventory-items"] })
-      toast.success(
-        `Updated stock for ${items.length} ${
-          items.length === 1 ? "item" : "items"
-        }.`
-      )
+      toast.success("Inventory levels updated successfully.")
       onOpenChange(false)
       onSuccess?.()
     },
     onError: (error) => {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to update bulk stock levels."
+        error instanceof Error ? error.message : "Failed to update inventory levels."
       )
     },
   })
@@ -151,11 +145,10 @@ export const BulkStockModal = ({
       <Drawer.Content className="flex max-w-4xl flex-col">
         <Drawer.Header>
           <Drawer.Title asChild>
-            <Heading level="h2">Bulk Stock Adjustment</Heading>
+            <Heading level="h2">Update inventory levels</Heading>
           </Drawer.Title>
           <Drawer.Description className="text-ui-fg-subtle txt-small">
-            Quickly adjust in-stock quantities across {items.length} selected{" "}
-            {items.length === 1 ? "item" : "items"} and locations.
+            Update the stocked inventory levels for the selected inventory items.
           </Drawer.Description>
         </Drawer.Header>
 
@@ -168,45 +161,75 @@ export const BulkStockModal = ({
               <Table>
                 <Table.Header>
                   <Table.Row>
-                    <Table.HeaderCell className="w-1/3">Item</Table.HeaderCell>
+                    <Table.HeaderCell className="min-w-[200px]">
+                      Item
+                    </Table.HeaderCell>
                     {locations.map((loc) => (
-                      <Table.HeaderCell key={loc.id} className="text-right">
+                      <Table.HeaderCell
+                        key={loc.id}
+                        className="min-w-[140px] text-center"
+                      >
                         {loc.name}
                       </Table.HeaderCell>
                     ))}
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {items.map((item) => (
-                    <Table.Row key={item.id}>
-                      <Table.Cell>
-                        <div className="flex flex-col">
-                          <Text size="small" weight="plus" className="truncate">
-                            {item.title || "Untitled Item"}
-                          </Text>
-                          <Text size="xsmall" className="text-ui-fg-subtle font-mono">
-                            {item.sku || "No SKU"}
-                          </Text>
-                        </div>
-                      </Table.Cell>
-                      {locations.map((loc) => {
-                        const val = grid[item.id]?.[loc.id] ?? 0
-                        return (
-                          <Table.Cell key={loc.id} className="text-right">
-                            <Input
-                              type="number"
-                              min={0}
-                              className="ml-auto w-24 text-right"
-                              value={val}
-                              onChange={(e) =>
-                                handleQtyChange(item.id, loc.id, e.target.value)
-                              }
-                            />
-                          </Table.Cell>
-                        )
-                      })}
-                    </Table.Row>
-                  ))}
+                  {items.map((item) => {
+                    const itemGrid = grid[item.id] ?? {}
+
+                    return (
+                      <Table.Row key={item.id}>
+                        <Table.Cell>
+                          <div className="flex flex-col">
+                            <span className="text-ui-fg-base txt-compact-small font-medium truncate">
+                              {item.title || "Untitled Item"}
+                            </span>
+                            {item.sku && (
+                              <span className="text-ui-fg-subtle txt-compact-xsmall font-mono">
+                                {item.sku}
+                              </span>
+                            )}
+                          </div>
+                        </Table.Cell>
+                        {locations.map((loc) => {
+                          const currentQty = itemGrid[loc.id] ?? 0
+                          const existingLevel = item.location_levels?.find(
+                            (l) => l.location_id === loc.id
+                          )
+                          const reserved = existingLevel?.reserved_quantity ?? 0
+
+                          return (
+                            <Table.Cell key={loc.id} className="p-2 text-center">
+                              <div className="flex flex-col items-center gap-y-1">
+                                <Input
+                                  type="number"
+                                  min={reserved}
+                                  value={currentQty}
+                                  onChange={(e) =>
+                                    handleQtyChange(
+                                      item.id,
+                                      loc.id,
+                                      e.target.value
+                                    )
+                                  }
+                                  className="w-24 text-center"
+                                />
+                                {reserved > 0 && (
+                                  <Text
+                                    size="xsmall"
+                                    className="text-ui-fg-muted"
+                                  >
+                                    ({reserved} reserved)
+                                  </Text>
+                                )}
+                              </div>
+                            </Table.Cell>
+                          )
+                        })}
+                      </Table.Row>
+                    )
+                  })}
                 </Table.Body>
               </Table>
             </div>
@@ -222,7 +245,7 @@ export const BulkStockModal = ({
               Cancel
             </Button>
             <Button type="submit" size="small" isLoading={isPending}>
-              Save All Changes
+              Save
             </Button>
           </Drawer.Footer>
         </form>

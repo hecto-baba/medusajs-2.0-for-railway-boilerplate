@@ -1,16 +1,21 @@
 "use client"
 
 import {
+  deleteVendorItemLocationLevel,
   type VendorInventoryItem,
   type VendorInventoryLevel,
 } from "@lib/data/vendor-client"
+import { ActionMenu, PlaceholderCell } from "@modules/common"
 import {
   Button,
   Container,
   Heading,
   Table,
-  Text,
+  toast,
+  usePrompt,
 } from "@medusajs/ui"
+import { PencilSquare, Trash } from "@medusajs/icons"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { ManageLocationsDrawer } from "../forms/manage-locations-drawer"
 import { AdjustStockDrawer } from "../forms/adjust-stock-drawer"
@@ -20,131 +25,135 @@ export const LocationLevelsSection = ({
 }: {
   item: VendorInventoryItem
 }) => {
+  const queryClient = useQueryClient()
+  const prompt = usePrompt()
   const [isManageOpen, setIsManageOpen] = useState(false)
   const [selectedLevel, setSelectedLevel] = useState<VendorInventoryLevel | null>(
     null
   )
 
+  const { mutateAsync: removeLevel } = useMutation({
+    mutationFn: (locationId: string) =>
+      deleteVendorItemLocationLevel(item.id, locationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vendor-inventory-items"] })
+      queryClient.invalidateQueries({
+        queryKey: ["vendor-inventory-item", item.id],
+      })
+      toast.success("Inventory level deleted successfully.")
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete inventory level."
+      )
+    },
+  })
+
+  const handleDeleteLevel = async (lvl: VendorInventoryLevel) => {
+    const res = await prompt({
+      title: "Are you sure?",
+      description:
+        "You are about to delete an inventory level. This action cannot be undone.",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+    })
+
+    if (res) {
+      await removeLevel(lvl.location_id)
+    }
+  }
+
   const levels = item.location_levels ?? []
 
   return (
     <>
-      <Container className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <Heading level="h2">Location Stock Levels</Heading>
-            <Text size="small" className="text-ui-fg-subtle">
-              Stock counts across active fulfillment warehouses.
-            </Text>
-          </div>
+      <Container className="divide-y p-0">
+        <div className="flex items-center justify-between px-6 py-4">
+          <Heading level="h2">Locations</Heading>
           <Button
             size="small"
             variant="secondary"
             onClick={() => setIsManageOpen(true)}
           >
-            Manage Locations
+            Manage locations
           </Button>
         </div>
 
         {levels.length === 0 ? (
-          <div className="border-ui-border-base bg-ui-bg-subtle flex flex-col items-center justify-center rounded-lg border py-8 text-center">
-            <Text size="small" className="text-ui-fg-subtle">
-              This inventory item is not currently stocked at any warehouse.
-            </Text>
-            <Button
-              size="small"
-              variant="secondary"
-              className="mt-3"
-              onClick={() => setIsManageOpen(true)}
-            >
-              Add Stock Location
-            </Button>
+          <div className="p-6 text-center">
+            <span className="text-ui-fg-subtle txt-compact-small">
+              No records
+            </span>
           </div>
         ) : (
-          <div className="border-ui-border-base overflow-hidden rounded-lg border">
-            <Table>
-              <Table.Header>
-                <Table.Row>
-                  <Table.HeaderCell>Location</Table.HeaderCell>
-                  <Table.HeaderCell className="text-right">
-                    In Stock
-                  </Table.HeaderCell>
-                  <Table.HeaderCell className="text-right">
-                    Reserved
-                  </Table.HeaderCell>
-                  <Table.HeaderCell className="text-right">
-                    Available
-                  </Table.HeaderCell>
-                  <Table.HeaderCell className="w-24 text-right">
-                    Actions
-                  </Table.HeaderCell>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {levels.map((lvl) => {
-                  const locationName = Array.isArray(lvl.stock_locations)
-                    ? lvl.stock_locations[0]?.name
-                    : lvl.stock_locations?.name || lvl.location_id
+          <Table>
+            <Table.Header>
+              <Table.Row>
+                <Table.HeaderCell>Location</Table.HeaderCell>
+                <Table.HeaderCell>Reserved</Table.HeaderCell>
+                <Table.HeaderCell>In Stock</Table.HeaderCell>
+                <Table.HeaderCell>Available</Table.HeaderCell>
+                <Table.HeaderCell className="w-12 text-right" />
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {levels.map((lvl) => {
+                const locationName = Array.isArray(lvl.stock_locations)
+                  ? lvl.stock_locations[0]?.name
+                  : lvl.stock_locations?.name || lvl.location_id
 
-                  const locationAddress = Array.isArray(lvl.stock_locations)
-                    ? lvl.stock_locations[0]?.address
-                    : lvl.stock_locations?.address
+                const stocked = Number(lvl.stocked_quantity ?? 0)
+                const reserved = Number(lvl.reserved_quantity ?? 0)
+                const available = stocked - reserved
 
-                  const stocked = Number(lvl.stocked_quantity ?? 0)
-                  const reserved = Number(lvl.reserved_quantity ?? 0)
-                  const available = stocked - reserved
+                const actions = [
+                  {
+                    actions: [
+                      {
+                        icon: <PencilSquare />,
+                        label: "Edit",
+                        onClick: () => setSelectedLevel(lvl),
+                      },
+                      {
+                        icon: <Trash />,
+                        label: "Delete",
+                        onClick: () => handleDeleteLevel(lvl),
+                        disabled: reserved > 0 || stocked > 0,
+                      },
+                    ],
+                  },
+                ]
 
-                  return (
-                    <Table.Row key={lvl.id}>
-                      <Table.Cell>
-                        <div className="flex flex-col">
-                          <Text size="small" weight="plus">
-                            {locationName}
-                          </Text>
-                          {locationAddress && (
-                            <Text size="xsmall" className="text-ui-fg-subtle">
-                              {[
-                                locationAddress.city,
-                                locationAddress.country_code?.toUpperCase(),
-                              ]
-                                .filter(Boolean)
-                                .join(", ")}
-                            </Text>
-                          )}
-                        </div>
-                      </Table.Cell>
-                      <Table.Cell className="text-right font-medium">
-                        {stocked}
-                      </Table.Cell>
-                      <Table.Cell className="text-right text-ui-fg-muted font-medium">
-                        {reserved}
-                      </Table.Cell>
-                      <Table.Cell className="text-right">
-                        <span
-                          className={`font-semibold ${
-                            available > 0
-                              ? "text-ui-fg-interactive"
-                              : "text-ui-fg-error"
-                          }`}
-                        >
-                          {available}
-                        </span>
-                      </Table.Cell>
-                      <Table.Cell className="text-right">
-                        <Button
-                          size="small"
-                          variant="secondary"
-                          onClick={() => setSelectedLevel(lvl)}
-                        >
-                          Adjust
-                        </Button>
-                      </Table.Cell>
-                    </Table.Row>
-                  )
-                })}
-              </Table.Body>
-            </Table>
-          </div>
+                return (
+                  <Table.Row key={lvl.id}>
+                    <Table.Cell>
+                      <div className="flex size-full items-center overflow-hidden">
+                        <span className="truncate">{locationName}</span>
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <div className="flex size-full items-center overflow-hidden">
+                        <span className="truncate">{reserved}</span>
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <div className="flex size-full items-center overflow-hidden">
+                        <span className="truncate">{stocked}</span>
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <div className="flex size-full items-center overflow-hidden">
+                        <span className="truncate">{available}</span>
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell className="text-right">
+                      <ActionMenu groups={actions} />
+                    </Table.Cell>
+                  </Table.Row>
+                )
+              })}
+            </Table.Body>
+          </Table>
         )}
       </Container>
 

@@ -6,9 +6,8 @@ import {
   type VendorCustomer,
 } from "@lib/data/vendor-client"
 import {
-  Avatar,
-  Badge,
   Button,
+  Container,
   createDataTableColumnHelper,
   createDataTableFilterHelper,
   DataTable,
@@ -16,21 +15,32 @@ import {
   DataTablePaginationState,
   DataTableSortingState,
   Heading,
-  Text,
   toast,
   useDataTable,
   usePrompt,
 } from "@medusajs/ui"
-import { Plus, Trash, PencilSquare, Eye } from "@medusajs/icons"
+import { PencilSquare, Trash } from "@medusajs/icons"
+import {
+  AccountCell,
+  AccountHeader,
+  ActionMenu,
+  DateCell,
+  EmailCell,
+  EmailHeader,
+  FirstSeenHeader,
+  NameCell,
+  NameHeader,
+} from "@modules/common"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
-import { ActionMenu, PlaceholderCell } from "@modules/common"
 import { CustomerDrawer } from "./forms/customer-drawer"
+import { CreateCustomerModal } from "./forms/create-customer-modal"
 
 const columnHelper = createDataTableColumnHelper<VendorCustomer>()
 const filterHelper = createDataTableFilterHelper<VendorCustomer>()
+
+const PAGE_SIZE = 20
 
 export const CustomersTable = () => {
   const router = useRouter()
@@ -42,10 +52,10 @@ export const CustomersTable = () => {
   const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
-    pageSize: 20,
+    pageSize: PAGE_SIZE,
   })
 
-  // Drawer states
+  // Modal / Drawer states
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<VendorCustomer | null>(
     null
@@ -80,24 +90,25 @@ export const CustomersTable = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteVendorCustomer(id),
-    onSuccess: () => {
-      toast.success("Customer removed successfully")
+    onSuccess: (_, id) => {
+      const deletedCustomer = customers.find((c) => c.id === id)
+      toast.success(
+        `Customer ${deletedCustomer?.email || "customer"} was successfully deleted.`
+      )
       queryClient.invalidateQueries({ queryKey: ["vendor-customers"] })
     },
     onError: (err: any) => {
-      toast.error(err.message || "Failed to remove customer")
+      toast.error(err.message || "Failed to delete customer")
     },
   })
 
   const handleDelete = async (customer: VendorCustomer) => {
-    const customerName =
-      [customer.first_name, customer.last_name].filter(Boolean).join(" ") ||
-      customer.email
-
     const confirmed = await prompt({
-      title: "Remove Customer",
-      description: `Are you sure you want to remove "${customerName}" from your store?`,
-      confirmText: "Remove",
+      title: "Delete Customer",
+      description: `You are about to delete the customer ${customer.email}. This action cannot be undone.`,
+      verificationInstruction: "Type to confirm",
+      verificationText: customer.email,
+      confirmText: "Delete",
       cancelText: "Cancel",
       variant: "danger",
     })
@@ -111,10 +122,10 @@ export const CustomersTable = () => {
     () => [
       filterHelper.accessor("has_account", {
         type: "select",
-        label: "Account Status",
+        label: "Account",
         options: [
-          { label: "Registered Account", value: "true" },
-          { label: "Guest Checkout", value: "false" },
+          { label: "Registered", value: "true" },
+          { label: "Guest", value: "false" },
         ],
       }),
     ],
@@ -123,103 +134,40 @@ export const CustomersTable = () => {
 
   const columns = useMemo(
     () => [
-      columnHelper.accessor("first_name", {
-        header: "Customer",
+      columnHelper.accessor("email", {
+        header: () => <EmailHeader />,
         enableSorting: true,
-        cell: ({ row }) => {
-          const c = row.original
-          const fullName =
-            [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed"
-          const fallback = (
-            c.first_name?.[0] ||
-            c.email?.[0] ||
-            "C"
-          ).toUpperCase()
-
-          return (
-            <Link
-              href={`/customers/${c.id}`}
-              className="flex items-center gap-x-3 group"
-            >
-              <Avatar fallback={fallback} size="small" />
-              <div className="flex flex-col">
-                <Text
-                  size="small"
-                  weight="plus"
-                  className="group-hover:text-ui-fg-interactive transition-colors"
-                >
-                  {fullName}
-                </Text>
-                <Text size="xsmall" className="text-ui-fg-subtle">
-                  {c.email}
-                </Text>
-              </div>
-            </Link>
-          )
-        },
+        sortAscLabel: "A-Z",
+        sortDescLabel: "Z-A",
+        cell: ({ getValue, row }) => (
+          <div
+            className="cursor-pointer font-medium hover:text-ui-fg-interactive transition-colors"
+            onClick={() => router.push(`/customers/${row.original.id}`)}
+          >
+            <EmailCell email={getValue()} />
+          </div>
+        ),
       }),
-      columnHelper.accessor("phone", {
-        header: "Phone",
-        cell: ({ getValue }) => {
-          const phone = getValue()
-          return phone ? (
-            <Text size="small">{phone}</Text>
-          ) : (
-            <PlaceholderCell />
-          )
-        },
+      columnHelper.display({
+        id: "name",
+        header: () => <NameHeader />,
+        cell: ({
+          row: {
+            original: { first_name, last_name },
+          },
+        }) => <NameCell firstName={first_name} lastName={last_name} />,
       }),
       columnHelper.accessor("has_account", {
-        header: "Account",
-        cell: ({ getValue }) => {
-          const hasAccount = getValue()
-          return (
-            <Badge size="small" color={hasAccount ? "green" : "grey"}>
-              {hasAccount ? "Registered" : "Guest"}
-            </Badge>
-          )
-        },
-      }),
-      columnHelper.accessor("groups", {
-        header: "Groups",
-        cell: ({ getValue }) => {
-          const groups = getValue()
-          if (!groups || !groups.length) {
-            return <PlaceholderCell />
-          }
-          return (
-            <div className="flex flex-wrap gap-1">
-              {groups.map((g) => (
-                <Badge key={g.id} size="small" color="blue">
-                  {g.name}
-                </Badge>
-              ))}
-            </div>
-          )
-        },
-      }),
-      columnHelper.accessor("orders_count", {
-        header: "Orders",
-        cell: ({ getValue }) => {
-          const count = getValue() ?? 0
-          return (
-            <Badge size="small" color={count > 0 ? "purple" : "grey"}>
-              {count} {count === 1 ? "order" : "orders"}
-            </Badge>
-          )
-        },
+        header: () => <AccountHeader />,
+        enableSorting: true,
+        cell: ({ getValue }) => <AccountCell hasAccount={getValue()} />,
       }),
       columnHelper.accessor("created_at", {
-        header: "Added",
+        header: () => <FirstSeenHeader />,
         enableSorting: true,
-        cell: ({ getValue }) => {
-          const date = getValue()
-          return (
-            <Text size="small" className="text-ui-fg-subtle">
-              {date ? new Date(date).toLocaleDateString() : "-"}
-            </Text>
-          )
-        },
+        sortAscLabel: "Oldest first",
+        sortDescLabel: "Newest first",
+        cell: ({ getValue }) => <DateCell date={getValue()} />,
       }),
       columnHelper.display({
         id: "actions",
@@ -231,17 +179,12 @@ export const CustomersTable = () => {
                 {
                   actions: [
                     {
-                      label: "View Details",
-                      icon: <Eye className="h-4 w-4" />,
-                      onClick: () => router.push(`/customers/${customer.id}`),
-                    },
-                    {
                       label: "Edit",
                       icon: <PencilSquare className="h-4 w-4" />,
                       onClick: () => setEditingCustomer(customer),
                     },
                     {
-                      label: "Remove",
+                      label: "Delete",
                       icon: <Trash className="h-4 w-4" />,
                       onClick: () => handleDelete(customer),
                     },
@@ -282,23 +225,16 @@ export const CustomersTable = () => {
   })
 
   return (
-    <div className="flex flex-col gap-y-4">
+    <Container className="divide-y p-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Heading level="h1">Customers</Heading>
-          <Text size="small" className="text-ui-fg-subtle">
-            Manage your store customers, order history, and addresses.
-          </Text>
-        </div>
-
+      <div className="flex items-center justify-between px-6 py-4">
+        <Heading level="h1">Customers</Heading>
         <Button
-          variant="primary"
+          variant="secondary"
           size="small"
           onClick={() => setIsCreateOpen(true)}
         >
-          <Plus className="h-4 w-4 mr-1" />
-          Create Customer
+          Create
         </Button>
       </div>
 
@@ -306,16 +242,27 @@ export const CustomersTable = () => {
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between">
           <div className="flex items-center gap-x-2">
-            <DataTable.Search placeholder="Search name, email, phone..." />
+            <DataTable.Search placeholder="Search" />
             <DataTable.FilterMenu />
           </div>
         </DataTable.Toolbar>
-        <DataTable.Table />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No customers",
+              description: "Your customers will show up here.",
+            },
+            filtered: {
+              heading: "No results",
+              description: "No customers match the current filter criteria.",
+            },
+          }}
+        />
         <DataTable.Pagination />
       </DataTable>
 
-      {/* Drawers */}
-      <CustomerDrawer
+      {/* Focus Modals & Drawers */}
+      <CreateCustomerModal
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
       />
@@ -327,6 +274,6 @@ export const CustomersTable = () => {
         }}
         customer={editingCustomer}
       />
-    </div>
+    </Container>
   )
 }

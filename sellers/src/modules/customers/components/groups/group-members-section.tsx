@@ -5,211 +5,270 @@ import {
   type VendorCustomer,
   type VendorCustomerGroup,
 } from "@lib/data/vendor-client"
-import { ActionMenu, PlaceholderCell } from "@modules/common"
 import {
-  Avatar,
-  Badge,
   Button,
+  Checkbox,
   Container,
+  createDataTableColumnHelper,
+  createDataTableCommandHelper,
+  DataTable,
+  DataTablePaginationState,
+  DataTableRowSelectionState,
   Heading,
-  Input,
-  Table,
   Text,
   toast,
+  useDataTable,
   usePrompt,
 } from "@medusajs/ui"
-import { MagnifyingGlass, Plus, Trash } from "@medusajs/icons"
+import { PencilSquare, Trash } from "@medusajs/icons"
+import {
+  AccountCell,
+  AccountHeader,
+  ActionMenu,
+  DateCell,
+  EmailCell,
+  EmailHeader,
+  FirstSeenHeader,
+  NameCell,
+  NameHeader,
+} from "@modules/common"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { AddCustomersModal } from "./add-customers-modal"
+import { CustomerDrawer } from "../forms/customer-drawer"
 
 type GroupMembersSectionProps = {
   group: VendorCustomerGroup
 }
+
+const columnHelper = createDataTableColumnHelper<VendorCustomer>()
+const commandHelper = createDataTableCommandHelper()
 
 export const GroupMembersSection = ({ group }: GroupMembersSectionProps) => {
   const queryClient = useQueryClient()
   const prompt = usePrompt()
 
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [editingCustomer, setEditingCustomer] = useState<VendorCustomer | null>(
+    null
+  )
   const [search, setSearch] = useState("")
+  const [rowSelection, setRowSelection] = useState<DataTableRowSelectionState>({})
+  const [pagination, setPagination] = useState<DataTablePaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  })
 
   const members = group.customers ?? []
   const memberIds = members.map((m) => m.id)
 
-  const filteredMembers = members.filter((m) => {
-    if (!search.trim()) return true
-    const term = search.toLowerCase().trim()
-    const name = [m.first_name, m.last_name].filter(Boolean).join(" ").toLowerCase()
-    const email = (m.email || "").toLowerCase()
-    const phone = (m.phone || "").toLowerCase()
-    return name.includes(term) || email.includes(term) || phone.includes(term)
-  })
-
   const removeMutation = useMutation({
-    mutationFn: (customerId: string) =>
-      batchVendorCustomerGroupMembers(group.id, { remove: [customerId] }),
+    mutationFn: (customerIds: string[]) =>
+      batchVendorCustomerGroupMembers(group.id, { remove: customerIds }),
     onSuccess: () => {
       toast.success("Customer removed from group")
       queryClient.invalidateQueries({
         queryKey: ["vendor-customer-group", group.id],
       })
       queryClient.invalidateQueries({ queryKey: ["vendor-customer-groups"] })
+      setRowSelection({})
     },
     onError: (err: any) => {
       toast.error(err.message || "Failed to remove customer")
     },
   })
 
-  const handleRemove = async (customer: VendorCustomer) => {
-    const customerName =
-      [customer.first_name, customer.last_name].filter(Boolean).join(" ") ||
-      customer.email
-
-    const confirmed = await prompt({
-      title: "Remove Member",
-      description: `Are you sure you want to remove "${customerName}" from ${group.name}?`,
-      confirmText: "Remove",
+  const handleRemoveSingle = async (customer: VendorCustomer) => {
+    const res = await prompt({
+      title: "Remove customer",
+      description:
+        "You are about to remove 1 customer from the customer group. This action cannot be undone.",
+      confirmText: "Continue",
       cancelText: "Cancel",
-      variant: "danger",
     })
 
-    if (confirmed) {
-      removeMutation.mutate(customer.id)
+    if (res) {
+      removeMutation.mutate([customer.id])
     }
   }
 
+  const handleRemoveBatch = async () => {
+    const selectedIds = Object.keys(rowSelection).filter(
+      (k) => rowSelection[k]
+    )
+
+    if (selectedIds.length === 0) return
+
+    const res = await prompt({
+      title: "Remove customers",
+      description: `You are about to remove ${selectedIds.length} customers from the customer group. This action cannot be undone.`,
+      confirmText: "Continue",
+      cancelText: "Cancel",
+    })
+
+    if (res) {
+      removeMutation.mutate(selectedIds)
+    }
+  }
+
+  const filteredMembers = useMemo(() => {
+    if (!search.trim()) return members
+    const term = search.toLowerCase().trim()
+    return members.filter((m) => {
+      const name = [m.first_name, m.last_name].filter(Boolean).join(" ").toLowerCase()
+      const email = (m.email || "").toLowerCase()
+      return name.includes(term) || email.includes(term)
+    })
+  }, [members, search])
+
+  const count = filteredMembers.length
+  const pagedMembers = useMemo(() => {
+    const start = pagination.pageIndex * pagination.pageSize
+    return filteredMembers.slice(start, start + pagination.pageSize)
+  }, [filteredMembers, pagination])
+
+  const columns = useMemo(
+    () => [
+      columnHelper.select({
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsSomePageRowsSelected()
+                ? "indeterminate"
+                : table.getIsAllPageRowsSelected()
+            }
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ),
+      }),
+      columnHelper.accessor("email", {
+        header: () => <EmailHeader />,
+        cell: ({ getValue, row }) => (
+          <Link
+            href={`/customers/${row.original.id}`}
+            className="text-ui-fg-base hover:text-ui-fg-interactive font-medium transition-colors"
+          >
+            <EmailCell email={getValue()} />
+          </Link>
+        ),
+      }),
+      columnHelper.display({
+        id: "name",
+        header: () => <NameHeader />,
+        cell: ({
+          row: {
+            original: { first_name, last_name },
+          },
+        }) => <NameCell firstName={first_name} lastName={last_name} />,
+      }),
+      columnHelper.accessor("has_account", {
+        header: () => <AccountHeader />,
+        cell: ({ getValue }) => <AccountCell hasAccount={getValue()} />,
+      }),
+      columnHelper.accessor("created_at", {
+        header: () => <FirstSeenHeader />,
+        cell: ({ getValue }) => <DateCell date={getValue()} />,
+      }),
+      columnHelper.display({
+        id: "actions",
+        cell: ({ row }) => {
+          const customer = row.original
+          return (
+            <ActionMenu
+              groups={[
+                {
+                  actions: [
+                    {
+                      label: "Edit",
+                      icon: <PencilSquare className="h-4 w-4" />,
+                      onClick: () => setEditingCustomer(customer),
+                    },
+                    {
+                      label: "Remove",
+                      icon: <Trash className="h-4 w-4" />,
+                      onClick: () => handleRemoveSingle(customer),
+                    },
+                  ],
+                },
+              ]}
+            />
+          )
+        },
+      }),
+    ],
+    []
+  )
+
+  const commands = useMemo(
+    () => [
+      commandHelper.command({
+        label: "Remove",
+        shortcut: "r",
+        action: handleRemoveBatch,
+      }),
+    ],
+    [rowSelection, members]
+  )
+
+  const table = useDataTable({
+    data: pagedMembers,
+    columns,
+    rowCount: count,
+    getRowId: (row) => row.id,
+    commands,
+    rowSelection: {
+      state: rowSelection,
+      onRowSelectionChange: setRowSelection,
+    },
+    pagination: {
+      state: pagination,
+      onPaginationChange: setPagination,
+    },
+    search: {
+      state: search,
+      onSearchChange: setSearch,
+    },
+  })
+
   return (
     <>
-      <Container className="p-0 overflow-hidden">
-        <div className="flex items-center justify-between p-6 border-b">
-          <div>
-            <Heading level="h2">Customers ({members.length})</Heading>
-            <Text size="small" className="text-ui-fg-subtle">
-              Customers assigned to this group.
-            </Text>
-          </div>
-
+      <Container className="divide-y p-0">
+        <div className="flex items-center justify-between px-6 py-4">
+          <Heading level="h2">Customers</Heading>
           <Button
             variant="secondary"
             size="small"
             onClick={() => setIsAddOpen(true)}
           >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Customers
+            Add
           </Button>
         </div>
 
-        {members.length > 0 && (
-          <div className="p-4 border-b bg-ui-bg-subtle/50">
-            <div className="relative max-w-sm">
-              <MagnifyingGlass className="absolute left-3 top-2.5 h-4 w-4 text-ui-fg-muted" />
-              <Input
-                placeholder="Search group members..."
-                className="pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-
-        {filteredMembers.length === 0 ? (
+        {members.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center">
             <Text size="small" className="text-ui-fg-subtle">
-              {search
-                ? "No matching group members found."
-                : "No customers in this group yet."}
+              This group doesn&apos;t have customers.
             </Text>
           </div>
         ) : (
-          <Table>
-            <Table.Header>
-              <Table.Row>
-                <Table.HeaderCell>Customer</Table.HeaderCell>
-                <Table.HeaderCell>Phone</Table.HeaderCell>
-                <Table.HeaderCell>Company</Table.HeaderCell>
-                <Table.HeaderCell>Account</Table.HeaderCell>
-                <Table.HeaderCell className="w-12"></Table.HeaderCell>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {filteredMembers.map((customer) => {
-                const fullName =
-                  [customer.first_name, customer.last_name]
-                    .filter(Boolean)
-                    .join(" ") || "Unnamed"
-                const fallback = (
-                  customer.first_name?.[0] ||
-                  customer.email?.[0] ||
-                  "C"
-                ).toUpperCase()
-
-                return (
-                  <Table.Row key={customer.id}>
-                    <Table.Cell>
-                      <Link
-                        href={`/customers/${customer.id}`}
-                        className="flex items-center gap-x-3 group"
-                      >
-                        <Avatar fallback={fallback} size="small" />
-                        <div className="flex flex-col">
-                          <Text
-                            size="small"
-                            weight="plus"
-                            className="group-hover:text-ui-fg-interactive transition-colors"
-                          >
-                            {fullName}
-                          </Text>
-                          <Text size="xsmall" className="text-ui-fg-subtle">
-                            {customer.email}
-                          </Text>
-                        </div>
-                      </Link>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {customer.phone ? (
-                        <Text size="small">{customer.phone}</Text>
-                      ) : (
-                        <PlaceholderCell />
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {customer.company_name ? (
-                        <Text size="small">{customer.company_name}</Text>
-                      ) : (
-                        <PlaceholderCell />
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Badge
-                        size="small"
-                        color={customer.has_account ? "green" : "grey"}
-                      >
-                        {customer.has_account ? "Registered" : "Guest"}
-                      </Badge>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <ActionMenu
-                        groups={[
-                          {
-                            actions: [
-                              {
-                                label: "Remove from Group",
-                                icon: <Trash className="h-4 w-4" />,
-                                onClick: () => handleRemove(customer),
-                              },
-                            ],
-                          },
-                        ]}
-                      />
-                    </Table.Cell>
-                  </Table.Row>
-                )
-              })}
-            </Table.Body>
-          </Table>
+          <DataTable instance={table}>
+            <DataTable.Toolbar className="flex items-center justify-between">
+              <DataTable.Search placeholder="Search customers..." />
+            </DataTable.Toolbar>
+            <DataTable.Table />
+            <DataTable.Pagination />
+            <DataTable.CommandBar />
+          </DataTable>
         )}
       </Container>
 
@@ -218,6 +277,14 @@ export const GroupMembersSection = ({ group }: GroupMembersSectionProps) => {
         onOpenChange={setIsAddOpen}
         groupId={group.id}
         existingMemberIds={memberIds}
+      />
+
+      <CustomerDrawer
+        open={Boolean(editingCustomer)}
+        onOpenChange={(open) => {
+          if (!open) setEditingCustomer(null)
+        }}
+        customer={editingCustomer}
       />
     </>
   )

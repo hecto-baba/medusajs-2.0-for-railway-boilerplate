@@ -1,90 +1,117 @@
 "use client"
 
-import { type VendorCustomer } from "@lib/data/vendor-client"
-import { ActionMenu, SectionRow } from "@modules/common"
-import { Avatar, Badge, Container, Heading, Text } from "@medusajs/ui"
-import { PencilSquare } from "@medusajs/icons"
+import {
+  deleteVendorCustomer,
+  type VendorCustomer,
+} from "@lib/data/vendor-client"
+import {
+  AccountCell,
+  ActionMenu,
+} from "@modules/common"
+import { Container, Heading, Text, toast, usePrompt } from "@medusajs/ui"
+import { PencilSquare, Trash } from "@medusajs/icons"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { CustomerDrawer } from "../forms/customer-drawer"
 
-type GeneralSectionProps = {
+type CustomerGeneralSectionProps = {
   customer: VendorCustomer
 }
 
-export const GeneralSection = ({ customer }: GeneralSectionProps) => {
+export const GeneralSection = ({ customer }: CustomerGeneralSectionProps) => {
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  const prompt = usePrompt()
   const [isEditOpen, setIsEditOpen] = useState(false)
 
-  const fullName =
-    [customer.first_name, customer.last_name].filter(Boolean).join(" ") ||
-    "Unnamed Customer"
-  const fallback = (
-    customer.first_name?.[0] ||
-    customer.email?.[0] ||
-    "C"
-  ).toUpperCase()
+  const name = [customer.first_name, customer.last_name]
+    .filter(Boolean)
+    .join(" ")
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteVendorCustomer(customer.id),
+    onSuccess: () => {
+      toast.success(`Customer ${customer.email} was successfully deleted.`)
+      queryClient.invalidateQueries({ queryKey: ["vendor-customers"] })
+      router.push("/customers")
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to delete customer")
+    },
+  })
+
+  const handleDelete = async () => {
+    const res = await prompt({
+      title: "Delete Customer",
+      description: `You are about to delete the customer ${customer.email}. This action cannot be undone.`,
+      verificationInstruction: "Type to confirm",
+      verificationText: customer.email,
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      variant: "danger",
+    })
+
+    if (!res) {
+      return
+    }
+
+    deleteMutation.mutate()
+  }
 
   return (
     <>
-      <Container className="p-6">
-        <div className="flex items-center justify-between border-b pb-4">
-          <div className="flex items-center gap-x-4">
-            <Avatar fallback={fallback} size="large" />
-            <div>
-              <Heading level="h2">{fullName}</Heading>
-              <Text size="small" className="text-ui-fg-subtle">
-                {customer.email}
-              </Text>
-            </div>
+      <Container className="divide-y p-0">
+        <div className="flex items-center justify-between px-6 py-4">
+          <Heading level="h1">{customer.email}</Heading>
+          <div className="flex items-center gap-x-2">
+            <AccountCell hasAccount={customer.has_account} />
+            <ActionMenu
+              groups={[
+                {
+                  actions: [
+                    {
+                      label: "Edit",
+                      icon: <PencilSquare className="h-4 w-4" />,
+                      onClick: () => setIsEditOpen(true),
+                    },
+                    {
+                      label: "Delete",
+                      icon: <Trash className="h-4 w-4" />,
+                      onClick: handleDelete,
+                    },
+                  ],
+                },
+              ]}
+            />
           </div>
-
-          <ActionMenu
-            groups={[
-              {
-                actions: [
-                  {
-                    label: "Edit Details",
-                    icon: <PencilSquare className="h-4 w-4" />,
-                    onClick: () => setIsEditOpen(true),
-                  },
-                ],
-              },
-            ]}
-          />
         </div>
 
-        <div className="flex flex-col divide-y pt-2">
-          <SectionRow
-            title="Account Status"
-            value={
-              <Badge size="small" color={customer.has_account ? "green" : "grey"}>
-                {customer.has_account ? "Registered User" : "Guest Customer"}
-              </Badge>
-            }
-          />
-          <SectionRow
-            title="Phone Number"
-            value={customer.phone || "-"}
-          />
-          <SectionRow
-            title="Company Name"
-            value={customer.company_name || "-"}
-          />
-          <SectionRow
-            title="Orders Placed"
-            value={`${customer.orders_count ?? customer.orders?.length ?? 0} orders`}
-          />
-          <SectionRow
-            title="Customer Since"
-            value={
-              customer.created_at
-                ? new Date(customer.created_at).toLocaleDateString(undefined, {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
-                : "-"
-            }
-          />
+        <div className="text-ui-fg-subtle grid grid-cols-2 items-center px-6 py-4">
+          <Text size="small" leading="compact" weight="plus">
+            Name
+          </Text>
+          <Text size="small" leading="compact">
+            {name || "-"}
+          </Text>
+        </div>
+
+        <div className="text-ui-fg-subtle grid grid-cols-2 items-center px-6 py-4">
+          <Text size="small" leading="compact" weight="plus">
+            Company
+          </Text>
+          <Text size="small" leading="compact">
+            {customer.company_name || "-"}
+          </Text>
+        </div>
+
+        <div className="text-ui-fg-subtle grid grid-cols-2 items-center px-6 py-4">
+          <Text size="small" leading="compact" weight="plus">
+            Phone
+          </Text>
+          <Text size="small" leading="compact">
+            {customer.phone || "-"}
+          </Text>
         </div>
       </Container>
 

@@ -1,7 +1,12 @@
 export { CustomersTable } from "./components/customers-table"
 export { CustomerDrawer } from "./components/forms/customer-drawer"
+export { CreateCustomerModal } from "./components/forms/create-customer-modal"
 export { AddressDrawer } from "./components/forms/address-drawer"
+export { AddCustomerGroupsModal } from "./components/forms/add-customer-groups-modal"
 export { CustomerDetail } from "./components/detail/customer-detail"
 export { CustomerGroupsTable } from "./components/groups/customer-groups-table"
+export { CreateGroupModal } from "./components/groups/create-group-modal"
 export { CustomerGroupDetail } from "./components/groups/group-detail"
 export { GroupDrawer } from "./components/groups/group-drawer"
+export { AddCustomersModal } from "./components/groups/add-customers-modal"
+
