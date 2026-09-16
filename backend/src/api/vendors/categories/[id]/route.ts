@@ -87,30 +87,21 @@ export const GET = async (
 }
 
 export const POST = async (
-  req: AuthenticatedMedusaRequest<z.infer<typeof UpdateVendorCategorySchema>>,
+  _req: AuthenticatedMedusaRequest<z.infer<typeof UpdateVendorCategorySchema>>,
   res: MedusaResponse
 ) => {
-  const categoryId = req.params.id
-
-  const { result } = await updateProductCategoriesWorkflow(req.scope).run({
-    input: {
-      selector: { id: categoryId },
-      update: req.validatedBody as any,
-    },
+  res.status(403).json({
+    message:
+      "Categories are managed centrally by the platform taxonomy (TrustClaw) and cannot be updated by vendors.",
   })
-
-  res.json({ category: result[0] })
 }
 
 export const DELETE = async (
-  req: AuthenticatedMedusaRequest,
+  _req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  const categoryId = req.params.id
-
-  await deleteProductCategoriesWorkflow(req.scope).run({
-    input: [categoryId],
+  res.status(403).json({
+    message:
+      "Categories are managed centrally by the platform taxonomy (TrustClaw) and cannot be deleted by vendors.",
   })
-
-  res.json({ id: categoryId, object: "product_category", deleted: true })
 }

@@ -47,8 +47,8 @@ export const GET = async (
     }),
     query.graph({
       entity: "product_category",
-      fields: ["id", "name"],
-      pagination: { order: { name: "ASC" } },
+      fields: ["id", "name", "metadata.*"],
+      pagination: { take: 5000, order: { name: "ASC" } },
     }),
     query.graph({
       entity: "product_tag",

@@ -405,6 +405,98 @@ export type VendorTaxonomy = {
  */
 export const getVendorTaxonomy = () => request<VendorTaxonomy>("taxonomy", {})
 
+/* --------------------------------------------------- TrustClaw taxonomy */
+
+export type TrustClawSegment = {
+  id: string
+  name: string
+  code: string
+  type: string
+  orderType?: string
+  description: string | null
+  sortOrder: number
+  isActive: boolean
+  categoryCount: number
+  vendorCategoryCount?: number
+}
+
+export type TrustClawCategory = {
+  id: string
+  name: string
+  code: string
+  description: string | null
+  level: number
+  path: string
+  parentId: string | null
+  hasChildren: boolean
+  childCount: number
+  sortOrder: number
+  segmentId: string
+  segment?: { id: string; name: string; code: string }
+  medusa_id?: string | null
+  children?: TrustClawCategory[]
+}
+
+/**
+ * Fetch all active TrustClaw business segments (e.g. Agriculture, Grocery).
+ * Proxied through Medusa so the API key stays server-side.
+ */
+export const getTrustClawSegments = () =>
+  request<{ segments: TrustClawSegment[] }>("taxonomy/segments", {}).then(
+    (r) => r.segments
+  )
+
+export type TrustClawCategoryQueryParams = {
+  segmentCode?: string
+  segmentId?: string
+  parentId?: string
+  level?: string
+  hasChildren?: string | boolean
+  vendorCategoryId?: string
+  pathPrefix?: string
+  search?: string
+  tree?: string | boolean
+  limit?: string | number
+}
+
+/**
+ * Fetch TrustClaw categories for a given segment or advanced filter criteria.
+ */
+export const getTrustClawCategories = (
+  paramsOrSegmentCode: TrustClawCategoryQueryParams | string,
+  parentId?: string
+) => {
+  const params: Record<string, string | number | undefined> =
+    typeof paramsOrSegmentCode === "string"
+      ? {
+          segmentCode: paramsOrSegmentCode,
+          ...(parentId !== undefined ? { parentId } : {}),
+        }
+      : {
+          segmentCode: paramsOrSegmentCode.segmentCode,
+          segmentId: paramsOrSegmentCode.segmentId,
+          parentId: paramsOrSegmentCode.parentId,
+          level: paramsOrSegmentCode.level,
+          hasChildren:
+            paramsOrSegmentCode.hasChildren !== undefined
+              ? String(paramsOrSegmentCode.hasChildren)
+              : undefined,
+          vendorCategoryId: paramsOrSegmentCode.vendorCategoryId,
+          pathPrefix: paramsOrSegmentCode.pathPrefix,
+          search: paramsOrSegmentCode.search,
+          tree:
+            paramsOrSegmentCode.tree !== undefined
+              ? String(paramsOrSegmentCode.tree)
+              : undefined,
+          limit: paramsOrSegmentCode.limit,
+        }
+
+  return request<{ categories: TrustClawCategory[] }>(
+    "taxonomy/tc-categories",
+    params
+  ).then((r) => r.categories)
+}
+
 /* ---------------------------------------------------------- return reasons */
 
 export type VendorReturnReason = {

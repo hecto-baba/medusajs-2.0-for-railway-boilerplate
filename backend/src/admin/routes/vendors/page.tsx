@@ -7,6 +7,7 @@ import {
   createDataTableColumnHelper,
   DataTable,
   Heading,
+  Select,
   StatusBadge,
   Text,
   useDataTable,
@@ -15,6 +16,12 @@ import { useQuery } from "@tanstack/react-query"
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { sdk } from "../../lib/sdk"
+import type {
+  TrustClawSegment,
+  TrustClawVendorType,
+} from "../../types/trustclaw"
+
+const NONE = "__none__"
 
 type VendorAdmin = {
   id: string
@@ -57,6 +64,32 @@ const VendorsPage = () => {
     pageSize: PAGE_SIZE,
   })
   const [search, setSearch] = useState("")
+  const [segmentFilter, setSegmentFilter] = useState("")
+  const [vendorTypeFilter, setVendorTypeFilter] = useState("")
+
+  // ── TrustClaw Segments (for filter dropdown) ──
+  const { data: segmentsData } = useQuery<{ segments: TrustClawSegment[] }>({
+    queryKey: ["admin-taxonomy-segments-for-vendor-filter"],
+    queryFn: () =>
+      sdk.client.fetch<{ segments: TrustClawSegment[] }>(
+        "/admin/taxonomy/segments"
+      ),
+    staleTime: 10 * 60 * 1000,
+  })
+  const segments = segmentsData?.segments ?? []
+
+  // ── TrustClaw Vendor Types (for filter dropdown) ──
+  const { data: vtData } = useQuery<{
+    vendor_types: TrustClawVendorType[]
+  }>({
+    queryKey: ["admin-taxonomy-vendor-types-for-vendor-filter"],
+    queryFn: () =>
+      sdk.client.fetch<{
+        vendor_types: TrustClawVendorType[]
+      }>("/admin/taxonomy/vendor-types"),
+    staleTime: 10 * 60 * 1000,
+  })
+  const vendorTypes = vtData?.vendor_types ?? []
 
   const { data, isLoading, refetch } = useQuery<VendorListResponse>({
     queryFn: () =>
@@ -67,7 +100,12 @@ const VendorsPage = () => {
           ...(search.trim() ? { q: search.trim() } : {}),
         },
       }),
-    queryKey: [["admin-vendors", pagination.pageIndex, pagination.pageSize, search]],
+    queryKey: [[
+      "admin-vendors",
+      pagination.pageIndex,
+      pagination.pageSize,
+      search,
+    ]],
   })
 
   const vendors = useMemo(() => data?.vendors ?? [], [data])
@@ -198,8 +236,44 @@ const VendorsPage = () => {
               Monitor multi-vendor marketplace merchants, active catalogs, and store activities.
             </Text>
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
             <DataTable.Search placeholder="Search vendor or handle..." />
+            <Select
+              value={segmentFilter || NONE}
+              onValueChange={(v) =>
+                setSegmentFilter(v === NONE ? "" : v)
+              }
+            >
+              <Select.Trigger className="min-w-[140px]">
+                <Select.Value placeholder="All Segments" />
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value={NONE}>All Segments</Select.Item>
+                {segments.map((seg) => (
+                  <Select.Item key={seg.id} value={seg.code}>
+                    {seg.name}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select>
+            <Select
+              value={vendorTypeFilter || NONE}
+              onValueChange={(v) =>
+                setVendorTypeFilter(v === NONE ? "" : v)
+              }
+            >
+              <Select.Trigger className="min-w-[140px]">
+                <Select.Value placeholder="All Types" />
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value={NONE}>All Types</Select.Item>
+                {vendorTypes.map((vt) => (
+                  <Select.Item key={vt.id} value={vt.code}>
+                    {vt.name}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select>
             <Button variant="secondary" size="small" onClick={() => refetch()}>
               Refresh
             </Button>
