@@ -424,6 +424,12 @@ export default defineMiddlewares({
       ]
     },
     {
+      matcher: "/vendors/:p1/:id",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
       matcher: "/vendors/products",
       methods: ["POST"],
       middlewares: [
@@ -453,6 +459,12 @@ export default defineMiddlewares({
       methods: ["GET"],
       middlewares: [
         validateAndTransformQuery(GetVendorSearchSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/products/:id",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
       ]
     },
     {

@@ -21,6 +21,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { PriceFields } from "./detail/variant-drawer"
+import { TrustClawCategoryPicker } from "./detail/trustclaw-category-picker"
 
 type ProductFormProps = {
   product?: VendorProduct
@@ -138,6 +139,9 @@ export const ProductForm = ({ product }: ProductFormProps) => {
     product?.discountable ?? true
   )
   const [prices, setPrices] = useState<Record<string, string>>({})
+  const [categoryIds, setCategoryIds] = useState<string[]>(
+    product?.categories?.map((c) => c.id) ?? []
+  )
 
   // Attributes
   const [weight, setWeight] = useState(product?.weight?.toString() ?? "")
@@ -174,6 +178,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
       if (isEdit) {
         return updateVendorProduct(product!.id, {
           ...base,
+          categories: categoryIds.map((id) => ({ id })),
           // Only sent when the seller actually changed it: the API rejects a
           // handle that collides with another product, and resending the
           // unchanged one is a needless way to hit that.
@@ -186,6 +191,9 @@ export const ProductForm = ({ product }: ProductFormProps) => {
       return createVendorProduct({
         ...base,
         ...(handle.trim() ? { handle: handle.trim() } : {}),
+        ...(categoryIds.length > 0
+          ? { categories: categoryIds.map((id) => ({ id })) }
+          : {}),
         // A product with no option and no variant cannot be added to a cart,
         // so a default pair is created alongside it. Sellers refine these
         // later on the product's own page.
@@ -279,6 +287,19 @@ export const ProductForm = ({ product }: ProductFormProps) => {
           </Button>
         </div>
       </div>
+
+      <Card
+        title="Product Category & Classification"
+        description="Assign a standardized category from the industry taxonomy to improve search discovery and storefront classification."
+      >
+        <TrustClawCategoryPicker
+          selectedMedusaCategoryId={categoryIds[0] ?? null}
+          selectedCategoryName={product?.categories?.[0]?.name ?? null}
+          onSelectCategory={(categoryId) => {
+            setCategoryIds(categoryId ? [categoryId] : [])
+          }}
+        />
+      </Card>
 
       <Card title="General">
         <Field id="title" label="Title">

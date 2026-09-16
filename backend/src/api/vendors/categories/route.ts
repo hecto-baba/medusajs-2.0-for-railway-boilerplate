@@ -25,17 +25,13 @@ export const CreateVendorCategorySchema = z.object({
 })
 
 export const POST = async (
-  req: AuthenticatedMedusaRequest<z.infer<typeof CreateVendorCategorySchema>>,
+  _req: AuthenticatedMedusaRequest<z.infer<typeof CreateVendorCategorySchema>>,
   res: MedusaResponse
 ) => {
-  const { result } = await createVendorCategoryWorkflow(req.scope).run({
-    input: {
-      vendor_admin_id: req.auth_context.actor_id,
-      category: req.validatedBody as any,
-    },
+  res.status(403).json({
+    message:
+      "Categories are managed centrally by the platform taxonomy (TrustClaw) and cannot be created by vendors.",
   })
-
-  res.status(201).json({ category: result.category })
 }
 
 export const GET = async (
