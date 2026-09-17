@@ -519,24 +519,46 @@ export type TrustClawFieldType =
   | "DATE"
   | "LOCATION_GEO"
 
+export interface TrustClawRawQuestion {
+  key: string
+  type: string
+  label: string
+  order?: number
+  helpText?: string | null
+  required: boolean
+  placeholder?: string | null
+  options?: any
+  minCount?: number
+  maxCount?: number
+}
+
 export interface TrustClawQuestionField {
   id: string
   name: string
+  key: string
   label: string
   description?: string | null
-  type: TrustClawFieldType
+  helpText?: string | null
+  type: string
   placeholder?: string | null
   required: boolean
-  options?: TrustClawQuestionOption[]
+  order?: number
+  options?: any
+  minCount?: number
+  maxCount?: number
   validationRule?: string | null
   dependsOn?: { field: string; value: string | boolean } | null
   defaultValue?: unknown
 }
 
 export interface TrustClawQuestionSet {
+  id?: string
   step: OnboardingStepName | string
   title: string
+  subtitle?: string | null
   description?: string | null
+  version?: number
+  questions: TrustClawRawQuestion[]
   fields: TrustClawQuestionField[]
 }
 
@@ -596,9 +618,10 @@ export function fetchOnboardingStatus(
 /**
  * Fetch dynamic question sets for a vendor onboarding step / category.
  */
-export function fetchOnboardingQuestions(
+export async function fetchOnboardingQuestions(
   params: {
     vendorCategoryId?: string
+    vendorCategoryCode?: string
     step?: string
     segmentId?: string
     vendorTypeId?: string
@@ -606,14 +629,69 @@ export function fetchOnboardingQuestions(
 ): Promise<TrustClawQuestionSet[]> {
   const q: Record<string, string> = {}
   if (params.vendorCategoryId) q.vendorCategoryId = params.vendorCategoryId
+  if (params.vendorCategoryCode) q.vendorCategoryCode = params.vendorCategoryCode
   if (params.step) q.step = params.step
   if (params.segmentId) q.segmentId = params.segmentId
   if (params.vendorTypeId) q.vendorTypeId = params.vendorTypeId
 
-  return trustclawFetch<TrustClawQuestionSet[]>(
-    "/api/v1/onboarding/questions",
-    q
-  )
+  try {
+    const raw = await trustclawFetch<any[]>(
+      "/api/v1/onboarding/questions",
+      q
+    )
+
+    if (!Array.isArray(raw)) {
+      return []
+    }
+
+    return raw.map((item) => {
+      const rawQuestions: any[] = item.questions || item.fields || []
+      const mappedFields: TrustClawQuestionField[] = rawQuestions.map((q) => {
+        const fieldKey = q.key || q.id || q.name
+        let options = q.options
+
+        // Expand YEAR_RANGE:1950:CURRENT to an array of selectable year objects
+        if (typeof options === "string" && options.startsWith("YEAR_RANGE:")) {
+          const parts = options.split(":")
+          const startYear = parseInt(parts[1], 10) || 1950
+          const currentYear = new Date().getFullYear()
+          options = []
+          for (let y = currentYear; y >= startYear; y--) {
+            options.push({ label: String(y), value: String(y) })
+          }
+        }
+
+        return {
+          id: fieldKey,
+          name: fieldKey,
+          key: fieldKey,
+          label: q.label || fieldKey,
+          description: q.helpText || q.description || null,
+          helpText: q.helpText || q.description || null,
+          type: (q.type || "text").toLowerCase(),
+          placeholder: q.placeholder || null,
+          required: Boolean(q.required),
+          order: typeof q.order === "number" ? q.order : 0,
+          options: Array.isArray(options) ? options : options || undefined,
+          minCount: q.minCount,
+          maxCount: q.maxCount,
+        }
+      })
+
+      return {
+        id: item.id || item.step,
+        step: item.step,
+        title: item.title || item.step,
+        subtitle: item.subtitle || item.description || null,
+        description: item.subtitle || item.description || null,
+        version: item.version || 1,
+        questions: rawQuestions,
+        fields: mappedFields,
+      }
+    })
+  } catch (err: any) {
+    return []
+  }
 }
 
 /**

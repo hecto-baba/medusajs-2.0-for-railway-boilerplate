@@ -7,7 +7,7 @@ import {
   Switch,
   Text,
 } from "@medusajs/ui"
-import { CheckCircleSolid, PencilSquare, DocumentText } from "@medusajs/icons"
+import { CheckCircleSolid, PencilSquare, DocumentText, Photo } from "@medusajs/icons"
 import { useState } from "react"
 
 interface StepReviewProps {
@@ -21,6 +21,88 @@ interface StepReviewProps {
   isSubmitting: boolean
 }
 
+const STEP_ORDER: { step: string; stepIndex: number; title: string }[] = [
+  { step: "IDENTITY", stepIndex: 1, title: "2. Business Identity" },
+  { step: "LOCATION", stepIndex: 2, title: "3. Location & Service Coverage" },
+  { step: "OPERATIONS", stepIndex: 3, title: "4. Fulfillment & Operating Hours" },
+  { step: "CONTACT", stepIndex: 4, title: "5. Support & Contact" },
+  { step: "KYC", stepIndex: 5, title: "6. KYC & Compliance Verification" },
+  { step: "SHOWCASE", stepIndex: 6, title: "7. Store Photos & Showcase" },
+]
+
+function formatKeyLabel(key: string): string {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (l) => l.toUpperCase())
+    .replace(/Km\b/, "(km)")
+    .replace(/Gst\b/, "GST")
+    .replace(/Pan\b/, "PAN")
+    .replace(/Kyc\b/, "KYC")
+    .replace(/Sla\b/, "SLA")
+}
+
+function renderFormattedValue(value: any) {
+  if (value === undefined || value === null || value === "") {
+    return <span className="text-ui-fg-muted">—</span>
+  }
+
+  if (typeof value === "boolean") {
+    return (
+      <Badge color={value ? "green" : "grey"} size="2xsmall">
+        {value ? "Yes / Available" : "No"}
+      </Badge>
+    )
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span className="text-ui-fg-muted">—</span>
+    // Check if it's an image list
+    const isImages = value.some((v) => typeof v === "string" && (v.includes("/") || v.includes(".")))
+    if (isImages) {
+      return (
+        <div className="flex flex-wrap gap-1.5 pt-0.5">
+          {value.map((url, i) => (
+            <Badge key={i} color="blue" size="2xsmall" className="inline-flex items-center gap-1">
+              <Photo className="h-3 w-3" /> Photo {i + 1}
+            </Badge>
+          ))}
+        </div>
+      )
+    }
+    return (
+      <div className="flex flex-wrap gap-1 pt-0.5">
+        {value.map((item, i) => (
+          <Badge key={i} color="grey" size="2xsmall">
+            {String(item).replace(/_/g, " ")}
+          </Badge>
+        ))}
+      </div>
+    )
+  }
+
+  if (typeof value === "object") {
+    if (value.address) {
+      return (
+        <span className="font-semibold text-ui-fg-base">
+          {[value.address, value.city, value.postalCode, value.country].filter(Boolean).join(", ")}
+        </span>
+      )
+    }
+    return <span className="font-semibold text-ui-fg-base">{JSON.stringify(value)}</span>
+  }
+
+  if (typeof value === "string" && (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("blob:"))) {
+    return (
+      <div className="inline-flex items-center gap-1.5 text-xs text-ui-fg-interactive font-medium">
+        <DocumentText className="h-3.5 w-3.5" />
+        <span className="truncate max-w-[200px]">{value.split("/").pop()}</span>
+      </div>
+    )
+  }
+
+  return <span className="font-semibold text-ui-fg-base">{String(value)}</span>
+}
+
 export function OnboardingStepReview({
   segmentName,
   vendorTypeName,
@@ -32,13 +114,6 @@ export function OnboardingStepReview({
   isSubmitting,
 }: StepReviewProps) {
   const [agreed, setAgreed] = useState(false)
-
-  const identity = allAnswers.IDENTITY || {}
-  const location = allAnswers.LOCATION || {}
-  const operations = allAnswers.OPERATIONS || {}
-  const contact = allAnswers.CONTACT || {}
-  const kyc = allAnswers.KYC || {}
-  const showcase = allAnswers.SHOWCASE || {}
 
   return (
     <div className="flex flex-col gap-y-6">
@@ -91,146 +166,40 @@ export function OnboardingStepReview({
           </div>
         </div>
 
-        {/* Section 1: Identity */}
-        <div className="p-4 rounded-lg border border-ui-border-base bg-ui-bg-subtle/50 flex flex-col gap-y-3">
-          <div className="flex items-center justify-between border-b border-ui-border-base pb-2">
-            <span className="text-xs font-semibold text-ui-fg-base uppercase tracking-wider">
-              2. Business Identity
-            </span>
-            <Button
-              variant="transparent"
-              size="small"
-              onClick={() => onGoToStep(1)}
-              className="text-xs text-ui-fg-interactive flex items-center gap-x-1"
-            >
-              <PencilSquare className="h-3.5 w-3.5" /> Edit
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-            <div>
-              <span className="text-ui-fg-muted block">Legal Name:</span>
-              <span className="font-semibold text-ui-fg-base">{identity.business_legal_name || "—"}</span>
-            </div>
-            <div>
-              <span className="text-ui-fg-muted block">Trade / Store Name:</span>
-              <span className="font-semibold text-ui-fg-base">{identity.trade_name || "—"}</span>
-            </div>
-            <div>
-              <span className="text-ui-fg-muted block">Entity Type:</span>
-              <span className="font-semibold text-ui-fg-base">{identity.business_type || "—"}</span>
-            </div>
-            <div>
-              <span className="text-ui-fg-muted block">Tax / GST ID:</span>
-              <span className="font-semibold text-ui-fg-base">{identity.tax_id || "—"}</span>
-            </div>
-            <div>
-              <span className="text-ui-fg-muted block">Registration Number:</span>
-              <span className="font-semibold text-ui-fg-base">{identity.registration_number || "—"}</span>
-            </div>
-          </div>
-        </div>
+        {/* Dynamic Questionnaire Sections */}
+        {STEP_ORDER.map(({ step, stepIndex, title }) => {
+          const stepAnswers = allAnswers[step] || {}
+          const entries = Object.entries(stepAnswers)
 
-        {/* Section 2: Location */}
-        <div className="p-4 rounded-lg border border-ui-border-base bg-ui-bg-subtle/50 flex flex-col gap-y-3">
-          <div className="flex items-center justify-between border-b border-ui-border-base pb-2">
-            <span className="text-xs font-semibold text-ui-fg-base uppercase tracking-wider">
-              3. Location & Service Area
-            </span>
-            <Button
-              variant="transparent"
-              size="small"
-              onClick={() => onGoToStep(2)}
-              className="text-xs text-ui-fg-interactive flex items-center gap-x-1"
-            >
-              <PencilSquare className="h-3.5 w-3.5" /> Edit
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div>
-              <span className="text-ui-fg-muted block">Registered Address:</span>
-              <span className="font-semibold text-ui-fg-base">
-                {typeof location.registered_address === "object"
-                  ? `${location.registered_address?.address || ""}, ${location.registered_address?.city || ""}`
-                  : location.registered_address || "—"}
-              </span>
-            </div>
-            <div>
-              <span className="text-ui-fg-muted block">Coverage Radius:</span>
-              <span className="font-semibold text-ui-fg-base">
-                {location.service_radius_km ? `${location.service_radius_km} km` : "Nationwide"}
-              </span>
-            </div>
-          </div>
-        </div>
+          if (entries.length === 0) return null
 
-        {/* Section 3: Operations & Contact */}
-        <div className="p-4 rounded-lg border border-ui-border-base bg-ui-bg-subtle/50 flex flex-col gap-y-3">
-          <div className="flex items-center justify-between border-b border-ui-border-base pb-2">
-            <span className="text-xs font-semibold text-ui-fg-base uppercase tracking-wider">
-              4. Operations & Contact
-            </span>
-            <Button
-              variant="transparent"
-              size="small"
-              onClick={() => onGoToStep(3)}
-              className="text-xs text-ui-fg-interactive flex items-center gap-x-1"
-            >
-              <PencilSquare className="h-3.5 w-3.5" /> Edit
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-            <div>
-              <span className="text-ui-fg-muted block">Fulfillment Model:</span>
-              <span className="font-semibold text-ui-fg-base">{operations.fulfillment_model || "—"}</span>
-            </div>
-            <div>
-              <span className="text-ui-fg-muted block">Dispatch SLA:</span>
-              <span className="font-semibold text-ui-fg-base">
-                {operations.dispatch_sla_hours ? `${operations.dispatch_sla_hours} hrs` : "—"}
-              </span>
-            </div>
-            <div>
-              <span className="text-ui-fg-muted block">Support Email:</span>
-              <span className="font-semibold text-ui-fg-base">{contact.support_email || "—"}</span>
-            </div>
-            <div>
-              <span className="text-ui-fg-muted block">Support Phone:</span>
-              <span className="font-semibold text-ui-fg-base">{contact.support_phone || "—"}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 4: KYC Documents */}
-        <div className="p-4 rounded-lg border border-ui-border-base bg-ui-bg-subtle/50 flex flex-col gap-y-3">
-          <div className="flex items-center justify-between border-b border-ui-border-base pb-2">
-            <span className="text-xs font-semibold text-ui-fg-base uppercase tracking-wider">
-              5. KYC Verification Documents
-            </span>
-            <Button
-              variant="transparent"
-              size="small"
-              onClick={() => onGoToStep(5)}
-              className="text-xs text-ui-fg-interactive flex items-center gap-x-1"
-            >
-              <PencilSquare className="h-3.5 w-3.5" /> Edit
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {Object.entries(kyc).map(([key, fileVal]) => {
-              if (!fileVal) return null
-              return (
-                <div
-                  key={key}
-                  className="flex items-center gap-x-2 px-3 py-1.5 rounded-md border border-ui-border-base bg-ui-bg-base text-xs"
+          return (
+            <div key={step} className="p-4 rounded-lg border border-ui-border-base bg-ui-bg-subtle/50 flex flex-col gap-y-3">
+              <div className="flex items-center justify-between border-b border-ui-border-base pb-2">
+                <span className="text-xs font-semibold text-ui-fg-base uppercase tracking-wider">
+                  {title}
+                </span>
+                <Button
+                  variant="transparent"
+                  size="small"
+                  onClick={() => onGoToStep(stepIndex)}
+                  className="text-xs text-ui-fg-interactive flex items-center gap-x-1"
                 >
-                  <DocumentText className="text-ui-fg-interactive h-3.5 w-3.5" />
-                  <span className="font-medium text-ui-fg-base">{key.replace(/_/g, " ")}:</span>
-                  <Badge color="green" size="xsmall">Attached</Badge>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+                  <PencilSquare className="h-3.5 w-3.5" /> Edit
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                {entries.map(([k, v]) => (
+                  <div key={k} className="flex flex-col gap-y-0.5">
+                    <span className="text-ui-fg-muted text-[11px] block">{formatKeyLabel(k)}:</span>
+                    <div className="text-xs">{renderFormattedValue(v)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Compliance & Declaration */}
@@ -265,3 +234,4 @@ export function OnboardingStepReview({
     </div>
   )
 }
+

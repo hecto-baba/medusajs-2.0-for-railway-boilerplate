@@ -290,15 +290,41 @@ export function OnboardingStepQuestions({
     vendorTypeId,
   })
 
+  const dynamicSet = questionSets.find((qs) => qs.step === step)
+
+  const effectiveTitle = dynamicSet?.title || title
+  const effectiveDescription = dynamicSet?.subtitle || dynamicSet?.description || description
+
   const fields: VendorQuestionField[] = useMemo(() => {
-    // If TrustClaw provided dynamic fields for this step, use them
-    const dynamicSet = questionSets.find((qs) => qs.step === step)
-    if (dynamicSet && dynamicSet.fields && dynamicSet.fields.length > 0) {
-      return dynamicSet.fields
+    // 1. If dynamic question set exists from TrustClaw API, extract its exact questions
+    if (dynamicSet) {
+      if (dynamicSet.fields && dynamicSet.fields.length > 0) {
+        return dynamicSet.fields
+      }
+      if (dynamicSet.questions && dynamicSet.questions.length > 0) {
+        return dynamicSet.questions.map((q: any) => {
+          const key = q.key || q.id || q.name
+          return {
+            id: key,
+            name: key,
+            key: key,
+            label: q.label || key,
+            description: q.helpText || q.description || null,
+            helpText: q.helpText || q.description || null,
+            type: (q.type || "text").toLowerCase(),
+            placeholder: q.placeholder || null,
+            required: Boolean(q.required),
+            order: typeof q.order === "number" ? q.order : 0,
+            options: q.options,
+            minCount: q.minCount,
+            maxCount: q.maxCount,
+          }
+        })
+      }
     }
-    // Otherwise use the canonical fallback fields
+    // 2. Otherwise use the canonical fallback fields
     return DEFAULT_SCHEMAS[step] || []
-  }, [questionSets, step])
+  }, [dynamicSet, step])
 
   const StepIcon = STEP_ICONS[step] || DocumentText
 
@@ -313,9 +339,11 @@ export function OnboardingStepQuestions({
           val === null ||
           val === "" ||
           (Array.isArray(val) && val.length === 0) ||
-          (typeof val === "object" && !val.address && field.type === "LOCATION_GEO")
+          (typeof val === "object" && !val.address && (String(field.type).toUpperCase() === "LOCATION_GEO" || String(field.type).toUpperCase() === "ADDRESS"))
         ) {
           newErrors[field.id] = `${field.label} is required.`
+        } else if (field.minCount && Array.isArray(val) && val.length < field.minCount) {
+          newErrors[field.id] = `${field.label} requires at least ${field.minCount} photos.`
         }
       }
     }
@@ -333,27 +361,34 @@ export function OnboardingStepQuestions({
   return (
     <div className="flex flex-col gap-y-6">
       {/* Step Header */}
-      <div className="flex flex-col gap-y-2 border-b border-ui-border-base pb-5">
+      <div className="flex flex-col gap-y-1.5 border-b border-ui-border-base pb-4">
         <div className="flex items-center gap-x-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ui-bg-interactive text-ui-fg-on-color">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ui-bg-interactive text-ui-fg-on-color shrink-0">
             <StepIcon className="h-4 w-4" />
           </span>
-          <Heading level="h2" className="text-xl font-semibold text-ui-fg-base">
-            {title}
+          <Heading level="h2" className="text-lg font-semibold text-ui-fg-base">
+            {effectiveTitle}
           </Heading>
         </div>
-        <Text size="small" className="text-ui-fg-subtle">
-          {description}
-        </Text>
+        {effectiveDescription ? (
+          <Text size="small" className="text-ui-fg-subtle text-xs">
+            {effectiveDescription}
+          </Text>
+        ) : null}
       </div>
 
       {/* Fields List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
         {fields.map((field) => {
+          const normType = String(field.type || "").toUpperCase()
           const isWide =
-            field.type === "TEXTAREA" ||
-            field.type === "LOCATION_GEO" ||
-            field.type === "FILE_UPLOAD"
+            normType === "TEXTAREA" ||
+            normType === "LOCATION_GEO" ||
+            normType === "ADDRESS" ||
+            normType === "FILE_UPLOAD" ||
+            normType === "IMAGE" ||
+            normType === "OPERATING_HOURS" ||
+            normType === "MULTI_SELECT"
 
           return (
             <div
@@ -380,18 +415,23 @@ export function OnboardingStepQuestions({
         })}
       </div>
 
-      {/* Navigation Footer */}
-      <div className="flex items-center justify-between pt-6 border-t border-ui-border-base">
-        <Button variant="secondary" onClick={onBack} disabled={isSaving}>
+      {/* Navigation Actions */}
+      <div className="flex items-center justify-between pt-6 border-t border-ui-border-base mt-2">
+        <Button
+          variant="secondary"
+          onClick={onBack}
+          disabled={isSaving}
+          type="button"
+        >
           ← Back
         </Button>
         <Button
           variant="primary"
-          disabled={isSaving}
-          isLoading={isSaving}
           onClick={handleValidateAndNext}
+          isLoading={isSaving}
+          type="button"
         >
-          Save & Continue →
+          Continue →
         </Button>
       </div>
     </div>
