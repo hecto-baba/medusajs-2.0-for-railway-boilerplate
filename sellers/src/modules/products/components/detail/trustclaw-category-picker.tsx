@@ -6,6 +6,7 @@ import {
   type TrustClawSegment,
   type TrustClawCategory,
 } from "@lib/data/vendor-client"
+import { useVendorOnboardingStatus } from "@modules/onboarding"
 import {
   Badge,
   Button,
@@ -15,6 +16,7 @@ import {
 } from "@medusajs/ui"
 import {
   ArrowLeft,
+  BuildingStorefront,
   CheckCircle,
   ChevronRight,
   Folder,
@@ -22,7 +24,7 @@ import {
   XMark,
 } from "@medusajs/icons"
 import { useQuery } from "@tanstack/react-query"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 interface Props {
   /** Called with the category ID and name once the seller selects a category */
@@ -35,6 +37,8 @@ interface Props {
   selectedMedusaCategoryId?: string | null
   /** Optional pre-filled category name or path for display in edit mode */
   selectedCategoryName?: string | null
+  /** Optional segment code override */
+  vendorSegmentCode?: string
 }
 
 const NONE = "__none__"
@@ -49,7 +53,11 @@ export function TrustClawCategoryPicker({
   onSelectCategory,
   selectedMedusaCategoryId,
   selectedCategoryName,
+  vendorSegmentCode: propSegmentCode,
 }: Props) {
+  // Fetch vendor's registered onboarding details
+  const { data: onboarding, isLoading: onboardingLoading } = useVendorOnboardingStatus()
+
   // Selected category state for instant feedback
   const [chosenCat, setChosenCat] = useState<{
     id: string
@@ -69,16 +77,39 @@ export function TrustClawCategoryPicker({
 
   const [isEditing, setIsEditing] = useState<boolean>(!selectedMedusaCategoryId)
 
-  // ── Hierarchical Browse State ──
-  const [selectedSegmentCode, setSelectedSegmentCode] = useState("")
-  const [breadcrumb, setBreadcrumb] = useState<TrustClawCategory[]>([])
-
-  // Fetch Segments
+  // Fetch Segments list
   const { data: segments = [], isLoading: segmentsLoading } = useQuery({
     queryKey: ["tc-segments"],
     queryFn: getTrustClawSegments,
     staleTime: 10 * 60 * 1000,
   })
+
+  // 1. Resolve vendor's effective segment code
+  const effectiveVendorSegmentCode =
+    propSegmentCode ||
+    onboarding?.segment?.code ||
+    segments.find(
+      (s) =>
+        s.id === onboarding?.segmentId ||
+        s.code === onboarding?.segmentId ||
+        (onboarding?.segment?.name &&
+          s.name?.toLowerCase() === onboarding.segment.name.toLowerCase())
+    )?.code
+
+  const isVendorScoped = Boolean(effectiveVendorSegmentCode)
+
+  // ── Hierarchical Browse State ──
+  const [selectedSegmentCode, setSelectedSegmentCode] = useState<string>(
+    effectiveVendorSegmentCode || ""
+  )
+  const [breadcrumb, setBreadcrumb] = useState<TrustClawCategory[]>([])
+
+  // Auto-synchronize locked segment once onboarding loads
+  useEffect(() => {
+    if (effectiveVendorSegmentCode && selectedSegmentCode !== effectiveVendorSegmentCode) {
+      setSelectedSegmentCode(effectiveVendorSegmentCode)
+    }
+  }, [effectiveVendorSegmentCode, selectedSegmentCode])
 
   // ── Browse Drilldown Query ──
   const currentParentId =
@@ -99,7 +130,9 @@ export function TrustClawCategoryPicker({
     staleTime: 5 * 60 * 1000,
   })
 
-  const currentSegment = segments.find((s) => s.code === selectedSegmentCode)
+  const currentSegment =
+    segments.find((s) => s.code === selectedSegmentCode) ||
+    (onboarding?.segment?.code === selectedSegmentCode ? onboarding.segment : null)
 
   // ── Handlers ──
   const handleSelect = (cat: TrustClawCategory) => {
@@ -120,7 +153,9 @@ export function TrustClawCategoryPicker({
     setChosenCat(null)
     setIsEditing(true)
     setBreadcrumb([])
-    setSelectedSegmentCode("")
+    if (!isVendorScoped) {
+      setSelectedSegmentCode("")
+    }
     onSelectCategory("", "")
   }
 
@@ -228,32 +263,53 @@ export function TrustClawCategoryPicker({
             )}
           </div>
 
-          {/* ── Step 1: Industry Segment Selector ── */}
-          <div className="flex flex-col gap-1.5">
-            <Label size="small" weight="plus">
-              1. Industry Segment
-            </Label>
-            <Select
-              value={selectedSegmentCode || NONE}
-              onValueChange={(v) => {
-                setSelectedSegmentCode(v === NONE ? "" : v)
-                setBreadcrumb([])
-              }}
-              disabled={segmentsLoading}
-            >
-              <Select.Trigger aria-label="Select segment">
-                <Select.Value placeholder="Select an industry segment (e.g. Fashion, Grocery, Electronics)…" />
-              </Select.Trigger>
-              <Select.Content>
-                <Select.Item value={NONE}>— Select segment —</Select.Item>
-                {segments.map((seg) => (
-                  <Select.Item key={seg.id} value={seg.code}>
-                    {seg.name} ({seg.orderType || "BUY"})
-                  </Select.Item>
-                ))}
-              </Select.Content>
-            </Select>
-          </div>
+          {/* ── Step 1: Industry Segment (Locked for Scoped Vendor / Select for Admin/Fallback) ── */}
+          {isVendorScoped ? (
+            <div className="flex items-center justify-between p-3 rounded-lg border border-ui-border-base bg-ui-bg-base shadow-sm">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-ui-bg-subtle-hover text-ui-fg-interactive shrink-0">
+                  <BuildingStorefront className="h-4 w-4" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ui-fg-muted">
+                    Your Business Segment
+                  </span>
+                  <span className="text-sm font-semibold text-ui-fg-base truncate">
+                    {currentSegment?.name || onboarding?.segment?.name || selectedSegmentCode}
+                  </span>
+                </div>
+              </div>
+              <Badge color="blue" size="small" className="shrink-0 font-medium">
+                {(currentSegment as any)?.orderType || "BUY"} • Scoped
+              </Badge>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <Label size="small" weight="plus">
+                1. Industry Segment
+              </Label>
+              <Select
+                value={selectedSegmentCode || NONE}
+                onValueChange={(v) => {
+                  setSelectedSegmentCode(v === NONE ? "" : v)
+                  setBreadcrumb([])
+                }}
+                disabled={segmentsLoading || onboardingLoading}
+              >
+                <Select.Trigger aria-label="Select segment">
+                  <Select.Value placeholder="Select an industry segment (e.g. Fashion, Grocery, Electronics)…" />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Item value={NONE}>— Select segment —</Select.Item>
+                  {segments.map((seg) => (
+                    <Select.Item key={seg.id} value={seg.code}>
+                      {seg.name} ({seg.orderType || "BUY"})
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select>
+            </div>
+          )}
 
           {/* ── Step 2: Category Hierarchy Navigation ── */}
           {selectedSegmentCode && (
@@ -372,3 +428,4 @@ export function TrustClawCategoryPicker({
     </div>
   )
 }
+

@@ -4,6 +4,8 @@ import type {
 } from "@medusajs/framework/http"
 import { Modules } from "@medusajs/framework/utils"
 import { fetchCategories, TrustClawError } from "../../../../lib/trustclaw"
+import { getVendorId } from "../../shared/vendor-scope"
+import { onboardingStore } from "../../../../lib/onboarding-store"
 
 /**
  * GET /vendors/taxonomy/tc-categories
@@ -12,7 +14,7 @@ import { fetchCategories, TrustClawError } from "../../../../lib/trustclaw"
  * The TrustClaw API key never leaves the Medusa server.
  *
  * Query parameters (all optional):
- *   segmentCode  - e.g. "AGRICULTURE"
+ *   segmentCode  - e.g. "AGRICULTURE" (defaults to vendor's registered segment)
  *   parentId     - "null" → root categories; "<uuid>" → children of that node
  *   tree         - "true" to get full nested tree (used only by sync job)
  *   limit        - default 200
@@ -34,10 +36,28 @@ export const GET = async (
     limit,
   } = req.query as Record<string, string>
 
+  let effectiveSegmentCode = segmentCode
+  let effectiveSegmentId = segmentId
+
+  // If no segment filter is explicitly provided, auto-scope to vendor's onboarding segment
+  if (!effectiveSegmentCode && !effectiveSegmentId) {
+    try {
+      const vendorId = await getVendorId(req)
+      const localRecord = onboardingStore.get(vendorId)
+      if (localRecord?.segment?.code) {
+        effectiveSegmentCode = localRecord.segment.code
+      } else if (localRecord?.segmentId) {
+        effectiveSegmentId = localRecord.segmentId
+      }
+    } catch {
+      // Non-fatal if vendor cannot be resolved or is admin
+    }
+  }
+
   try {
     const categories = await fetchCategories({
-      segmentCode,
-      segmentId,
+      segmentCode: effectiveSegmentCode,
+      segmentId: effectiveSegmentId,
       parentId: parentId ?? undefined,
       level,
       hasChildren,

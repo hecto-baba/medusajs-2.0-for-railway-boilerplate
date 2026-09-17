@@ -290,7 +290,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
 
       <Card
         title="Product Category & Classification"
-        description="Assign a standardized category from the industry taxonomy to improve search discovery and storefront classification."
+        description="Assign a standardized category tailored to your registered business vertical to optimize discovery and storefront classification."
       >
         <TrustClawCategoryPicker
           selectedMedusaCategoryId={categoryIds[0] ?? null}
