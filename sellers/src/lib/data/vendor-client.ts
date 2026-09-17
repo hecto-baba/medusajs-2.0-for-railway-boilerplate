@@ -2453,6 +2453,12 @@ export type VendorQuestionFieldType =
   | "BOOLEAN"
   | "DATE"
   | "LOCATION_GEO"
+  | "ADDRESS"
+  | "EMAIL"
+  | "PHONE"
+  | "OPERATING_HOURS"
+  | "IMAGE"
+  | string
 
 export type VendorQuestionOption = {
   label: string
@@ -2463,21 +2469,30 @@ export type VendorQuestionOption = {
 export type VendorQuestionField = {
   id: string
   name: string
+  key?: string
   label: string
   description?: string | null
+  helpText?: string | null
   type: VendorQuestionFieldType
   placeholder?: string | null
   required: boolean
-  options?: VendorQuestionOption[]
+  order?: number
+  options?: VendorQuestionOption[] | string
+  minCount?: number
+  maxCount?: number
   validationRule?: string | null
   dependsOn?: { field: string; value: string | boolean } | null
   defaultValue?: unknown
 }
 
 export type VendorQuestionSet = {
+  id?: string
   step: VendorOnboardingStepName | string
   title: string
+  subtitle?: string | null
   description?: string | null
+  version?: number
+  questions?: VendorQuestionField[]
   fields: VendorQuestionField[]
 }
 
