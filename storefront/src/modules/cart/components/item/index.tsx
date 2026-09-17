@@ -33,6 +33,7 @@ const Item = ({ item, type = "full" }: ItemProps) => {
   const { handle } = item.variant?.product ?? {}
 
   const isTicket = isTicketLineItem(item.metadata)
+  const isDeposit = !!item.metadata?.is_rental_deposit
 
   const changeQuantity = async (quantity: number) => {
     setError(null)
@@ -58,6 +59,37 @@ const Item = ({ item, type = "full" }: ItemProps) => {
   // TODO: Update this to grab the actual max inventory
   const maxQtyFromInventory = 10
   const maxQuantity = item.variant?.manage_inventory ? 10 : maxQtyFromInventory
+
+  // The deposit has no catalog product/variant behind it (it's a manual line
+  // item added alongside the rental), so it gets a plain, distinct row
+  // instead of the thumbnail/quantity-selector treatment a real product gets.
+  // Empty cells (rather than colSpan, which @medusajs/ui's Table.Cell doesn't
+  // type) keep the column count identical to a normal row.
+  if (isDeposit) {
+    return (
+      <Table.Row className="w-full" data-testid="product-row">
+        <Table.Cell className="!pl-0 p-4 w-24" />
+        <Table.Cell className="text-left">
+          <Text
+            className="txt-medium-plus text-ui-fg-base"
+            data-testid="product-title"
+          >
+            Security Deposit
+          </Text>
+          <Text className="txt-small text-ui-fg-subtle">
+            Refundable, held separately from the rental fee.
+          </Text>
+        </Table.Cell>
+        {type === "full" && <Table.Cell />}
+        {type === "full" && <Table.Cell className="hidden small:table-cell" />}
+        <Table.Cell className="!pr-0">
+          <span className="!pr-0 flex flex-col items-end h-full justify-center">
+            <LineItemPrice item={item} style="tight" />
+          </span>
+        </Table.Cell>
+      </Table.Row>
+    )
+  }
 
   return (
     <Table.Row className="w-full" data-testid="product-row">

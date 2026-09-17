@@ -28,6 +28,38 @@ class RentalModuleService extends MedusaService({
 
     return count > 0
   }
+
+  /**
+   * Every already-booked date range for a variant within a window, for
+   * painting blocked dates on a calendar ahead of time. Same overlap
+   * predicate as hasRentalOverlap, just returning the ranges instead of a
+   * yes/no for one specific range.
+   */
+  async listBookedRanges(
+    variant_id: string,
+    window_start: Date,
+    window_end: Date
+  ) {
+    const rentals = await this.listRentals({
+      variant_id,
+      status: ["active", "pending"],
+      $or: [
+        {
+          rental_start_date: {
+            $lte: window_end,
+          },
+          rental_end_date: {
+            $gte: window_start,
+          },
+        },
+      ],
+    })
+
+    return rentals.map((rental) => ({
+      start_date: rental.rental_start_date,
+      end_date: rental.rental_end_date,
+    }))
+  }
 }
 
 export default RentalModuleService

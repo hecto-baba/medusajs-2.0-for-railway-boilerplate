@@ -5,6 +5,8 @@ import { RENTAL_MODULE } from "../../modules/rental";
 import hasCartOverlap from "../../utils/has-cart-overlap";
 import validateRentalDates from "../../utils/validate-rental-dates";
 import countRentalDays from "../../utils/count-rental-days";
+import countRentalUnits from "../../utils/count-rental-units";
+import { RentalUnit } from "../../utils/rental-unit";
 
 completeCartWorkflow.hooks.validate(
   async ({ cart }, { container }) => {
@@ -89,15 +91,26 @@ completeCartWorkflow.hooks.validate(
       // Recomputed here too: this hook also guards the standard line-item
       // route, where nothing has validated the metadata beforehand.
       const derivedRentalDays = countRentalDays(startDate, endDate)
-      
+
+      const configuredUnit: RentalUnit =
+        ((rental_configuration as any).rental_unit as RentalUnit) ?? "day"
+      const derivedUnitsCount =
+        configuredUnit === "day" || configuredUnit === "custom"
+          ? derivedRentalDays
+          : countRentalUnits(startDate, endDate, configuredUnit)
+
       validateRentalDates(
-        startDate, 
-        endDate, 
+        startDate,
+        endDate,
         {
           min_rental_days: (rental_configuration as any).min_rental_days,
           max_rental_days: (rental_configuration as any).max_rental_days,
-        }, 
-        derivedRentalDays
+          rental_unit: configuredUnit,
+          min_rental_units: (rental_configuration as any).min_rental_units,
+          max_rental_units: (rental_configuration as any).max_rental_units,
+        },
+        derivedRentalDays,
+        derivedUnitsCount
       )
 
       const hasCartOverlapResult = hasCartOverlap(

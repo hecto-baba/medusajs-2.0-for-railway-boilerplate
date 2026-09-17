@@ -7,6 +7,9 @@ import { RentalConfiguration } from "../../modules/rental/models/rental-configur
 import hasCartOverlap from "../../utils/has-cart-overlap"
 import validateRentalDates from "../../utils/validate-rental-dates"
 import countRentalDays from "../../utils/count-rental-days"
+import countRentalUnits from "../../utils/count-rental-units"
+import calculateRentalTotal from "../../utils/rental-pricing"
+import { RentalUnit } from "../../utils/rental-unit"
 
 export type ValidateRentalCartItemInput = {
   variant: ProductVariantDTO
@@ -33,7 +36,14 @@ export const validateRentalCartItemStep = createStep(
 
     // Skip validation if not a rental product or if rental config is not active
     if (rental_configuration?.status !== "active") {
-      return new StepResponse({ is_rental: false, rental_days: 0, price: 0 })
+      return new StepResponse({
+        is_rental: false,
+        rental_days: 0,
+        rental_unit: "day" as RentalUnit,
+        rental_units_count: 0,
+        price: 0,
+        deposit_amount: 0,
+      })
     }
 
     // This is a rental product - validate quantity
@@ -60,17 +70,30 @@ export const validateRentalCartItemStep = createStep(
     const endDate = new Date(rentalEndDate as string)
     // Derived, never taken from the request: the client-supplied count sets
     // the price and is what min/max are checked against, so trusting it
-    // would let a caller book any period at a single day's rate.
+    // would let a caller book any period at a single day's rate. For an
+    // hour-unit rental, rentalStartDate/rentalEndDate carry real time-of-day
+    // (not just a date), so this still reflects the true elapsed period.
     const days = countRentalDays(startDate, endDate)
 
+    const rentalUnit: RentalUnit =
+      (rental_configuration.rental_unit as RentalUnit) ?? "day"
+    const unitsCount =
+      rentalUnit === "day" || rentalUnit === "custom"
+        ? days
+        : countRentalUnits(startDate, endDate, rentalUnit)
+
     validateRentalDates(
-      startDate, 
-      endDate, 
+      startDate,
+      endDate,
       {
         min_rental_days: rental_configuration.min_rental_days,
         max_rental_days: rental_configuration.max_rental_days,
-      }, 
-      days
+        rental_unit: rentalUnit,
+        min_rental_units: rental_configuration.min_rental_units,
+        max_rental_units: rental_configuration.max_rental_units,
+      },
+      days,
+      unitsCount
     )
 
     // Check if this rental variant is already in the cart with overlapping dates
@@ -101,10 +124,24 @@ export const validateRentalCartItemStep = createStep(
       )
     }
 
-    return new StepResponse({ 
+    const unitRate = (variant as any).calculated_price?.calculated_amount || 0
+    const { subtotal, depositAmount } = calculateRentalTotal({
+      unitRate,
+      unitsCount,
+      depositAmount: rental_configuration.security_deposit_amount ?? 0,
+      depositType: rental_configuration.security_deposit_type as
+        | "fixed"
+        | "percentage"
+        | undefined,
+    })
+
+    return new StepResponse({
       is_rental: true,
       rental_days: days,
-      price: ((variant as any).calculated_price?.calculated_amount || 0) * days
+      rental_unit: rentalUnit,
+      rental_units_count: unitsCount,
+      price: subtotal,
+      deposit_amount: depositAmount,
     })
   }
 )

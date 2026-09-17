@@ -7,7 +7,9 @@ import {
 import { createFindParams } from "@medusajs/medusa/api/utils/validators";
 import { PostRentalConfigBodySchema } from "./admin/products/[id]/rental-config/route";
 import { PostRentalStatusBodySchema } from "./admin/rentals/[id]/route";
+import { PostRentalDepositBodySchema } from "./admin/rentals/[id]/deposit/route";
 import { GetRentalAvailabilitySchema } from "./store/products/[id]/rental-availability/route";
+import { GetRentalBlockedDatesSchema } from "./store/products/[id]/rental-blocked-dates/route";
 import { PostCartItemsRentalsBody } from "./store/carts/[id]/line-items/rentals/route";
 import { PostCartItemsTicketsBody } from "./store/carts/[id]/line-items/tickets/route";
 import { PostVenueBodySchema } from "./admin/venues/route";
@@ -327,6 +329,13 @@ export default defineMiddlewares({
       ]
     },
     {
+      matcher: "/admin/rentals/:id/deposit",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostRentalDepositBodySchema)
+      ]
+    },
+    {
       matcher: "/admin/rentals/:id",
       methods: ["POST"],
       middlewares: [
@@ -338,6 +347,13 @@ export default defineMiddlewares({
       methods: ["GET"],
       middlewares: [
         validateAndTransformQuery(GetRentalAvailabilitySchema, {})
+      ]
+    },
+    {
+      matcher: "/store/products/:id/rental-blocked-dates",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetRentalBlockedDatesSchema, {})
       ]
     },
     {

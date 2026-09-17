@@ -10,7 +10,7 @@ import {
   releaseLockStep, 
   useQueryGraphStep
 } from "@medusajs/medusa/core-flows"
-import { QueryContext } from "@medusajs/framework/utils"
+import { QueryContext, generateEntityId } from "@medusajs/framework/utils"
 import { 
   ValidateRentalCartItemInput, 
   validateRentalCartItemStep
@@ -86,12 +86,50 @@ export const addToCartWithRentalWorkflow = createWorkflow(
         metadata: data.input.metadata,
       }
 
-      // If it's a rental product, use the calculated rental price
+      // If it's a rental product, use the calculated rental price and
+      // stamp the quote (unit, quantity, deposit) into metadata so
+      // create-rentals-for-order can persist exactly what was charged,
+      // regardless of what the product's configuration says by checkout.
       if (data.rentalData?.is_rental && data.rentalData.price) {
-        return [{
+        // Correlates the rental item with its deposit item below: neither
+        // has a cart line item id yet (both are created by the same
+        // addToCartWorkflow call), so cart-side cleanup (e.g. removing the
+        // deposit when the rental item is removed) matches on this instead.
+        // generateEntityId (not Date.now()) so two adds of the same variant
+        // within the same millisecond - a double-click, a retried request,
+        // two open tabs - can never collide onto the same group id.
+        const rentalGroupId = generateEntityId(undefined, "rentgrp")
+
+        const items: Record<string, unknown>[] = [{
           ...baseItem,
           unit_price: data.rentalData.price,
+          metadata: {
+            ...(data.input.metadata || {}),
+            rental_unit: data.rentalData.rental_unit,
+            rental_units_count: data.rentalData.rental_units_count,
+            rental_deposit_amount: data.rentalData.deposit_amount,
+            rental_group_id: rentalGroupId,
+          },
         }]
+
+        // Deposit is charged as its own line item rather than folded into
+        // unit_price above, so it can be tracked and refunded independently
+        // of the rental fee itself. No variant/product is attached - core
+        // Medusa's addToCartWorkflow supports a manual, catalog-less line
+        // item as long as title/quantity/unit_price are supplied directly.
+        if (data.rentalData.deposit_amount > 0) {
+          items.push({
+            title: "Security Deposit",
+            quantity: 1,
+            unit_price: data.rentalData.deposit_amount,
+            metadata: {
+              is_rental_deposit: true,
+              rental_group_id: rentalGroupId,
+            },
+          })
+        }
+
+        return items
       }
 
       // For non-rental products, don't specify unit_price (let Medusa calculate it)

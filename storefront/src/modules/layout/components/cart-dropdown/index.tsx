@@ -117,73 +117,107 @@ const CartDropdown = ({
                         ? -1
                         : 1
                     })
-                    .map((item) => (
-                      <div
-                        className="grid grid-cols-[122px_1fr] gap-x-4"
-                        key={item.id}
-                        data-testid="cart-item"
-                      >
-                        <LocalizedClientLink
-                          href={`/products/${item.variant?.product?.handle}`}
-                          className="w-24"
-                        >
-                          <Thumbnail
-                            thumbnail={item.variant?.product?.thumbnail}
-                            images={item.variant?.product?.images}
-                            size="square"
-                          />
-                        </LocalizedClientLink>
-                        <div className="flex flex-col justify-between flex-1">
-                          <div className="flex flex-col flex-1">
-                            <div className="flex items-start justify-between">
-                              <div className="flex flex-col overflow-ellipsis whitespace-nowrap mr-4 w-[180px]">
-                                <h3 className="text-base-regular overflow-hidden text-ellipsis">
-                                  <LocalizedClientLink
-                                    href={`/products/${item.variant?.product?.handle}`}
-                                    data-testid="product-link"
-                                  >
-                                    {item.title}
-                                  </LocalizedClientLink>
-                                </h3>
-                                <LineItemOptions
-                                  variant={item.variant}
-                                  data-testid="cart-item-variant"
-                                  data-value={item.variant}
-                                />
-                                <LineItemRentalDates
-                                  metadata={item.metadata}
-                                  data-testid="cart-item-rental-dates"
-                                />
-                                <LineItemSeatInfo
-                                  metadata={item.metadata}
-                                  data-testid="cart-item-seat-info"
-                                />
-                                {/* A ticket line is always one seat, so a
-                                    quantity reads as noise next to it. */}
-                                {!isTicketLineItem(item.metadata) && (
-                                  <span
-                                    data-testid="cart-item-quantity"
-                                    data-value={item.quantity}
-                                  >
-                                    Quantity: {item.quantity}
+                    .map((item) => {
+                      // The deposit is a manual line item with no catalog
+                      // product/variant behind it, so it gets a plain label
+                      // instead of a broken thumbnail/product link.
+                      const isDeposit = !!item.metadata?.is_rental_deposit
+
+                      if (isDeposit) {
+                        return (
+                          <div
+                            className="grid grid-cols-[122px_1fr] gap-x-4"
+                            key={item.id}
+                            data-testid="cart-item"
+                          >
+                            <div className="w-24" />
+                            <div className="flex flex-col justify-between flex-1">
+                              <div className="flex items-start justify-between">
+                                <div className="flex flex-col mr-4">
+                                  <h3 className="text-base-regular">
+                                    Security Deposit
+                                  </h3>
+                                  <span className="text-ui-fg-subtle txt-small">
+                                    Refundable
                                   </span>
-                                )}
-                              </div>
-                              <div className="flex justify-end">
-                                <LineItemPrice item={item} style="tight" />
+                                </div>
+                                <div className="flex justify-end">
+                                  <LineItemPrice item={item} style="tight" />
+                                </div>
                               </div>
                             </div>
                           </div>
-                          <DeleteButton
-                            id={item.id}
-                            className="mt-1"
-                            data-testid="cart-item-remove-button"
+                        )
+                      }
+
+                      return (
+                        <div
+                          className="grid grid-cols-[122px_1fr] gap-x-4"
+                          key={item.id}
+                          data-testid="cart-item"
+                        >
+                          <LocalizedClientLink
+                            href={`/products/${item.variant?.product?.handle}`}
+                            className="w-24"
                           >
-                            Remove
-                          </DeleteButton>
+                            <Thumbnail
+                              thumbnail={item.variant?.product?.thumbnail}
+                              images={item.variant?.product?.images}
+                              size="square"
+                            />
+                          </LocalizedClientLink>
+                          <div className="flex flex-col justify-between flex-1">
+                            <div className="flex flex-col flex-1">
+                              <div className="flex items-start justify-between">
+                                <div className="flex flex-col overflow-ellipsis whitespace-nowrap mr-4 w-[180px]">
+                                  <h3 className="text-base-regular overflow-hidden text-ellipsis">
+                                    <LocalizedClientLink
+                                      href={`/products/${item.variant?.product?.handle}`}
+                                      data-testid="product-link"
+                                    >
+                                      {item.title}
+                                    </LocalizedClientLink>
+                                  </h3>
+                                  <LineItemOptions
+                                    variant={item.variant}
+                                    data-testid="cart-item-variant"
+                                    data-value={item.variant}
+                                  />
+                                  <LineItemRentalDates
+                                    metadata={item.metadata}
+                                    data-testid="cart-item-rental-dates"
+                                  />
+                                  <LineItemSeatInfo
+                                    metadata={item.metadata}
+                                    data-testid="cart-item-seat-info"
+                                  />
+                                  {/* A ticket line is always one seat, so a
+                                      quantity reads as noise next to it. */}
+                                  {!isTicketLineItem(item.metadata) && (
+                                    <span
+                                      data-testid="cart-item-quantity"
+                                      data-value={item.quantity}
+                                    >
+                                      Quantity: {item.quantity}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex justify-end">
+                                  <LineItemPrice item={item} style="tight" />
+                                </div>
+                              </div>
+                            </div>
+                            <DeleteButton
+                              id={item.id}
+                              className="mt-1"
+                              data-testid="cart-item-remove-button"
+                            >
+                              Remove
+                            </DeleteButton>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                 </div>
                 <div className="p-4 flex flex-col gap-y-4 text-small-regular">
                   <div className="flex items-center justify-between">

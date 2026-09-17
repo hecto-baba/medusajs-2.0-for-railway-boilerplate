@@ -9,11 +9,18 @@ import { Modules } from "@medusajs/framework/utils"
 import { createRentalConfigurationStep } from "./steps/create-rental-configuration"
 import { updateRentalConfigurationStep } from "./steps/update-rental-configuration"
 import { RENTAL_MODULE } from "../modules/rental"
+import { RentalUnit } from "../utils/rental-unit"
 
 type UpsertRentalConfigWorkflowInput = {
   product_id: string
   min_rental_days?: number
   max_rental_days?: number | null
+  rental_unit?: RentalUnit
+  min_rental_units?: number
+  max_rental_units?: number | null
+  security_deposit_amount?: number
+  security_deposit_type?: "fixed" | "percentage"
+  requires_time_selection?: boolean
   status?: "active" | "inactive"
 }
 
@@ -38,6 +45,12 @@ export const upsertRentalConfigWorkflow = createWorkflow(
         product_id: input.product_id,
         min_rental_days: input.min_rental_days,
         max_rental_days: input.max_rental_days,
+        rental_unit: input.rental_unit,
+        min_rental_units: input.min_rental_units,
+        max_rental_units: input.max_rental_units,
+        security_deposit_amount: input.security_deposit_amount,
+        security_deposit_type: input.security_deposit_type,
+        requires_time_selection: input.requires_time_selection,
         status: input.status,
       })
 
@@ -69,6 +82,12 @@ export const upsertRentalConfigWorkflow = createWorkflow(
         id: products[0].rental_configuration!.id,
         min_rental_days: input.min_rental_days,
         max_rental_days: input.max_rental_days,
+        rental_unit: input.rental_unit,
+        min_rental_units: input.min_rental_units,
+        max_rental_units: input.max_rental_units,
+        security_deposit_amount: input.security_deposit_amount,
+        security_deposit_type: input.security_deposit_type,
+        requires_time_selection: input.requires_time_selection,
         status: input.status,
       })
     })

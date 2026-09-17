@@ -42,6 +42,12 @@ export const GET = async (
 export const PostVendorRentalConfigSchema = z.object({
   min_rental_days: z.number().int().min(1).optional(),
   max_rental_days: z.number().int().min(1).nullable().optional(),
+  rental_unit: z.enum(["hour", "day", "week", "month", "custom"]).optional(),
+  min_rental_units: z.number().int().min(1).optional(),
+  max_rental_units: z.number().int().min(1).nullable().optional(),
+  security_deposit_amount: z.number().min(0).optional(),
+  security_deposit_type: z.enum(["fixed", "percentage"]).optional(),
+  requires_time_selection: z.boolean().optional(),
   status: z.enum(["active", "inactive"]).optional(),
 })
 
@@ -59,6 +65,12 @@ export const POST = async (
       product_id: id,
       min_rental_days: req.validatedBody.min_rental_days,
       max_rental_days: req.validatedBody.max_rental_days,
+      rental_unit: req.validatedBody.rental_unit,
+      min_rental_units: req.validatedBody.min_rental_units,
+      max_rental_units: req.validatedBody.max_rental_units,
+      security_deposit_amount: req.validatedBody.security_deposit_amount,
+      security_deposit_type: req.validatedBody.security_deposit_type,
+      requires_time_selection: req.validatedBody.requires_time_selection,
       status: req.validatedBody.status,
     },
   })

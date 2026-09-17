@@ -17,6 +17,7 @@ export type ValidateRentalInput = {
     rental_start_date: Date
     rental_end_date: Date
     rental_days: number
+    rental_units_count?: number
   }[]
   order_id: string
 }
@@ -28,14 +29,15 @@ export const validateRentalStep = createStep(
 
     for (let i = 0; i < rental_items.length; i++) {
       const rentalItem = rental_items[i]
-      const { 
-        line_item_id, 
-        variant_id, 
-        quantity, 
-        rental_configuration, 
-        rental_start_date, 
-        rental_end_date, 
-        rental_days
+      const {
+        line_item_id,
+        variant_id,
+        quantity,
+        rental_configuration,
+        rental_start_date,
+        rental_end_date,
+        rental_days,
+        rental_units_count,
       } = rentalItem
 
       if (rental_configuration.status !== "active") {
@@ -65,13 +67,17 @@ export const validateRentalStep = createStep(
       const endDate = rental_end_date instanceof Date ? rental_end_date : new Date(rental_end_date)
       
       validateRentalDates(
-        startDate, 
-        endDate, 
+        startDate,
+        endDate,
         {
           min_rental_days: rental_configuration.min_rental_days,
           max_rental_days: rental_configuration.max_rental_days,
-        }, 
-        rental_days
+          rental_unit: rental_configuration.rental_unit as any,
+          min_rental_units: rental_configuration.min_rental_units,
+          max_rental_units: rental_configuration.max_rental_units,
+        },
+        rental_days,
+        rental_units_count
       )
 
       const hasCartOverlapResult = hasCartOverlap(
