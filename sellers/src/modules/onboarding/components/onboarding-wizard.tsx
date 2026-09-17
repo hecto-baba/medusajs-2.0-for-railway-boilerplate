@@ -120,6 +120,7 @@ export function OnboardingWizard({
   // Step-wise answers dictionary: stepId -> { fieldId: value }
   const [answers, setAnswers] = useState<Record<string, Record<string, any>>>({})
   const [isResubmitting, setIsResubmitting] = useState(false)
+  const [submittedLocalStatus, setSubmittedLocalStatus] = useState<string | null>(null)
 
   const { data: savedAnswersData } = useVendorOnboardingAnswers()
   const saveStepMutation = useSaveVendorOnboardingStep()
@@ -159,25 +160,33 @@ export function OnboardingWizard({
     }
   }, [savedAnswersData])
 
+  const effectiveStatus = submittedLocalStatus || onboarding.status
+
   // Handle Under Review state
   if (
-    (onboarding.status === "SUBMITTED" || onboarding.status === "UNDER_REVIEW") &&
+    (effectiveStatus === "SUBMITTED" || effectiveStatus === "UNDER_REVIEW") &&
     !isResubmitting
   ) {
     return (
       <OnboardingUnderReview
-        onboarding={onboarding}
-        onRefresh={onStatusRefresh}
+        onboarding={{ ...onboarding, status: effectiveStatus as any }}
+        onRefresh={() => {
+          setSubmittedLocalStatus(null)
+          onStatusRefresh()
+        }}
       />
     )
   }
 
   // Handle Rejected state
-  if (onboarding.status === "REJECTED" && !isResubmitting) {
+  if (effectiveStatus === "REJECTED" && !isResubmitting) {
     return (
       <OnboardingRejected
-        onboarding={onboarding}
-        onEditAndResubmit={() => setIsResubmitting(true)}
+        onboarding={{ ...onboarding, status: effectiveStatus as any }}
+        onEditAndResubmit={() => {
+          setSubmittedLocalStatus(null)
+          setIsResubmitting(true)
+        }}
       />
     )
   }
@@ -238,7 +247,8 @@ export function OnboardingWizard({
 
   const handleFinalSubmit = async () => {
     try {
-      await submitMutation.mutateAsync()
+      const res = await submitMutation.mutateAsync()
+      setSubmittedLocalStatus(res?.result?.status || "UNDER_REVIEW")
       toast.success("Application submitted successfully!")
       setIsResubmitting(false)
       onStatusRefresh()

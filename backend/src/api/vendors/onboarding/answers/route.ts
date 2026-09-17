@@ -22,22 +22,26 @@ export const GET = async (
   try {
     const remote = await fetchOnboardingAnswers(vendorId).catch(() => null)
 
+    const effectiveStatus = (localRecord.status && localRecord.status !== "DRAFT")
+      ? localRecord.status
+      : (remote?.status || localRecord.status || "DRAFT")
+
     const response: TrustClawAnswersResponse = {
       vendorId,
-      status: (remote?.status || localRecord.status || "DRAFT") as any,
-      segmentId: remote?.segmentId || localRecord.segmentId || null,
-      vendorTypeId: remote?.vendorTypeId || localRecord.vendorTypeId || null,
-      vendorCategoryId: remote?.vendorCategoryId || localRecord.vendorCategoryId || null,
+      status: effectiveStatus as any,
+      segmentId: localRecord.segmentId || remote?.segmentId || null,
+      vendorTypeId: localRecord.vendorTypeId || remote?.vendorTypeId || null,
+      vendorCategoryId: localRecord.vendorCategoryId || remote?.vendorCategoryId || null,
       answers: {
-        ...(localRecord.answers || {}),
         ...(remote?.answers || {}),
+        ...(localRecord.answers || {}),
       },
       completedSteps:
-        remote?.completedSteps?.length
-          ? remote.completedSteps
-          : localRecord.completedSteps || [],
-      rejectionReason: remote?.rejectionReason || localRecord.rejectionReason || null,
-      feedback: remote?.feedback || localRecord.feedback || null,
+        localRecord.completedSteps?.length
+          ? localRecord.completedSteps
+          : remote?.completedSteps || [],
+      rejectionReason: localRecord.rejectionReason || remote?.rejectionReason || null,
+      feedback: localRecord.feedback || remote?.feedback || null,
     }
 
     res.json({ answers: response })

@@ -35,25 +35,29 @@ export const GET = async (
   try {
     const remote = await fetchOnboardingStatus(vendorId).catch(() => null)
 
+    const effectiveStatus = (localRecord.status && localRecord.status !== "DRAFT")
+      ? localRecord.status
+      : (remote?.status || localRecord.status || "DRAFT")
+
     const statusResult: TrustClawOnboardingStatus = {
-      status: (remote?.status || localRecord.status || "DRAFT") as any,
+      status: effectiveStatus as any,
       currentStep: remote?.currentStep || localRecord.currentStep || "SEGMENT_SELECTION",
       completedSteps:
-        remote?.completedSteps?.length
-          ? remote.completedSteps
-          : localRecord.completedSteps,
-      segmentId: remote?.segmentId || localRecord.segmentId || segment?.id || null,
-      vendorTypeId: remote?.vendorTypeId || localRecord.vendorTypeId || vendorType?.id || null,
-      vendorCategoryId: remote?.vendorCategoryId || localRecord.vendorCategoryId || vendorCategory?.id || null,
-      segment: remote?.segment || segment || null,
-      vendorType: remote?.vendorType || vendorType || null,
-      vendorCategory: remote?.vendorCategory || vendorCategory || null,
+        localRecord.completedSteps?.length
+          ? localRecord.completedSteps
+          : remote?.completedSteps || [],
+      segmentId: localRecord.segmentId || remote?.segmentId || segment?.id || null,
+      vendorTypeId: localRecord.vendorTypeId || remote?.vendorTypeId || vendorType?.id || null,
+      vendorCategoryId: localRecord.vendorCategoryId || remote?.vendorCategoryId || vendorCategory?.id || null,
+      segment: segment || remote?.segment || null,
+      vendorType: vendorType || remote?.vendorType || null,
+      vendorCategory: vendorCategory || remote?.vendorCategory || null,
       vendorId,
       rejectionReason:
-        remote?.rejectionReason || localRecord.rejectionReason || undefined,
-      feedback: remote?.feedback || localRecord.feedback || undefined,
-      submittedAt: remote?.submittedAt || localRecord.submittedAt || undefined,
-      canEdit: localRecord.status !== "APPROVED" && localRecord.status !== "UNDER_REVIEW",
+        localRecord.rejectionReason || remote?.rejectionReason || undefined,
+      feedback: localRecord.feedback || remote?.feedback || undefined,
+      submittedAt: localRecord.submittedAt || remote?.submittedAt || undefined,
+      canEdit: effectiveStatus !== "APPROVED" && effectiveStatus !== "UNDER_REVIEW" && effectiveStatus !== "SUBMITTED",
     }
 
     res.json({ onboarding: statusResult })
@@ -72,7 +76,7 @@ export const GET = async (
       rejectionReason: localRecord.rejectionReason || undefined,
       feedback: localRecord.feedback || undefined,
       submittedAt: localRecord.submittedAt || undefined,
-      canEdit: localRecord.status !== "APPROVED" && localRecord.status !== "UNDER_REVIEW",
+      canEdit: localRecord.status !== "APPROVED" && localRecord.status !== "UNDER_REVIEW" && localRecord.status !== "SUBMITTED",
     }
     res.json({ onboarding: fallbackStatus })
   }
