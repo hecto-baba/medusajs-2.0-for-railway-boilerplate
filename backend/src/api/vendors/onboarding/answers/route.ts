@@ -1,0 +1,58 @@
+import type {
+  AuthenticatedMedusaRequest,
+  MedusaResponse,
+} from "@medusajs/framework/http"
+import { getVendorId } from "../../shared/vendor-scope"
+import { onboardingStore } from "../../../../lib/onboarding-store"
+import {
+  fetchOnboardingAnswers,
+  type TrustClawAnswersResponse,
+} from "../../../../lib/trustclaw"
+
+/**
+ * Fetches all saved onboarding answers and submission details for the calling vendor.
+ */
+export const GET = async (
+  req: AuthenticatedMedusaRequest,
+  res: MedusaResponse
+) => {
+  const vendorId = await getVendorId(req)
+  const localRecord = onboardingStore.get(vendorId)
+
+  try {
+    const remote = await fetchOnboardingAnswers(vendorId).catch(() => null)
+
+    const response: TrustClawAnswersResponse = {
+      vendorId,
+      status: (remote?.status || localRecord.status || "DRAFT") as any,
+      segmentId: remote?.segmentId || localRecord.segmentId || null,
+      vendorTypeId: remote?.vendorTypeId || localRecord.vendorTypeId || null,
+      vendorCategoryId: remote?.vendorCategoryId || localRecord.vendorCategoryId || null,
+      answers: {
+        ...(localRecord.answers || {}),
+        ...(remote?.answers || {}),
+      },
+      completedSteps:
+        remote?.completedSteps?.length
+          ? remote.completedSteps
+          : localRecord.completedSteps || [],
+      rejectionReason: remote?.rejectionReason || localRecord.rejectionReason || null,
+      feedback: remote?.feedback || localRecord.feedback || null,
+    }
+
+    res.json({ answers: response })
+  } catch {
+    const localResponse: TrustClawAnswersResponse = {
+      vendorId,
+      status: localRecord.status || "DRAFT",
+      segmentId: localRecord.segmentId || null,
+      vendorTypeId: localRecord.vendorTypeId || null,
+      vendorCategoryId: localRecord.vendorCategoryId || null,
+      answers: localRecord.answers || {},
+      completedSteps: localRecord.completedSteps || [],
+      rejectionReason: localRecord.rejectionReason || null,
+      feedback: localRecord.feedback || null,
+    }
+    res.json({ answers: localResponse })
+  }
+}

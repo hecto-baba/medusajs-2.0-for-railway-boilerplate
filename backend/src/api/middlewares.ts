@@ -424,6 +424,12 @@ export default defineMiddlewares({
       ]
     },
     {
+      matcher: "/vendors/onboarding/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
       matcher: "/vendors/:p1/:id",
       middlewares: [
         authenticate("vendor", ["session", "bearer"])

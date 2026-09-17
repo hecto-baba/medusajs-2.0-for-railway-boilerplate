@@ -9,13 +9,14 @@ import {
   CurrencyDollar,
   ReceiptPercent,
   ShoppingCart,
+  Sparkles,
   Tag,
   Users,
 } from "@medusajs/icons"
-import { Avatar, Text } from "@medusajs/ui"
+import { Avatar, Badge, Text } from "@medusajs/ui"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { UserMenu } from "./user-menu"
 import {
   LayoutComposer,
@@ -23,6 +24,8 @@ import {
   CORE_LAYOUT_IDS,
 } from "../layout-composer"
 import { Searchbar } from "../search"
+import { useVendorOnboardingStatus } from "@modules/onboarding"
+import { getVendorCapabilities } from "@lib/permissions/feature-access"
 
 type NavItem = {
   href: string
@@ -78,6 +81,41 @@ type SidebarProps = {
 
 export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
   const pathname = usePathname()
+  const { data: onboarding } = useVendorOnboardingStatus()
+
+  const capabilities = useMemo(
+    () => getVendorCapabilities(onboarding),
+    [onboarding]
+  )
+
+  // Filter navigation items dynamically based on vendor segment & type capabilities
+  const visibleNavItems = useMemo(() => {
+    const isApproved = onboarding?.status === "APPROVED"
+
+    // If not yet approved by admin, strictly show ONLY the Onboarding flow
+    if (!isApproved) {
+      return [
+        {
+          href: "/onboarding",
+          label: "Onboarding",
+          icon: Sparkles,
+        },
+      ]
+    }
+
+    const filtered = NAV_ITEMS.filter((item) => {
+      if (item.href === "/orders" && !capabilities.hasOrders) return false
+      if (item.href === "/products" && !capabilities.hasProducts) return false
+      if (item.href === "/inventory" && !capabilities.hasInventory) return false
+      if (item.href === "/pricing" && !capabilities.hasPricing) return false
+      if (item.href === "/promotions" && !capabilities.hasPromotions) return false
+      if (item.href === "/venues" && !capabilities.hasVenues) return false
+      if (item.href === "/shows" && !capabilities.hasShows) return false
+      return true
+    })
+
+    return filtered
+  }, [capabilities, onboarding])
 
   // Track expanded state for items with sub-menus
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
@@ -90,7 +128,7 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
 
   // Automatically keep parent expanded if child route is active
   useEffect(() => {
-    NAV_ITEMS.forEach((item) => {
+    visibleNavItems.forEach((item) => {
       if (
         item.items &&
         (pathname.startsWith(item.href) ||
@@ -101,7 +139,7 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
         setExpanded((prev) => ({ ...prev, [item.href]: true }))
       }
     })
-  }, [pathname])
+  }, [pathname, visibleNavItems])
 
   const toggleExpand = (href: string, e: React.MouseEvent) => {
     e.preventDefault()
@@ -109,14 +147,26 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
     setExpanded((prev) => ({ ...prev, [href]: !prev[href] }))
   }
 
+  const verticalLabel = onboarding?.segment?.name || null
+  const vendorTypeLabel = onboarding?.vendorType?.code || null
+
   return (
     <aside className="bg-ui-bg-subtle border-ui-border-base flex h-screen w-[220px] shrink-0 flex-col justify-between border-r">
       <div className="flex flex-col gap-y-4 p-3 overflow-y-auto">
-        <div className="flex items-center gap-x-2 px-2 py-1">
-          <Avatar fallback={storeName.charAt(0).toUpperCase()} size="small" />
-          <Text size="small" weight="plus" className="text-ui-fg-base truncate">
-            {storeName}
-          </Text>
+        <div className="flex flex-col gap-y-1 px-2 py-1">
+          <div className="flex items-center gap-x-2">
+            <Avatar fallback={storeName.charAt(0).toUpperCase()} size="small" />
+            <Text size="small" weight="plus" className="text-ui-fg-base truncate">
+              {storeName}
+            </Text>
+          </div>
+          {verticalLabel && (
+            <div className="flex items-center gap-x-1 pl-7">
+              <Badge size="xsmall" color="blue" className="text-[9px] py-0 px-1 truncate">
+                {verticalLabel} {vendorTypeLabel ? `• ${vendorTypeLabel}` : ""}
+              </Badge>
+            </div>
+          )}
         </div>
 
         <nav className="flex flex-col">
@@ -131,7 +181,7 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
                   <LayoutComposer.Entry id="Searchbar">
                     <Searchbar />
                   </LayoutComposer.Entry>
-                  {NAV_ITEMS.map((item) => {
+                  {visibleNavItems.map((item) => {
                     const Icon = item.icon
                     const isExactParentActive =
                       item.href === "/orders"

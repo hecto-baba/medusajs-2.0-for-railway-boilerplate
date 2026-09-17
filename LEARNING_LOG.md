@@ -1,5 +1,12 @@
 # Learning Log — medusajs-2.0-for-railway-boilerplate
 
+## Vendor Onboarding Gatekeeper & Admin Approval State Machine — 2026-09-17
+
+**What was used:** Persistent multi-stage onboarding store (`onboardingStore`) on Medusa backend combined with client-side route gatekeeping in `PanelShell` and `Sidebar`.
+**Why this over alternatives:** Strictly gating non-approved vendors at the shell level ensures no sensitive commercial tools (catalog, orders, inventory, pricing) are exposed before compliance review, while centralizing approval/rejection state transitions in Medusa prevents silent auto-approvals.
+**Alternatives considered:** Permissive open access with warning banners only; rejected because vendors must complete verification before gaining marketplace merchant privileges.
+**Core concept to remember:** Vendor lifecycle must follow a strict state machine: `DRAFT` → `UNDER_REVIEW` → (`APPROVED` | `REJECTED`). Newly registered vendors are kept strictly on `/onboarding` until an admin explicitly audits and approves the application from `/admin/vendor-applications`.
+
 ## Vendor 360° Admin Integration (Medusa 2.0 Query Graph & Tabbed UI) — 2026-09-14
 
 **What was used:** Medusa 2.0 `query.graph` multi-entity scoping on backend, combined with `@medusajs/ui` Tabs & DataTable components in admin UI.
