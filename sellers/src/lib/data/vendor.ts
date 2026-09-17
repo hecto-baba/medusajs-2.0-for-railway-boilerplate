@@ -95,10 +95,27 @@ export async function vendorSignup(
 
     registrationToken = token
   } catch (error) {
-    return toMessage(
-      error,
-      "Could not create that account. The email may already be registered."
-    )
+    // If the auth identity was created but vendor creation was interrupted previously,
+    // try logging in to claim/finish registration with the existing credentials.
+    try {
+      const loginToken = await sdk.auth.login("vendor", "emailpass", {
+        email,
+        password,
+      })
+      if (typeof loginToken === "string") {
+        registrationToken = loginToken
+      } else {
+        return toMessage(
+          error,
+          "Could not create that account. The email may already be registered."
+        )
+      }
+    } catch {
+      return toMessage(
+        error,
+        "Could not create that account. The email may already be registered."
+      )
+    }
   }
 
   try {
@@ -175,7 +192,7 @@ export async function vendorLogin(
     return toMessage(error, "Could not sign you in. Please try again.")
   }
 
-  redirect("/onboarding")
+  redirect("/dashboard")
 }
 
 export async function vendorLogout() {

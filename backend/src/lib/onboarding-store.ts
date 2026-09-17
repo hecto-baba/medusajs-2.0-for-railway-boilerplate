@@ -1,5 +1,6 @@
 import * as fs from "fs"
 import * as path from "path"
+import { Pool } from "pg"
 
 export type OnboardingStatus =
   | "DRAFT"
@@ -36,24 +37,119 @@ const STORE_PATH = path.resolve(process.cwd(), ".medusa", "vendor-onboarding-sto
 class OnboardingStore {
   private records: Map<string, VendorApplicationRecord> = new Map()
   private initialized = false
+  private pool: Pool | null = null
+  private dbReady = false
+  private initPromise: Promise<void> | null = null
 
-  private load() {
-    if (this.initialized) return
-    this.initialized = true
+  constructor() {
+    this.initDatabase()
+  }
+
+  private getDatabaseUrl(): string | undefined {
+    return process.env.DATABASE_URL
+  }
+
+  private initDatabase() {
+    const dbUrl = this.getDatabaseUrl()
+    if (!dbUrl) return
+
+    try {
+      this.pool = new Pool({
+        connectionString: dbUrl,
+        max: 5,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 5000,
+        ssl: dbUrl.includes("sslmode=require") || process.env.NODE_ENV === "production"
+          ? { rejectUnauthorized: false }
+          : false,
+      })
+
+      this.initPromise = this.ensureTableAndLoad()
+    } catch (err) {
+      console.warn("[OnboardingStore] Failed to initialize Postgres pool, using file fallback:", err)
+    }
+  }
+
+  private async ensureTableAndLoad(): Promise<void> {
+    if (!this.pool) return
+    try {
+      // 1. Create table if not exists
+      await this.pool.query(`
+        CREATE TABLE IF NOT EXISTS vendor_onboarding_application (
+          vendor_id VARCHAR(255) PRIMARY KEY,
+          data JSONB NOT NULL,
+          status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `)
+
+      // 2. Load all records from database into memory
+      const { rows } = await this.pool.query(`
+        SELECT vendor_id, data FROM vendor_onboarding_application;
+      `)
+
+      for (const row of rows) {
+        if (row.vendor_id && row.data) {
+          const rec = row.data as VendorApplicationRecord
+          rec.vendorId = row.vendor_id
+          this.records.set(row.vendor_id, rec)
+        }
+      }
+
+      // 3. Migrate any existing file records into Postgres
+      this.loadFromFile()
+      for (const [vendorId, record] of this.records.entries()) {
+        const found = rows.some((r) => r.vendor_id === vendorId)
+        if (!found) {
+          await this.persistToDb(record).catch(() => {})
+        }
+      }
+
+      this.dbReady = true
+      this.initialized = true
+    } catch (err) {
+      console.warn("[OnboardingStore] Database sync error, falling back to local store:", err)
+      this.loadFromFile()
+    }
+  }
+
+  private loadFromFile() {
     try {
       if (fs.existsSync(STORE_PATH)) {
         const raw = fs.readFileSync(STORE_PATH, "utf-8")
         const parsed = JSON.parse(raw) as Record<string, VendorApplicationRecord>
         for (const [k, v] of Object.entries(parsed)) {
-          this.records.set(k, v)
+          if (!this.records.has(k)) {
+            this.records.set(k, v)
+          }
         }
       }
     } catch {
-      // In-memory fallback
+      // Ignore file read error
     }
   }
 
-  private persist() {
+  private async persistToDb(record: VendorApplicationRecord): Promise<void> {
+    if (!this.pool) return
+    try {
+      await this.pool.query(
+        `
+        INSERT INTO vendor_onboarding_application (vendor_id, data, status, updated_at)
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (vendor_id) DO UPDATE
+        SET data = EXCLUDED.data,
+            status = EXCLUDED.status,
+            updated_at = NOW();
+      `,
+        [record.vendorId, JSON.stringify(record), record.status]
+      )
+    } catch (err) {
+      console.error(`[OnboardingStore] Failed to persist record ${record.vendorId} to DB:`, err)
+    }
+  }
+
+  private persistToFile() {
     try {
       const dir = path.dirname(STORE_PATH)
       if (!fs.existsSync(dir)) {
@@ -65,12 +161,27 @@ class OnboardingStore {
       }
       fs.writeFileSync(STORE_PATH, JSON.stringify(obj, null, 2), "utf-8")
     } catch {
-      // Ignore write errors in ephemeral environments
+      // Ignore file write errors
+    }
+  }
+
+  private persist(record: VendorApplicationRecord) {
+    this.persistToFile()
+    if (this.pool) {
+      this.persistToDb(record).catch(() => {})
+    }
+  }
+
+  public async ensureLoaded(): Promise<void> {
+    if (this.initPromise) {
+      await this.initPromise
     }
   }
 
   public get(vendorId: string): VendorApplicationRecord {
-    this.load()
+    if (!this.initialized) {
+      this.loadFromFile()
+    }
     let record = this.records.get(vendorId)
     if (!record) {
       record = {
@@ -83,7 +194,7 @@ class OnboardingStore {
         updatedAt: new Date().toISOString(),
       }
       this.records.set(vendorId, record)
-      this.persist()
+      this.persist(record)
     }
     return record
   }
@@ -101,7 +212,6 @@ class OnboardingStore {
       vendorCategory?: { id: string; name: string; code: string } | null
     }
   ): VendorApplicationRecord {
-    this.load()
     const record = this.get(vendorId)
 
     if (taxonomy?.segmentId !== undefined) record.segmentId = taxonomy.segmentId
@@ -126,12 +236,11 @@ class OnboardingStore {
     record.currentStep = step
     record.updatedAt = new Date().toISOString()
     this.records.set(vendorId, record)
-    this.persist()
+    this.persist(record)
     return record
   }
 
   public submit(vendorId: string): VendorApplicationRecord {
-    this.load()
     const record = this.get(vendorId)
     record.status = "UNDER_REVIEW"
     record.submittedAt = new Date().toISOString()
@@ -139,23 +248,21 @@ class OnboardingStore {
     record.feedback = null
     record.updatedAt = new Date().toISOString()
     this.records.set(vendorId, record)
-    this.persist()
+    this.persist(record)
     return record
   }
 
   public approve(vendorId: string): VendorApplicationRecord {
-    this.load()
     const record = this.get(vendorId)
     record.status = "APPROVED"
     record.approvedAt = new Date().toISOString()
     record.updatedAt = new Date().toISOString()
     this.records.set(vendorId, record)
-    this.persist()
+    this.persist(record)
     return record
   }
 
   public reject(vendorId: string, reason: string): VendorApplicationRecord {
-    this.load()
     const record = this.get(vendorId)
     record.status = "REJECTED"
     record.rejectionReason = reason
@@ -163,12 +270,11 @@ class OnboardingStore {
     record.rejectedAt = new Date().toISOString()
     record.updatedAt = new Date().toISOString()
     this.records.set(vendorId, record)
-    this.persist()
+    this.persist(record)
     return record
   }
 
   public listAll(): VendorApplicationRecord[] {
-    this.load()
     return Array.from(this.records.values())
   }
 }

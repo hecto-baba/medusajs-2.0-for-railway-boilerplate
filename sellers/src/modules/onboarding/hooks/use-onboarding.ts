@@ -71,7 +71,12 @@ export const useSubmitVendorOnboarding = () => {
 
   return useMutation({
     mutationFn: () => submitVendorOnboarding(),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      queryClient.setQueryData([...ONBOARDING_QUERY_KEY, "status"], (old: any) => ({
+        ...(old || {}),
+        status: data?.result?.status || "UNDER_REVIEW",
+        submittedAt: data?.result?.submittedAt || new Date().toISOString(),
+      }))
       queryClient.invalidateQueries({ queryKey: [...ONBOARDING_QUERY_KEY] })
     },
   })
