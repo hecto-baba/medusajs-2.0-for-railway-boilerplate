@@ -388,7 +388,10 @@ export function OnboardingStepQuestions({
             normType === "FILE_UPLOAD" ||
             normType === "IMAGE" ||
             normType === "OPERATING_HOURS" ||
-            normType === "MULTI_SELECT"
+            normType === "MULTI_SELECT" ||
+            normType === "LOCATION_PICKER" ||
+            normType === "CITIES" ||
+            normType === "CITY_PICKER"
 
           return (
             <div
