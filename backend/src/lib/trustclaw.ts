@@ -27,39 +27,77 @@ export class TrustClawError extends Error {
   }
 }
 
+export interface TrustClawFetchOptions {
+  method?: "GET" | "POST" | "PATCH" | "DELETE"
+  params?: Record<string, string | number | boolean | undefined | null>
+  body?: unknown
+}
+
 async function trustclawFetch<T>(
   path: string,
-  params: Record<string, string> = {}
+  options: TrustClawFetchOptions | Record<string, string> = {}
 ): Promise<T> {
+  let method: "GET" | "POST" | "PATCH" | "DELETE" = "GET"
+  let params: Record<string, string | number | boolean | undefined | null> = {}
+  let body: unknown = undefined
+
+  if ("method" in options || "params" in options || "body" in options) {
+    method = (options as TrustClawFetchOptions).method || "GET"
+    params = (options as TrustClawFetchOptions).params || {}
+    body = (options as TrustClawFetchOptions).body
+  } else {
+    params = options as Record<string, string>
+  }
+
   const url = new URL(`${BASE_URL}${path}`)
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== "") {
-      url.searchParams.set(k, v)
+      url.searchParams.set(k, String(v))
     }
   })
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "x-api-key": API_KEY,
+  }
+
   const res = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": API_KEY,
-    },
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
     // Do not cache at the fetch layer — the proxy routes and job will
     // decide their own caching / revalidation strategy.
     cache: "no-store",
   })
 
   if (!res.ok) {
+    let errorDetail = res.statusText
+    try {
+      const errJson = (await res.json()) as { error?: string; message?: string }
+      if (errJson.error || errJson.message) {
+        errorDetail = errJson.error || errJson.message || res.statusText
+      }
+    } catch {
+      // ignore json parse failure on raw error responses
+    }
     throw new TrustClawError(
       res.status,
-      `TrustClaw API error ${res.status}: ${res.statusText}`
+      `TrustClaw API error ${res.status}: ${errorDetail}`
     )
   }
 
-  const json = (await res.json()) as { success: boolean; data: T; error?: string }
+  const json = (await res.json()) as {
+    success: boolean
+    data: T
+    error?: string
+    message?: string
+  }
 
   if (!json.success) {
-    throw new TrustClawError(500, json.error ?? "TrustClaw returned success=false")
+    throw new TrustClawError(
+      500,
+      json.error ?? json.message ?? "TrustClaw returned success=false"
+    )
   }
 
   return json.data
@@ -172,6 +210,61 @@ export function fetchSegments(): Promise<TrustClawSegment[]> {
   })
 }
 
+let cachedSegments: TrustClawSegment[] | null = null
+let cachedVendorTypes: TrustClawVendorType[] | null = null
+let cachedVendorCategories: TrustClawVendorCategory[] | null = null
+let lastTaxonomyFetchTime = 0
+const TAXONOMY_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+export async function resolveTaxonomyDetails(params: {
+  segmentId?: string | null
+  vendorTypeId?: string | null
+  vendorCategoryId?: string | null
+}): Promise<{
+  segment?: { id: string; name: string; code: string } | null
+  vendorType?: { id: string; name: string; code: string } | null
+  vendorCategory?: { id: string; name: string; code: string } | null
+}> {
+  const now = Date.now()
+  if (!cachedSegments || !cachedVendorTypes || !cachedVendorCategories || now - lastTaxonomyFetchTime > TAXONOMY_CACHE_TTL) {
+    try {
+      const [segs, vts, vcs] = await Promise.all([
+        fetchSegments().catch(() => []),
+        fetchVendorTypes({ status: "ALL" }).catch(() => []),
+        fetchVendorCategories({ status: "ALL", limit: "500" }).catch(() => []),
+      ])
+      if (segs.length) cachedSegments = segs
+      if (vts.length) cachedVendorTypes = vts
+      if (vcs.length) cachedVendorCategories = vcs
+      lastTaxonomyFetchTime = now
+    } catch {
+      // ignore
+    }
+  }
+
+  let segment =
+    cachedSegments?.find((s) => s.id === params.segmentId || s.code === params.segmentId) || null
+  let vendorType =
+    cachedVendorTypes?.find((vt) => vt.id === params.vendorTypeId || vt.code === params.vendorTypeId) || null
+  let vendorCategory =
+    cachedVendorCategories?.find((vc) => vc.id === params.vendorCategoryId || vc.code === params.vendorCategoryId) || null
+
+  if (vendorCategory) {
+    if (vendorCategory.segment) {
+      segment = vendorCategory.segment as any
+    }
+    if (vendorCategory.vendorType) {
+      vendorType = vendorCategory.vendorType as any
+    }
+  }
+
+  return {
+    segment: segment ? { id: segment.id, name: segment.name, code: segment.code } : null,
+    vendorType: vendorType ? { id: vendorType.id, name: vendorType.name, code: vendorType.code } : null,
+    vendorCategory: vendorCategory ? { id: vendorCategory.id, name: vendorCategory.name, code: vendorCategory.code } : null,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // API helpers — Vendor Types
 // ---------------------------------------------------------------------------
@@ -235,6 +328,7 @@ export function fetchVendorCategories(
     segmentId?: string
     vendorTypeCode?: string
     vendorTypeId?: string
+    status?: string
     level?: string
     parentId?: string
     pathPrefix?: string
@@ -250,6 +344,7 @@ export function fetchVendorCategories(
   if (params.segmentId) q.segmentId = params.segmentId
   if (params.vendorTypeCode) q.vendorTypeCode = params.vendorTypeCode
   if (params.vendorTypeId) q.vendorTypeId = params.vendorTypeId
+  q.status = params.status ?? "ALL"
   if (params.level) q.level = params.level
   if (params.parentId !== undefined) q.parentId = params.parentId
   if (params.pathPrefix) q.pathPrefix = params.pathPrefix
@@ -365,3 +460,295 @@ export function fetchCatalogProducts(
 
   return trustclawFetch<TrustClawCatalogProductsResponse>("/api/v1/products", q)
 }
+
+// ---------------------------------------------------------------------------
+// Typed response shapes — Onboarding & Question Engine
+// ---------------------------------------------------------------------------
+
+export type OnboardingStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "UNDER_REVIEW"
+  | "APPROVED"
+  | "REJECTED"
+
+export type OnboardingStepName =
+  | "SEGMENT_SELECTION"
+  | "IDENTITY"
+  | "LOCATION"
+  | "OPERATIONS"
+  | "CONTACT"
+  | "KYC"
+  | "SHOWCASE"
+  | "REVIEW"
+  | "SUBMITTED"
+
+export interface TrustClawOnboardingStatus {
+  status: OnboardingStatus
+  currentStep: OnboardingStepName | string
+  completedSteps: (OnboardingStepName | string)[]
+  vendorId?: string
+  segmentId?: string | null
+  vendorTypeId?: string | null
+  vendorCategoryId?: string | null
+  segment?: { id: string; name: string; code: string } | null
+  vendorType?: { id: string; name: string; code: string } | null
+  vendorCategory?: { id: string; name: string; code: string } | null
+  rejectionReason?: string | null
+  feedback?: string | null
+  submittedAt?: string | null
+  reviewedAt?: string | null
+  canEdit?: boolean
+}
+
+export interface TrustClawQuestionOption {
+  label: string
+  value: string
+  description?: string
+}
+
+export type TrustClawFieldType =
+  | "TEXT"
+  | "TEXTAREA"
+  | "SELECT"
+  | "MULTI_SELECT"
+  | "RADIO"
+  | "FILE_UPLOAD"
+  | "NUMBER"
+  | "BOOLEAN"
+  | "DATE"
+  | "LOCATION_GEO"
+
+export interface TrustClawQuestionField {
+  id: string
+  name: string
+  label: string
+  description?: string | null
+  type: TrustClawFieldType
+  placeholder?: string | null
+  required: boolean
+  options?: TrustClawQuestionOption[]
+  validationRule?: string | null
+  dependsOn?: { field: string; value: string | boolean } | null
+  defaultValue?: unknown
+}
+
+export interface TrustClawQuestionSet {
+  step: OnboardingStepName | string
+  title: string
+  description?: string | null
+  fields: TrustClawQuestionField[]
+}
+
+export interface TrustClawSaveStepPayload {
+  vendorId: string
+  step: OnboardingStepName | string
+  answers: Record<string, unknown>
+  segmentId?: string
+  vendorTypeId?: string
+  vendorCategoryId?: string
+}
+
+export interface TrustClawSaveStepResult {
+  success: boolean
+  savedStep: string
+  nextStep?: string
+  completedSteps: string[]
+}
+
+export interface TrustClawSubmitPayload {
+  vendorId: string
+}
+
+export interface TrustClawSubmitResult {
+  success: boolean
+  status: OnboardingStatus
+  submittedAt: string
+}
+
+export interface TrustClawAnswersResponse {
+  vendorId: string
+  status: OnboardingStatus
+  segmentId?: string | null
+  vendorTypeId?: string | null
+  vendorCategoryId?: string | null
+  answers: Record<string, Record<string, unknown>>
+  completedSteps: string[]
+  rejectionReason?: string | null
+  feedback?: string | null
+}
+
+// ---------------------------------------------------------------------------
+// API helpers — Onboarding
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch the onboarding application status for a vendor.
+ */
+export function fetchOnboardingStatus(
+  vendorId: string
+): Promise<TrustClawOnboardingStatus> {
+  return trustclawFetch<TrustClawOnboardingStatus>("/api/v1/onboarding/status", {
+    vendorId,
+  })
+}
+
+/**
+ * Fetch dynamic question sets for a vendor onboarding step / category.
+ */
+export function fetchOnboardingQuestions(
+  params: {
+    vendorCategoryId?: string
+    step?: string
+    segmentId?: string
+    vendorTypeId?: string
+  } = {}
+): Promise<TrustClawQuestionSet[]> {
+  const q: Record<string, string> = {}
+  if (params.vendorCategoryId) q.vendorCategoryId = params.vendorCategoryId
+  if (params.step) q.step = params.step
+  if (params.segmentId) q.segmentId = params.segmentId
+  if (params.vendorTypeId) q.vendorTypeId = params.vendorTypeId
+
+  return trustclawFetch<TrustClawQuestionSet[]>(
+    "/api/v1/onboarding/questions",
+    q
+  )
+}
+
+/**
+ * Save draft or step answers for a vendor's onboarding application.
+ */
+export function saveOnboardingStep(
+  payload: TrustClawSaveStepPayload
+): Promise<TrustClawSaveStepResult> {
+  return trustclawFetch<TrustClawSaveStepResult>(
+    "/api/v1/onboarding/save-step",
+    {
+      method: "POST",
+      body: payload,
+    }
+  )
+}
+
+/**
+ * Submit the onboarding application for final review.
+ */
+export function submitOnboarding(
+  vendorId: string
+): Promise<TrustClawSubmitResult> {
+  return trustclawFetch<TrustClawSubmitResult>("/api/v1/onboarding/submit", {
+    method: "POST",
+    body: { vendorId },
+  })
+}
+
+/**
+ * Fetch all previously saved onboarding answers for a vendor.
+ */
+export function fetchOnboardingAnswers(
+  vendorId: string
+): Promise<TrustClawAnswersResponse> {
+  return trustclawFetch<TrustClawAnswersResponse>(
+    "/api/v1/onboarding/answers",
+    {
+      vendorId,
+    }
+  )
+}
+
+// ---------------------------------------------------------------------------
+// API helpers — Admin Application Review
+// ---------------------------------------------------------------------------
+
+export interface TrustClawAdminApplicationItem {
+  id: string
+  vendorId: string
+  vendorName?: string
+  email?: string
+  status: OnboardingStatus
+  currentStep: string
+  completedSteps: string[]
+  segment?: { id: string; name: string; code: string } | null
+  vendorType?: { id: string; name: string; code: string } | null
+  vendorCategory?: { id: string; name: string; code: string } | null
+  rejectionReason?: string | null
+  feedback?: string | null
+  submittedAt?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface TrustClawAdminApplicationsResponse {
+  items: TrustClawAdminApplicationItem[]
+  count: number
+  limit: number
+  offset: number
+}
+
+/**
+ * Admin: list vendor onboarding applications.
+ */
+export function adminFetchApplications(
+  params: {
+    status?: string
+    segmentId?: string
+    vendorTypeId?: string
+    search?: string
+    limit?: string
+    offset?: string
+  } = {}
+): Promise<TrustClawAdminApplicationsResponse> {
+  const q: Record<string, string> = {}
+  if (params.status) q.status = params.status
+  if (params.segmentId) q.segmentId = params.segmentId
+  if (params.vendorTypeId) q.vendorTypeId = params.vendorTypeId
+  if (params.search) q.search = params.search
+  if (params.limit) q.limit = params.limit
+  if (params.offset) q.offset = params.offset
+
+  return trustclawFetch<TrustClawAdminApplicationsResponse>(
+    "/api/v1/admin/onboarding/applications",
+    q
+  )
+}
+
+/**
+ * Admin: approve a vendor application.
+ */
+export function adminApproveApplication(
+  vendorId: string
+): Promise<{ success: boolean; status: OnboardingStatus; approvedAt: string }> {
+  return trustclawFetch<{
+    success: boolean
+    status: OnboardingStatus
+    approvedAt: string
+  }>(
+    `/api/v1/admin/onboarding/applications/${encodeURIComponent(vendorId)}/approve`,
+    {
+      method: "POST",
+    }
+  )
+}
+
+/**
+ * Admin: reject or request revisions on a vendor application.
+ */
+export function adminRejectApplication(
+  vendorId: string,
+  reason: string
+): Promise<{ success: boolean; status: OnboardingStatus; rejectedAt: string }> {
+  return trustclawFetch<{
+    success: boolean
+    status: OnboardingStatus
+    rejectedAt: string
+  }>(
+    `/api/v1/admin/onboarding/applications/${encodeURIComponent(vendorId)}/reject`,
+    {
+      method: "POST",
+      body: { reason },
+    }
+  )
+}
+
+

@@ -5,10 +5,10 @@ import type {
 import { fetchVendorCategories, TrustClawError } from "../../../../lib/trustclaw"
 
 /**
- * GET /admin/taxonomy/vendor-categories
+ * GET /vendors/taxonomy/vendor-categories
  *
- * Proxies TrustClaw's /api/v1/vendor-categories for the Medusa Admin panel.
- * Forwards status=ALL by default so draft/staged categories are accessible for mapping.
+ * Proxies TrustClaw's /api/v1/vendor-categories for Seller panel classification.
+ * Passes status=ALL by default so draft/staged categories are accessible during onboarding.
  */
 export const GET = async (
   req: AuthenticatedMedusaRequest,

@@ -497,6 +497,67 @@ export const getTrustClawCategories = (
   ).then((r) => r.categories)
 }
 
+export type TrustClawVendorType = {
+  id: string
+  name: string
+  code: string
+  description: string | null
+  sortOrder: number
+  isActive: boolean
+  vendorCategoryCount: number
+}
+
+export type TrustClawVendorCategory = {
+  id: string
+  name: string
+  code: string
+  description: string | null
+  level: number
+  path: string
+  parentId: string | null
+  hasChildren: boolean
+  childCount: number
+  sortOrder: number
+  onboardingMode: string
+  vendorTypeId: string
+  commissionPct: number
+  commissionFlat: number
+  isActive: boolean
+  segment?: { id: string; name: string; code: string }
+  vendorType?: { id: string; name: string; code: string }
+}
+
+/**
+ * Fetch vendor transaction types (ORDER, BOOKING, RENTAL, etc.).
+ */
+export const getTrustClawVendorTypes = (params: {
+  segmentCode?: string
+  segmentId?: string
+  search?: string
+} = {}) =>
+  request<{ vendor_types: TrustClawVendorType[] }>(
+    "taxonomy/vendor-types",
+    params
+  ).then((r) => r.vendor_types)
+
+/**
+ * Fetch vendor store classifications.
+ */
+export const getTrustClawVendorCategories = (params: {
+  segmentCode?: string
+  segmentId?: string
+  vendorTypeCode?: string
+  vendorTypeId?: string
+  status?: string
+  level?: string
+  parentId?: string
+  search?: string
+} = {}) =>
+  request<{ vendor_categories: TrustClawVendorCategory[] }>(
+    "taxonomy/vendor-categories",
+    { status: "ALL", ...params }
+  ).then((r) => r.vendor_categories)
+
 /* ---------------------------------------------------------- return reasons */
 
 export type VendorReturnReason = {
@@ -2342,6 +2403,155 @@ export const searchVendor = (params: {
   limit?: number
   entity?: string | string[]
 }) => request<VendorSearchResponse>("search", params)
+
+/* ------------------------------------------------------------- onboarding */
+
+export type VendorOnboardingStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "UNDER_REVIEW"
+  | "APPROVED"
+  | "REJECTED"
+
+export type VendorOnboardingStepName =
+  | "SEGMENT_SELECTION"
+  | "IDENTITY"
+  | "LOCATION"
+  | "OPERATIONS"
+  | "CONTACT"
+  | "KYC"
+  | "SHOWCASE"
+  | "REVIEW"
+  | "SUBMITTED"
+
+export type VendorOnboardingData = {
+  status: VendorOnboardingStatus
+  currentStep: VendorOnboardingStepName | string
+  completedSteps: (VendorOnboardingStepName | string)[]
+  vendorId?: string
+  segmentId?: string | null
+  vendorTypeId?: string | null
+  vendorCategoryId?: string | null
+  segment?: { id: string; name: string; code: string } | null
+  vendorType?: { id: string; name: string; code: string } | null
+  vendorCategory?: { id: string; name: string; code: string } | null
+  rejectionReason?: string | null
+  feedback?: string | null
+  submittedAt?: string | null
+  reviewedAt?: string | null
+  canEdit?: boolean
+}
+
+export type VendorQuestionFieldType =
+  | "TEXT"
+  | "TEXTAREA"
+  | "SELECT"
+  | "MULTI_SELECT"
+  | "RADIO"
+  | "FILE_UPLOAD"
+  | "NUMBER"
+  | "BOOLEAN"
+  | "DATE"
+  | "LOCATION_GEO"
+
+export type VendorQuestionOption = {
+  label: string
+  value: string
+  description?: string
+}
+
+export type VendorQuestionField = {
+  id: string
+  name: string
+  label: string
+  description?: string | null
+  type: VendorQuestionFieldType
+  placeholder?: string | null
+  required: boolean
+  options?: VendorQuestionOption[]
+  validationRule?: string | null
+  dependsOn?: { field: string; value: string | boolean } | null
+  defaultValue?: unknown
+}
+
+export type VendorQuestionSet = {
+  step: VendorOnboardingStepName | string
+  title: string
+  description?: string | null
+  fields: VendorQuestionField[]
+}
+
+export type SaveVendorOnboardingStepPayload = {
+  step: VendorOnboardingStepName | string
+  answers: Record<string, unknown>
+  segmentId?: string
+  vendorTypeId?: string
+  vendorCategoryId?: string
+  segment?: { id: string; name: string; code: string }
+  vendorType?: { id: string; name: string; code: string }
+  vendorCategory?: { id: string; name: string; code: string }
+}
+
+export type SaveVendorOnboardingStepResult = {
+  success: boolean
+  savedStep: string
+  nextStep?: string
+  completedSteps: string[]
+}
+
+export type SubmitVendorOnboardingResult = {
+  success: boolean
+  status: VendorOnboardingStatus
+  submittedAt: string
+}
+
+export type VendorOnboardingAnswersResponse = {
+  vendorId: string
+  status: VendorOnboardingStatus
+  segmentId?: string | null
+  vendorTypeId?: string | null
+  vendorCategoryId?: string | null
+  answers: Record<string, Record<string, unknown>>
+  completedSteps: string[]
+  rejectionReason?: string | null
+  feedback?: string | null
+}
+
+export const getVendorOnboardingStatus = () =>
+  request<{ onboarding: VendorOnboardingData }>("onboarding/status", {})
+
+export const getVendorOnboardingQuestions = (
+  params: {
+    vendorCategoryId?: string
+    step?: string
+    segmentId?: string
+    vendorTypeId?: string
+  } = {}
+) =>
+  request<{ questions: VendorQuestionSet[] }>("onboarding/questions", params)
+
+export const saveVendorOnboardingStep = (
+  payload: SaveVendorOnboardingStepPayload
+) =>
+  mutate<{ result: SaveVendorOnboardingStepResult }>(
+    "onboarding/save-step",
+    "POST",
+    payload
+  )
+
+export const submitVendorOnboarding = () =>
+  mutate<{ result: SubmitVendorOnboardingResult }>(
+    "onboarding/submit",
+    "POST",
+    {}
+  )
+
+export const getVendorOnboardingAnswers = () =>
+  request<{ answers: VendorOnboardingAnswersResponse }>(
+    "onboarding/answers",
+    {}
+  )
+
 
 
 

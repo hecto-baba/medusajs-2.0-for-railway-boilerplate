@@ -142,7 +142,7 @@ export async function vendorSignup(
     return "Your store was created. Please sign in to continue."
   }
 
-  redirect("/orders")
+  redirect("/onboarding")
 }
 
 export async function vendorLogin(
@@ -175,7 +175,7 @@ export async function vendorLogin(
     return toMessage(error, "Could not sign you in. Please try again.")
   }
 
-  redirect("/orders")
+  redirect("/onboarding")
 }
 
 export async function vendorLogout() {
