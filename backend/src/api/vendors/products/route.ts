@@ -25,6 +25,12 @@ export const GetVendorProductsSchema = z.object({
   order: z.string().optional(),
 })
 
+import {
+  createInventoryLevelsWorkflow,
+  updateInventoryLevelsWorkflow,
+} from "@medusajs/medusa/core-flows"
+import { ensureVariantInventoryItem, getVendorId } from "./helpers"
+
 export const POST = async (
   req: AuthenticatedMedusaRequest<HttpTypes.AdminCreateProduct>,
   res: MedusaResponse
@@ -35,6 +41,112 @@ export const POST = async (
       product: req.validatedBody,
     },
   })
+
+  const rawBody = ((req as any).body || {}) as any
+  const variantsInput = rawBody.variants || (req.validatedBody as any)?.variants || []
+
+  // Provision inventory items, remote links, and stocked inventory levels if requested
+  if (result.product?.variants?.length) {
+    try {
+      const vendorId = await getVendorId(req)
+      const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+
+      // Resolve target stock location: request explicit override -> vendor's primary location -> store default location
+      let stockLocationId: string | undefined = rawBody.stock_location_id
+      if (!stockLocationId) {
+        const {
+          data: [vendorAdmin],
+        } = await query.graph({
+          entity: "vendor_admin",
+          fields: ["vendor.id", "vendor.stock_locations.id"],
+          filters: { id: [req.auth_context.actor_id] },
+        })
+        stockLocationId = vendorAdmin?.vendor?.stock_locations?.[0]?.id
+      }
+
+      if (!stockLocationId) {
+        const { data: defaultLocations } = await query.graph({
+          entity: "stock_location",
+          fields: ["id"],
+        })
+        stockLocationId = defaultLocations?.[0]?.id
+      }
+
+      for (let i = 0; i < result.product.variants.length; i++) {
+        const createdVariant = result.product.variants[i]
+        const inputVariant =
+          variantsInput[i] ||
+          variantsInput.find(
+            (v: any) =>
+              (v.sku && v.sku === createdVariant.sku) ||
+              (v.title && v.title === createdVariant.title)
+          ) ||
+          {}
+
+        const shouldManageInventory = inputVariant.manage_inventory ?? true
+        const inventoryQuantity =
+          typeof inputVariant.inventory_quantity === "number"
+            ? inputVariant.inventory_quantity
+            : typeof inputVariant.metadata?.inventory_quantity === "number"
+            ? inputVariant.metadata.inventory_quantity
+            : undefined
+
+        if (shouldManageInventory || inventoryQuantity !== undefined) {
+          const inventoryItemId = await ensureVariantInventoryItem(
+            req,
+            createdVariant.id,
+            vendorId
+          )
+
+          if (
+            stockLocationId &&
+            inventoryQuantity !== undefined &&
+            inventoryQuantity >= 0
+          ) {
+            const { data: existingLevels } = await query.graph({
+              entity: "inventory_level",
+              fields: ["id"],
+              filters: {
+                inventory_item_id: [inventoryItemId],
+                location_id: [stockLocationId],
+              },
+            })
+
+            if (existingLevels.length) {
+              await updateInventoryLevelsWorkflow(req.scope).run({
+                input: {
+                  updates: [
+                    {
+                      inventory_item_id: inventoryItemId,
+                      location_id: stockLocationId,
+                      stocked_quantity: inventoryQuantity,
+                    },
+                  ],
+                },
+              })
+            } else {
+              await createInventoryLevelsWorkflow(req.scope).run({
+                input: {
+                  inventory_levels: [
+                    {
+                      inventory_item_id: inventoryItemId,
+                      location_id: stockLocationId,
+                      stocked_quantity: inventoryQuantity,
+                    },
+                  ],
+                },
+              })
+            }
+          }
+        }
+      }
+    } catch (inventoryErr) {
+      console.error(
+        "[POST /vendors/products] Inventory auto-provisioning error:",
+        inventoryErr
+      )
+    }
+  }
 
   res.status(201).json({ product: result.product })
 }

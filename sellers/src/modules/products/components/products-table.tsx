@@ -6,6 +6,7 @@ import {
   type VendorProduct,
 } from "@lib/data/vendor-client"
 import {
+  Button,
   createDataTableColumnHelper,
   createDataTableCommandHelper,
   createDataTableFilterHelper,
@@ -19,6 +20,7 @@ import {
   useDataTable,
   usePrompt,
 } from "@medusajs/ui"
+import { Plus } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -31,6 +33,7 @@ import {
 } from "@modules/common"
 import { ProductExportButton } from "./product-export-button"
 import { ProductImportModal } from "./product-import-modal"
+import { AddProductModal } from "./add-product-modal"
 
 const columnHelper = createDataTableColumnHelper<VendorProduct>()
 const filterHelper = createDataTableFilterHelper<VendorProduct>()
@@ -163,6 +166,7 @@ export const ProductsTable = () => {
 
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
+  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false)
 
   // A select filter's value arrives either as a bare array or wrapped in an
   // operator object depending on how it was set, so it is normalised here.
@@ -319,40 +323,50 @@ export const ProductsTable = () => {
   })
 
   return (
-    <DataTable instance={table}>
-      <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-        <Heading level="h2">Products</Heading>
-        <div className="flex items-center gap-x-2">
-          <DataTable.Search placeholder="Search products..." />
-          <DataTable.FilterMenu tooltip="Filter" />
-          <DataTable.SortingMenu tooltip="Sort" />
-          <ProductExportButton />
-          <ProductImportModal />
-          <Link
-            href="/products/new"
-            className="bg-ui-button-inverted text-ui-contrast-fg-primary shadow-buttons-inverted txt-compact-small-plus rounded-md px-3 py-1.5"
-          >
-            Create
-          </Link>
-        </div>
-      </DataTable.Toolbar>
-      <DataTable.FilterBar />
-      <DataTable.Table
-        emptyState={{
-          empty: {
-            heading: "No products yet",
-            description: "Create your first product to start selling.",
-          },
-          filtered: {
-            heading: "No matches",
-            description: "No products match that search.",
-          },
-        }}
+    <>
+      <DataTable instance={table}>
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <Heading level="h2">Products</Heading>
+          <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search products..." />
+            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTable.SortingMenu tooltip="Sort" />
+            <ProductExportButton />
+            <ProductImportModal />
+            <Button
+              size="small"
+              variant="primary"
+              onClick={() => setIsAddProductModalOpen(true)}
+              className="gap-x-1.5"
+            >
+              <Plus className="size-4" />
+              <span>Add Product</span>
+            </Button>
+          </div>
+        </DataTable.Toolbar>
+        <DataTable.FilterBar />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No products yet",
+              description: "Browse the Master Catalog or create your first custom product.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No products match that search.",
+            },
+          }}
+        />
+        <DataTable.Pagination />
+        <DataTable.CommandBar
+          selectedLabel={(count) => count + " selected"}
+        />
+      </DataTable>
+
+      <AddProductModal
+        open={isAddProductModalOpen}
+        onOpenChange={setIsAddProductModalOpen}
       />
-      <DataTable.Pagination />
-      <DataTable.CommandBar
-        selectedLabel={(count) => count + " selected"}
-      />
-    </DataTable>
+    </>
   )
 }
