@@ -4,6 +4,7 @@ import type { VendorProduct } from "@lib/data/vendor-client"
 import { Button, StatusBadge } from "@medusajs/ui"
 import Link from "next/link"
 import { Row, Section } from "./section"
+export { TrustClawAttributesSection } from "./trustclaw-attributes-section"
 
 const STATUS_COLOR = {
   published: "green",

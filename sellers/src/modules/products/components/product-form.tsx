@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { PriceFields } from "./detail/variant-drawer"
 import { TrustClawCategoryPicker } from "./detail/trustclaw-category-picker"
+import { TrustClawAttributesSection } from "./detail/trustclaw-attributes-section"
 
 type ProductFormProps = {
   product?: VendorProduct
@@ -432,6 +433,15 @@ export const ProductForm = ({ product }: ProductFormProps) => {
           />
         </Field>
       </Card>
+
+      {product && (
+        <Card
+          title="Specifications & Master Attributes"
+          description="Standardized product attributes imported from TrustClaw Master Catalog or custom specifications."
+        >
+          <TrustClawAttributesSection product={product} embedded />
+        </Card>
+      )}
 
       {error && (
         <Text size="small" className="text-ui-fg-error">
