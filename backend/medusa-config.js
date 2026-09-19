@@ -64,6 +64,9 @@ const medusaConfig = {
   },
   modules: [
     {
+      resolve: './src/modules/appointment-booking'
+    },
+    {
       resolve: './src/modules/rental'
     },
     {
@@ -197,7 +200,11 @@ const medusaConfig = {
     ...(MEILISEARCH_ENABLED ? [{
       resolve: '@rokmohar/medusa-plugin-meilisearch',
       options: {}
-    }] : [])
+    }] : []),
+    {
+      resolve: '@rsc-labs/medusa-booking-system',
+      options: {}
+    }
   ]
 };
 

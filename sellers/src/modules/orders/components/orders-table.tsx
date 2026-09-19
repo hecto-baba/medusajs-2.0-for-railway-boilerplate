@@ -10,6 +10,7 @@ import {
   useDataTable,
 } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
+import Link from "next/link"
 import { useState } from "react"
 
 const columnHelper = createDataTableColumnHelper<VendorOrder>()
@@ -62,7 +63,14 @@ const fulfillmentBadge = (order: VendorOrder) => {
 const columns = [
   columnHelper.accessor("display_id", {
     header: "Order",
-    cell: ({ getValue }) => `#${getValue()}`,
+    cell: ({ row }) => (
+      <Link
+        href={`/orders/${row.original.id}`}
+        className="text-ui-fg-interactive hover:text-ui-fg-interactive-hover"
+      >
+        #{row.original.display_id}
+      </Link>
+    ),
   }),
   columnHelper.accessor("created_at", {
     header: "Date",

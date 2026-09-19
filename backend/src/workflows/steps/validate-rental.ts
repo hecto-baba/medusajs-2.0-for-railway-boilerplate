@@ -6,6 +6,9 @@ import { InferTypeOf } from "@medusajs/framework/types"
 import { RentalConfiguration } from "../../modules/rental/models/rental-configuration"
 import hasCartOverlap from "../../utils/has-cart-overlap"
 import validateRentalDates from "../../utils/validate-rental-dates"
+import countRentalDays from "../../utils/count-rental-days"
+import countRentalUnits from "../../utils/count-rental-units"
+import { RentalUnit } from "../../utils/rental-unit"
 import { cancelOrderWorkflow } from "@medusajs/medusa/core-flows"
 
 export type ValidateRentalInput = {
@@ -27,6 +30,17 @@ export const validateRentalStep = createStep(
   async ({ rental_items, order_id }: ValidateRentalInput, { container }) => {
     const rentalModuleService: RentalModuleService = container.resolve(RENTAL_MODULE)
 
+    // Pass 1: every synchronous, in-memory check (config/quantity/metadata/
+    // date validity, plus overlap against sibling items in this same order).
+    // Errors here throw immediately, in item order, exactly as before.
+    // The DB-backed overlap check is deferred to a single batched call after
+    // this loop instead of one query per item - see hasAnyRentalOverlap.
+    const dbOverlapChecks: {
+      variant_id: string
+      start_date: Date
+      end_date: Date
+    }[] = []
+
     for (let i = 0; i < rental_items.length; i++) {
       const rentalItem = rental_items[i]
       const {
@@ -37,7 +51,6 @@ export const validateRentalStep = createStep(
         rental_start_date,
         rental_end_date,
         rental_days,
-        rental_units_count,
       } = rentalItem
 
       if (rental_configuration.status !== "active") {
@@ -65,7 +78,22 @@ export const validateRentalStep = createStep(
 
       const startDate = rental_start_date instanceof Date ? rental_start_date : new Date(rental_start_date)
       const endDate = rental_end_date instanceof Date ? rental_end_date : new Date(rental_end_date)
-      
+
+      // Recomputed from the actual dates rather than trusting the
+      // rental_days/rental_units_count carried on the item: those values
+      // originate from order line-item metadata, which was already correct
+      // at add-to-cart time but is never re-derived between then and this
+      // (final, pre-persistence) checkpoint. Recomputing here means this
+      // check still catches a bad/tampered/stale count instead of validating
+      // against it, matching every other validateRentalDates call site.
+      const derivedRentalDays = countRentalDays(startDate, endDate)
+      const configuredUnit: RentalUnit =
+        (rental_configuration.rental_unit as RentalUnit) ?? "day"
+      const derivedUnitsCount =
+        configuredUnit === "day" || configuredUnit === "custom"
+          ? derivedRentalDays
+          : countRentalUnits(startDate, endDate, configuredUnit)
+
       validateRentalDates(
         startDate,
         endDate,
@@ -76,8 +104,8 @@ export const validateRentalStep = createStep(
           min_rental_units: rental_configuration.min_rental_units,
           max_rental_units: rental_configuration.max_rental_units,
         },
-        rental_days,
-        rental_units_count
+        derivedRentalDays,
+        derivedUnitsCount
       )
 
       const hasCartOverlapResult = hasCartOverlap(
@@ -85,7 +113,7 @@ export const validateRentalStep = createStep(
           variant_id,
           rental_start_date,
           rental_end_date,
-          rental_days,
+          rental_days: derivedRentalDays,
         },
         rental_items.slice(i + 1).map((item) => ({
           id: item.line_item_id,
@@ -105,12 +133,24 @@ export const validateRentalStep = createStep(
         )
       }
 
-      if (await rentalModuleService.hasRentalOverlap(variant_id, startDate, endDate)) {
-        throw new MedusaError(
-          MedusaError.Types.NOT_ALLOWED,
-          `Variant ${variant_id} is already rented during the requested period (${startDate.toISOString()} to ${endDate.toISOString()})`
-        )
-      }
+      dbOverlapChecks.push({ variant_id, start_date: startDate, end_date: endDate })
+    }
+
+    // Pass 2: one batched query for every item's DB-backed overlap check,
+    // instead of the previous N sequential hasRentalOverlap calls. Reports
+    // the first offending item, in the same item order as before, so the
+    // error a caller sees for a single-conflict case is unchanged.
+    const overlappingIndexes = await rentalModuleService.hasAnyRentalOverlap(
+      dbOverlapChecks
+    )
+
+    if (overlappingIndexes.size > 0) {
+      const firstOverlapIndex = Math.min(...overlappingIndexes)
+      const { variant_id, start_date, end_date } = dbOverlapChecks[firstOverlapIndex]
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        `Variant ${variant_id} is already rented during the requested period (${start_date.toISOString()} to ${end_date.toISOString()})`
+      )
     }
 
     return new StepResponse({ validated: true }, order_id)

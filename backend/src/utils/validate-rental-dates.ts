@@ -1,5 +1,5 @@
 import { MedusaError } from "@medusajs/framework/utils"
-import { RentalUnit } from "./rental-unit"
+import { RENTAL_UNIT_DAY_SIZE, RentalUnit } from "./rental-unit"
 
 const UNIT_NOUN: Record<RentalUnit, string> = {
   hour: "hour",
@@ -50,6 +50,23 @@ export default function validateRentalDates(
             `unitsCount is required to validate a ${unit}-unit rental`
           )
         })()
+
+  // Week/month units are derived from a flat day-size divisor (see
+  // rental-unit.ts), so a span that isn't an exact multiple of that divisor
+  // has no unambiguous unit count - count-rental-units.ts would otherwise
+  // silently round it, which can under- or over-charge relative to the days
+  // actually held. Day/custom are exact by construction (units === days) and
+  // hour is exempt (it's measured in elapsed minutes, not day-multiples), so
+  // only week/month need this check.
+  if (unit === "week" || unit === "month") {
+    const unitSizeInDays = RENTAL_UNIT_DAY_SIZE[unit]
+    if (days % unitSizeInDays !== 0) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `A ${unitNoun}-based rental must span an exact number of ${unitNoun}s (multiples of ${unitSizeInDays} days). Received a ${days}-day span.`
+      )
+    }
+  }
 
   const min = rentalConfiguration.min_rental_units ?? rentalConfiguration.min_rental_days
   const max =

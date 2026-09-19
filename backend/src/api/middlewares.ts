@@ -12,6 +12,15 @@ import { GetRentalAvailabilitySchema } from "./store/products/[id]/rental-availa
 import { GetRentalBlockedDatesSchema } from "./store/products/[id]/rental-blocked-dates/route";
 import { PostCartItemsRentalsBody } from "./store/carts/[id]/line-items/rentals/route";
 import { PostCartItemsTicketsBody } from "./store/carts/[id]/line-items/tickets/route";
+import { PostCartItemsAppointmentsBody } from "./store/carts/[id]/line-items/appointments/route";
+import { GetAvailableSlotsSchema } from "./store/providers/[id]/available-slots/route";
+import { PostVendorProviderSchema } from "./vendors/providers/me/route";
+import { PostVendorRecurringAvailabilitySchema } from "./vendors/providers/me/recurring-availability/route";
+import { PostVendorAvailabilityExceptionSchema } from "./vendors/providers/me/exceptions/route";
+import { PostVendorAppointmentSlotsSchema } from "./vendors/providers/me/slots/route";
+import { PostAdminRecurringAvailabilitySchema } from "./admin/providers/[id]/recurring-availability/route";
+import { PostAdminAvailabilityExceptionSchema } from "./admin/providers/[id]/exceptions/route";
+import { PostAdminAppointmentSlotsSchema } from "./admin/providers/[id]/slots/route";
 import { PostVenueBodySchema } from "./admin/venues/route";
 import { PostTicketProductBodySchema } from "./admin/ticket-products/route";
 import { GetTicketProductSeatsSchema } from "./store/ticket-products/[id]/seats/route";
@@ -21,6 +30,8 @@ import { GetVendorOrdersSchema } from "./vendors/orders/route";
 import { GetVendorPromotionsSchema } from "./vendors/promotions/route";
 import { GetVendorCampaignsSchema } from "./vendors/campaigns/route";
 import { PostVendorRentalConfigSchema } from "./vendors/products/[id]/rental-config/route";
+import { PostVendorRentalStatusBodySchema } from "./vendors/rentals/[id]/route";
+import { PostVendorRentalDepositBodySchema } from "./vendors/rentals/[id]/deposit/route";
 import { PostVendorInventoryLevelSchema } from "./vendors/products/[id]/variants/[variant_id]/inventory-levels/route";
 import { GetVendorReturnReasonsSchema } from "./vendors/return-reasons/route";
 import { GetVendorSearchSchema } from "./vendors/search/route";
@@ -371,6 +382,20 @@ export default defineMiddlewares({
       ]
     },
     {
+      matcher: "/store/carts/:id/line-items/appointments",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostCartItemsAppointmentsBody)
+      ]
+    },
+    {
+      matcher: "/store/providers/:id/available-slots",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetAvailableSlotsSchema, {})
+      ]
+    },
+    {
       matcher: "/admin/venues",
       methods: ["POST"],
       middlewares: [
@@ -462,6 +487,16 @@ export default defineMiddlewares({
       methods: ["GET"],
       middlewares: [
         validateAndTransformQuery(GetVendorOrdersSchema, {})
+      ]
+    },
+    // "/vendors/*" only matches a single path segment (see the comment above
+    // "/vendors/products/:id/*"), so the previously order-list-only /vendors/orders
+    // namespace needs its own explicit entry now that /vendors/orders/:id/rentals
+    // exists one level deeper.
+    {
+      matcher: "/vendors/orders/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
       ]
     },
     {
@@ -601,6 +636,78 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(PostVendorRentalConfigSchema)
+      ]
+    },
+    // "/vendors/*" only matches a single path segment, so /vendors/rentals/:id
+    // and its /deposit sub-route need their own explicit auth entry - same
+    // reasoning as "/vendors/products/:id/*" above.
+    {
+      matcher: "/vendors/rentals/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/rentals/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorRentalStatusBodySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/rentals/:id/deposit",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorRentalDepositBodySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/providers/me",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorProviderSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/providers/me/recurring-availability",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorRecurringAvailabilitySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/providers/me/exceptions",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorAvailabilityExceptionSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/providers/me/slots",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorAppointmentSlotsSchema)
+      ]
+    },
+    {
+      matcher: "/admin/providers/:id/recurring-availability",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostAdminRecurringAvailabilitySchema)
+      ]
+    },
+    {
+      matcher: "/admin/providers/:id/exceptions",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostAdminAvailabilityExceptionSchema)
+      ]
+    },
+    {
+      matcher: "/admin/providers/:id/slots",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostAdminAppointmentSlotsSchema)
       ]
     },
     {

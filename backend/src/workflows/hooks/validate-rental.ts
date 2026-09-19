@@ -51,15 +51,24 @@ completeCartWorkflow.hooks.validate(
       }
     }
 
+    // Pass 1: every synchronous, in-memory check. The DB-backed overlap
+    // check is deferred to a single batched call after this loop instead of
+    // one hasRentalOverlap query per item - see hasAnyRentalOverlap.
+    const dbOverlapChecks: {
+      variant_id: string
+      start_date: Date
+      end_date: Date
+    }[] = []
+
     for (let i = 0; i < rentalItems.length; i++) {
       const rentalItem = rentalItems[i]
-      const { 
-        line_item_id, 
-        variant_id, 
-        quantity, 
-        rental_configuration, 
-        rental_start_date, 
-        rental_end_date, 
+      const {
+        line_item_id,
+        variant_id,
+        quantity,
+        rental_configuration,
+        rental_start_date,
+        rental_end_date,
         rental_days
       } = rentalItem
 
@@ -138,12 +147,22 @@ completeCartWorkflow.hooks.validate(
         )
       }
 
-      if (await rentalModuleService.hasRentalOverlap(variant_id as string, startDate, endDate)) {
-        throw new MedusaError(
-          MedusaError.Types.NOT_ALLOWED,
-          `Variant ${variant_id} is already rented during the requested period (${startDate.toISOString()} to ${endDate.toISOString()})`
-        )
-      }
+      dbOverlapChecks.push({ variant_id: variant_id as string, start_date: startDate, end_date: endDate })
+    }
+
+    // Pass 2: one batched query for every item's DB-backed overlap check,
+    // instead of the previous N sequential hasRentalOverlap calls.
+    const overlappingIndexes = await rentalModuleService.hasAnyRentalOverlap(
+      dbOverlapChecks
+    )
+
+    if (overlappingIndexes.size > 0) {
+      const firstOverlapIndex = Math.min(...overlappingIndexes)
+      const { variant_id, start_date, end_date } = dbOverlapChecks[firstOverlapIndex]
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        `Variant ${variant_id} is already rented during the requested period (${start_date.toISOString()} to ${end_date.toISOString()})`
+      )
     }
   }
 )

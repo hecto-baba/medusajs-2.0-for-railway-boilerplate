@@ -69,6 +69,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { href: "/venues", label: "Venues", icon: Buildings },
   { href: "/shows", label: "Shows", icon: Calendar },
+  { href: "/my-schedule", label: "My Schedule", icon: Calendar },
 ]
 
 type SidebarProps = {

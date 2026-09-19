@@ -98,6 +98,28 @@ export type VendorOrder = {
   fulfillments?: { id: string; delivered_at: string | null; shipped_at: string | null }[]
 }
 
+/** A single order's full detail, scoped to the vendor's own line items. */
+export type VendorOrderDetail = VendorOrder & {
+  subtotal: number
+  shipping_total: number
+  tax_total: number
+  customer?: {
+    email: string | null
+    first_name?: string | null
+    last_name?: string | null
+  } | null
+  shipping_address?: Record<string, unknown> | null
+  billing_address?: Record<string, unknown> | null
+  items?: {
+    id: string
+    title: string
+    variant_title?: string | null
+    quantity: number
+    unit_price: number
+    metadata?: Record<string, unknown> | null
+  }[]
+}
+
 export type ListResponse<T> = {
   count: number
   limit: number
@@ -209,6 +231,9 @@ export const confirmVendorProductImport = (transactionId: string) =>
 
 export const listVendorOrders = (params: { limit: number; offset: number }) =>
   request<ListResponse<{ orders: VendorOrder[] }>>("orders", params)
+
+export const getVendorOrder = (orderId: string) =>
+  request<{ order: VendorOrderDetail }>("orders/" + orderId, {})
 
 const mutate = async <T>(
   path: string,
@@ -345,11 +370,23 @@ export const uploadVendorImages = async (files: File[]) => {
 
 /* ------------------------------------------------------------------ rental */
 
+export type VendorRentalUnit = "hour" | "day" | "week" | "month" | "custom"
+export type VendorRentalDepositType = "fixed" | "percentage"
+
 export type VendorRentalConfig = {
   id: string
   product_id: string
+  // Legacy day-only fields, kept for backward compatibility with configs
+  // saved before unit/deposit support - min_rental_units/max_rental_units
+  // are the fields new saves read and write.
   min_rental_days: number
   max_rental_days: number | null
+  rental_unit: VendorRentalUnit
+  min_rental_units: number
+  max_rental_units: number | null
+  security_deposit_amount: number
+  security_deposit_type: VendorRentalDepositType
+  requires_time_selection: boolean
   status: "active" | "inactive"
 }
 
@@ -362,8 +399,12 @@ export const getVendorRentalConfig = (productId: string) =>
 export const upsertVendorRentalConfig = (
   productId: string,
   body: {
-    min_rental_days?: number
-    max_rental_days?: number | null
+    rental_unit?: VendorRentalUnit
+    min_rental_units?: number
+    max_rental_units?: number | null
+    security_deposit_amount?: number
+    security_deposit_type?: VendorRentalDepositType
+    requires_time_selection?: boolean
     status?: "active" | "inactive"
   }
 ) =>
@@ -371,6 +412,68 @@ export const upsertVendorRentalConfig = (
     "products/" + productId + "/rental-config",
     "POST",
     body
+  )
+
+/* -------------------------------------------------------- rentals (bookings) */
+
+export type VendorRentalDepositStatus =
+  | "held"
+  | "refunded"
+  | "partially_refunded"
+  | "forfeited"
+
+export type VendorRental = {
+  id: string
+  variant_id: string
+  customer_id: string
+  order_id: string
+  line_item_id: string
+  rental_start_date: string
+  rental_end_date: string
+  actual_return_date: string | null
+  rental_days: number
+  rental_unit: VendorRentalUnit
+  rental_units_count: number | null
+  pickup_time: string | null
+  return_time: string | null
+  security_deposit_amount: number
+  security_deposit_status: VendorRentalDepositStatus | null
+  status: "pending" | "active" | "returned" | "cancelled"
+  product_variant?: {
+    id: string
+    title: string
+    product?: {
+      id: string
+      title: string
+      thumbnail: string | null
+    }
+  }
+}
+
+export const listVendorOrderRentals = (orderId: string) =>
+  request<{ rentals: VendorRental[] }>(
+    "orders/" + orderId + "/rentals",
+    {}
+  )
+
+export const updateVendorRentalStatus = (
+  rentalId: string,
+  status: "active" | "returned" | "cancelled"
+) =>
+  mutate<{ rental: VendorRental }>(
+    "rentals/" + rentalId,
+    "POST",
+    { status }
+  )
+
+export const updateVendorRentalDeposit = (
+  rentalId: string,
+  status: "refunded" | "partially_refunded" | "forfeited"
+) =>
+  mutate<{ rental: VendorRental }>(
+    "rentals/" + rentalId + "/deposit",
+    "POST",
+    { status }
   )
 
 /**
@@ -2232,6 +2335,131 @@ export type VendorRegion = {
 
 export const listVendorRegions = () =>
   request<{ regions: VendorRegion[] }>("regions", {})
+
+/* ---------------------------------------------------------- appointments */
+
+export type VendorProvider = {
+  id: string
+  vendor_admin_id: string
+  display_name: string | null
+  bio: string | null
+  timezone: string
+  status: "active" | "inactive"
+}
+
+export type VendorRecurringAvailability = {
+  id: string
+  provider_id: string
+  day_of_week: number
+  start_time: string
+  end_time: string
+  effective_from: string
+  effective_until: string | null
+  status: "active" | "inactive"
+}
+
+export type VendorAvailabilityException = {
+  id: string
+  provider_id: string
+  date: string
+  type: "blackout" | "extra_hours"
+  start_time: string | null
+  end_time: string | null
+  reason: string | null
+}
+
+export type VendorAppointmentAttendee = {
+  id: string
+  appointment_id: string
+  customer_id: string
+  order_id: string | null
+  status: "reserved" | "confirmed" | "cancelled"
+}
+
+export type VendorAppointment = {
+  id: string
+  provider_id: string
+  service_product_id: string
+  start_time: string
+  end_time: string
+  max_capacity: number
+  status: "available" | "booked" | "cancelled" | "completed"
+  service_product?: { id: string; title: string } | null
+  attendees?: VendorAppointmentAttendee[]
+}
+
+export const getVendorProviderMe = () =>
+  request<{ provider: VendorProvider | null }>("providers/me", {})
+
+export const createVendorProvider = (body: {
+  display_name?: string | null
+  bio?: string | null
+  timezone: string
+}) => mutate<{ provider: VendorProvider }>("providers/me", "POST", body)
+
+export const listVendorRecurringAvailability = () =>
+  request<{ recurring_availabilities: VendorRecurringAvailability[] }>(
+    "providers/me/recurring-availability",
+    {}
+  )
+
+export const createVendorRecurringAvailability = (body: {
+  day_of_week: number
+  start_time: string
+  end_time: string
+  effective_from: string
+  effective_until?: string | null
+}) =>
+  mutate<{ recurring_availability: VendorRecurringAvailability }>(
+    "providers/me/recurring-availability",
+    "POST",
+    body
+  )
+
+export const deleteVendorRecurringAvailability = (id: string) =>
+  mutate<{ id: string; deleted: boolean }>(
+    `providers/me/recurring-availability/${id}`,
+    "DELETE"
+  )
+
+export const listVendorAvailabilityExceptions = () =>
+  request<{ availability_exceptions: VendorAvailabilityException[] }>(
+    "providers/me/exceptions",
+    {}
+  )
+
+export const createVendorAvailabilityException = (body: {
+  date: string
+  type: "blackout" | "extra_hours"
+  start_time?: string | null
+  end_time?: string | null
+  reason?: string | null
+}) =>
+  mutate<{ availability_exception: VendorAvailabilityException }>(
+    "providers/me/exceptions",
+    "POST",
+    body
+  )
+
+export const listVendorAppointments = () =>
+  request<{ appointments: VendorAppointment[] }>(
+    "providers/me/appointments",
+    {}
+  )
+
+export const createVendorAppointmentSlots = (body: {
+  service_product_id: string
+  service_variant_id?: string | null
+  service_duration_minutes: number
+  max_capacity?: number
+  date_from: string
+  date_to: string
+}) =>
+  mutate<{ appointments: VendorAppointment[] }>(
+    "providers/me/slots",
+    "POST",
+    body
+  )
 
 /* ---------------------------------------------------------------- search */
 
