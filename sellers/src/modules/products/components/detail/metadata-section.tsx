@@ -105,16 +105,40 @@ export const MetadataSection = ({ product }: { product: VendorProduct }) => {
       <div className="px-6 py-4">
         {current.length ? (
           <div className="flex flex-col gap-y-2">
-            {current.map((pair) => (
-              <div key={pair.key} className="grid grid-cols-2 gap-x-4">
-                <Text size="small" weight="plus">
-                  {pair.key}
-                </Text>
-                <Text size="small" className="text-ui-fg-subtle break-all">
-                  {pair.value}
-                </Text>
-              </div>
-            ))}
+            {current.map((pair) => {
+              const isAttributesKey = pair.key.toLowerCase() === "attributes"
+              return (
+                <div key={pair.key} className="grid grid-cols-2 gap-x-4 items-start">
+                  <Text size="small" weight="plus">
+                    {pair.key}
+                  </Text>
+                  {isAttributesKey ? (
+                    <div className="flex flex-col gap-y-1">
+                      <div className="flex items-center gap-x-2">
+                        <Badge size="small" color="purple">
+                          Specifications Table
+                        </Badge>
+                        <Text size="xsmall" className="text-ui-fg-muted">
+                          Rendered in specifications table
+                        </Text>
+                      </div>
+                      <details className="group mt-1 cursor-pointer">
+                        <summary className="text-[11px] text-ui-fg-interactive hover:text-ui-fg-interactive-hover font-medium select-none">
+                          View raw JSON
+                        </summary>
+                        <pre className="mt-1.5 max-h-32 overflow-auto rounded bg-ui-bg-subtle p-2 text-[10px] text-ui-fg-subtle">
+                          {pair.value}
+                        </pre>
+                      </details>
+                    </div>
+                  ) : (
+                    <Text size="small" className="text-ui-fg-subtle break-all">
+                      {pair.value}
+                    </Text>
+                  )}
+                </div>
+              )
+            })}
           </div>
         ) : (
           <Text size="small" className="text-ui-fg-muted">

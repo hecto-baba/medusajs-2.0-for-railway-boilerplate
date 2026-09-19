@@ -9,7 +9,11 @@ import {
 } from "@modules/layout"
 import { Text } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
-import { AttributesSection, GeneralSection } from "./general-section"
+import {
+  AttributesSection,
+  GeneralSection,
+  TrustClawAttributesSection,
+} from "./general-section"
 import { OrganizeSection } from "./organize-section"
 import {
   SalesChannelSection,
@@ -93,6 +97,9 @@ export const ProductDetail = ({ id }: { id: string }) => {
             </LayoutComposer.Entry>
             <LayoutComposer.Entry id="ProductAttributesSection">
               <AttributesSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductTrustClawAttributesSection">
+              <TrustClawAttributesSection product={product} />
             </LayoutComposer.Entry>
           </>
         ),
