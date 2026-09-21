@@ -13,6 +13,7 @@ export type NewCampaignDraft = {
   budget_type: "usage" | "spend"
   budget_limit: string
   budget_currency_code: string
+  budget_attribute: "" | "customer_id" | "customer_email"
 }
 
 export const DEFAULT_NEW_CAMPAIGN: NewCampaignDraft = {
@@ -24,6 +25,7 @@ export const DEFAULT_NEW_CAMPAIGN: NewCampaignDraft = {
   budget_type: "usage",
   budget_limit: "",
   budget_currency_code: "",
+  budget_attribute: "",
 }
 
 export type CampaignChoice = "none" | "existing" | "new"
@@ -254,7 +256,10 @@ export const PromotionCampaignStep = ({
             <RadioGroup
               value={newCampaign.budget_type}
               onValueChange={(value) =>
-                set({ budget_type: value as "usage" | "spend" })
+                set({
+                  budget_type: value as "usage" | "spend",
+                  ...(value === "spend" ? { budget_attribute: "" } : {}),
+                })
               }
             >
               <RadioGroup.ChoiceBox
@@ -269,6 +274,36 @@ export const PromotionCampaignStep = ({
               />
             </RadioGroup>
           </Field>
+
+          {newCampaign.budget_type === "usage" && (
+            <Field
+              label="Limit usage per"
+              hint="Total counts every redemption. Per customer and per email count separately for each person."
+            >
+              <Select
+                value={newCampaign.budget_attribute || "total"}
+                onValueChange={(value) =>
+                  set({
+                    budget_attribute:
+                      value === "total"
+                        ? ""
+                        : (value as "customer_id" | "customer_email"),
+                  })
+                }
+              >
+                <Select.Trigger>
+                  <Select.Value />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Item value="total">
+                    Total uses (across all customers)
+                  </Select.Item>
+                  <Select.Item value="customer_id">Per customer</Select.Item>
+                  <Select.Item value="customer_email">Per email</Select.Item>
+                </Select.Content>
+              </Select>
+            </Field>
+          )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {newCampaign.budget_type === "spend" && (

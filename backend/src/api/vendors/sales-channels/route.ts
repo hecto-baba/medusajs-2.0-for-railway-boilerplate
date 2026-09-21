@@ -10,6 +10,8 @@ export const GetVendorSalesChannelsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
   q: z.string().optional(),
+  order: z.string().optional(),
+  status: z.enum(["all", "enabled", "disabled"]).optional(),
 })
 
 export const CreateVendorSalesChannelSchema = z.object({
@@ -38,7 +40,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q } = req.validatedQuery as unknown as z.infer<
+  const { limit, offset, q, order, status } = req.validatedQuery as unknown as z.infer<
     typeof GetVendorSalesChannelsSchema
   >
 
@@ -65,6 +67,26 @@ export const GET = async (
     }
   }
 
+  const filters: Record<string, any> = {}
+  if (q) {
+    filters.$or = [
+      { name: { $ilike: `%${q}%` } },
+      { description: { $ilike: `%${q}%` } },
+    ]
+  }
+  if (status === "enabled") {
+    filters.is_disabled = false
+  } else if (status === "disabled") {
+    filters.is_disabled = true
+  }
+
+  let orderConfig: Record<string, "ASC" | "DESC"> = { created_at: "ASC" }
+  if (order) {
+    const isDesc = order.startsWith("-")
+    const field = isDesc ? order.slice(1) : order
+    orderConfig = { [field]: isDesc ? "DESC" : "ASC" }
+  }
+
   // Also query store channels
   const { data: allChannels, metadata } = await query.graph({
     entity: "sales_channel",
@@ -78,13 +100,11 @@ export const GET = async (
       "updated_at",
       "products.id",
     ],
-    filters: {
-      ...(q ? { name: { $ilike: `%${q}%` } } : {}),
-    },
+    filters,
     pagination: {
       skip: offset,
       take: limit,
-      order: { created_at: "ASC" },
+      order: orderConfig,
     },
   })
 

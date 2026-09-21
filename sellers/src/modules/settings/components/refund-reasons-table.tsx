@@ -12,6 +12,7 @@ import {
   createDataTableColumnHelper,
   DataTable,
   DataTablePaginationState,
+  DataTableSortingState,
   Heading,
   toast,
   useDataTable,
@@ -33,13 +34,26 @@ export const RefundReasonsTable = () => {
     pageIndex: 0,
     pageSize: 20,
   })
+  const [search, setSearch] = useState("")
+  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
 
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
+  const order = sorting?.id
+    ? sorting.desc
+      ? `-${sorting.id}`
+      : sorting.id
+    : undefined
 
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-refund-reasons", limit, offset],
-    queryFn: () => listVendorRefundReasons({ limit, offset }),
+    queryKey: ["vendor-refund-reasons", limit, offset, search, order],
+    queryFn: () =>
+      listVendorRefundReasons({
+        limit,
+        offset,
+        q: search.trim() || undefined,
+        order,
+      }),
     placeholderData: (previous) => previous,
   })
 
@@ -74,8 +88,18 @@ export const RefundReasonsTable = () => {
   }
 
   const columns = [
-    columnHelper.accessor("label", { header: "Label" }),
-    columnHelper.accessor("code", { header: "Code" }),
+    columnHelper.accessor("label", {
+      header: "Label",
+      enableSorting: true,
+    }),
+    columnHelper.accessor("code", {
+      header: "Code",
+      enableSorting: true,
+    }),
+    columnHelper.accessor("description", {
+      header: "Description",
+      cell: ({ row }) => row.original.description || "-",
+    }),
     columnHelper.action({
       actions: (ctx) => [
         {
@@ -101,21 +125,27 @@ export const RefundReasonsTable = () => {
     getRowId: (row) => row.id,
     isLoading,
     pagination: { state: pagination, onPaginationChange: setPagination },
+    search: { state: search, onSearchChange: setSearch },
+    sorting: { state: sorting, onSortingChange: setSorting },
   })
 
   return (
     <Container className="p-0">
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between gap-x-2 px-6 py-4">
+        <DataTable.Toolbar className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-4">
           <Heading>Refund Reasons</Heading>
-          <Button
-            size="small"
-            variant="secondary"
-            onClick={() => router.push("/settings/refund-reasons/create")}
-          >
-            <PlusMini />
-            Create
-          </Button>
+          <div className="flex items-center gap-x-2 w-full sm:w-auto">
+            <DataTable.Search placeholder="Search refund reasons..." />
+            <Button
+              size="small"
+              variant="secondary"
+              onClick={() => router.push("/settings/refund-reasons/create")}
+              className="shrink-0"
+            >
+              <PlusMini />
+              Create
+            </Button>
+          </div>
         </DataTable.Toolbar>
         <DataTable.Table />
         <DataTable.Pagination />

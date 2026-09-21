@@ -9,6 +9,11 @@ import { getOrdersListWorkflow } from "@medusajs/medusa/core-flows"
 export const GetVendorOrdersSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
+  q: z.string().optional(),
+  order: z.string().optional(),
+  status: z.string().optional(),
+  payment_status: z.string().optional(),
+  fulfillment_status: z.string().optional(),
 })
 
 /**
@@ -24,9 +29,15 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset } = req.validatedQuery as unknown as z.infer<
-    typeof GetVendorOrdersSchema
-  >
+  const {
+    limit,
+    offset,
+    q,
+    order,
+    status,
+    payment_status,
+    fulfillment_status,
+  } = req.validatedQuery as unknown as z.infer<typeof GetVendorOrdersSchema>
 
   const {
     data: [vendorAdmin],
@@ -48,22 +59,14 @@ export const GET = async (
   )
 
   const allOrders = vendorAdmin.vendor.orders ?? []
-
-  const sortedIds = allOrders
+  const allOrderIds = allOrders
     .filter(Boolean)
-    .sort((a, b) =>
-      new Date(b!.created_at as string).getTime() -
-      new Date(a!.created_at as string).getTime()
-    )
-    .map((order) => order!.id)
+    .map((o) => o!.id)
     .filter((id: any) => typeof id === "string" && id.length > 0)
 
-  const count = sortedIds.length
-  const pageIds = sortedIds.slice(offset, offset + limit)
-
   // If vendor has no linked orders or no products, short-circuit immediately
-  if (!pageIds.length || !vendorProductIds.size) {
-    res.json({ orders: [], count, limit, offset })
+  if (!allOrderIds.length || !vendorProductIds.size) {
+    res.json({ orders: [], count: 0, limit, offset })
     return
   }
 
@@ -95,7 +98,7 @@ export const GET = async (
         "customer.email",
       ],
       variables: {
-        filters: { id: pageIds },
+        filters: { id: allOrderIds },
       },
     },
   })
@@ -106,9 +109,12 @@ export const GET = async (
 
   // Filter out any line items that do not belong to this vendor's catalog
   const scopedOrders = orderRows
-    .map((order: any) => {
-      const vendorItems = (order.items || []).filter((item: any) => {
-        const itemProductId = item.product_id || item.variant?.product_id || item.variant?.product?.id
+    .map((rawOrder: any) => {
+      const vendorItems = (rawOrder.items || []).filter((item: any) => {
+        const itemProductId =
+          item.product_id ||
+          item.variant?.product_id ||
+          item.variant?.product?.id
         return itemProductId && vendorProductIds.has(itemProductId)
       })
 
@@ -116,7 +122,7 @@ export const GET = async (
         return null
       }
 
-      // Calculate vendor-specific subtotal (in minor units)
+      // Calculate vendor-specific subtotal
       const vendorSubtotal = vendorItems.reduce((acc: number, item: any) => {
         const unitPrice = Number(item.unit_price) || 0
         const quantity = Number(item.quantity) || 1
@@ -124,16 +130,81 @@ export const GET = async (
       }, 0)
 
       return {
-        ...order,
+        ...rawOrder,
         items: vendorItems,
-        // Scoped financials so the vendor only sees their own sales volume
         subtotal: vendorSubtotal,
         total: vendorSubtotal,
       }
     })
     .filter(Boolean)
 
-  res.json({ orders: scopedOrders, count, limit, offset })
+  // Filter by search query
+  let filtered = scopedOrders
+  if (q) {
+    const lower = q.toLowerCase()
+    filtered = filtered.filter(
+      (o: any) =>
+        o.display_id?.toString().includes(lower) ||
+        o.email?.toLowerCase().includes(lower) ||
+        o.customer?.first_name?.toLowerCase().includes(lower) ||
+        o.customer?.last_name?.toLowerCase().includes(lower) ||
+        o.customer?.email?.toLowerCase().includes(lower)
+    )
+  }
+
+  // Filter by order status
+  if (status && status !== "all") {
+    filtered = filtered.filter((o: any) => o.status === status)
+  }
+
+  // Filter by payment status
+  if (payment_status && payment_status !== "all") {
+    filtered = filtered.filter((o: any) => {
+      const pStatus = o.payment_collections?.[0]?.status ?? "not_paid"
+      return pStatus === payment_status
+    })
+  }
+
+  // Filter by fulfillment status
+  if (fulfillment_status && fulfillment_status !== "all") {
+    filtered = filtered.filter((o: any) => {
+      const fulfillments = o.fulfillments ?? []
+      const fStatus = !fulfillments.length
+        ? "not_fulfilled"
+        : fulfillments.some((f: any) => f.delivered_at)
+          ? "delivered"
+          : fulfillments.some((f: any) => f.shipped_at)
+            ? "shipped"
+            : "fulfilled"
+      return fStatus === fulfillment_status
+    })
+  }
+
+  // Sort orders
+  const sortField = order ? (order.startsWith("-") ? order.slice(1) : order) : "created_at"
+  const isDesc = order ? order.startsWith("-") : true // default created_at DESC
+
+  const sorted = filtered.sort((a: any, b: any) => {
+    let valA = a[sortField]
+    let valB = b[sortField]
+
+    if (sortField === "created_at") {
+      valA = new Date(valA || 0).getTime()
+      valB = new Date(valB || 0).getTime()
+    } else if (sortField === "display_id" || sortField === "total") {
+      valA = Number(valA) || 0
+      valB = Number(valB) || 0
+    }
+
+    if (valA < valB) return isDesc ? 1 : -1
+    if (valA > valB) return isDesc ? -1 : 1
+    return 0
+  })
+
+  const count = sorted.length
+  const paged = sorted.slice(offset, offset + limit)
+
+  res.json({ orders: paged, count, limit, offset })
 }
 
 

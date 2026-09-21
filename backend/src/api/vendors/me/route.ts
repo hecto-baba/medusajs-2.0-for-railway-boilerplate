@@ -32,6 +32,7 @@ export const GET = async (
       "vendor.name",
       "vendor.handle",
       "vendor.logo",
+      "vendor.metadata",
     ],
     filters: { id: [req.auth_context.actor_id] },
   })
@@ -88,6 +89,7 @@ export const PATCH = async (
     last_name?: string | null
     name?: string
     logo?: string | null
+    metadata?: Record<string, unknown> | null
   }
 
   // Each field is applied only when the client actually sent the key, so a
@@ -122,6 +124,9 @@ export const PATCH = async (
   if ("logo" in body) {
     vendorUpdate.logo = body.logo || null
   }
+  if ("metadata" in body) {
+    vendorUpdate.metadata = body.metadata ?? null
+  }
 
   if (Object.keys(vendorUpdate).length && existing.vendor?.id) {
     await marketplace.updateVendors({ id: existing.vendor.id, ...vendorUpdate })
@@ -140,6 +145,7 @@ export const PATCH = async (
       "vendor.name",
       "vendor.handle",
       "vendor.logo",
+      "vendor.metadata",
     ],
     filters: { id: [existing.id] },
   })

@@ -1,6 +1,11 @@
 import { requireVendorSession } from "@lib/data/vendor"
 import { Text } from "@medusajs/ui"
-import { StoreGeneralSection } from "@modules/settings"
+import {
+  StoreGeneralSection,
+  StoreCurrencySection,
+  StoreMetadataSection,
+  StoreJsonDrawer,
+} from "@modules/settings"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Store" }
@@ -21,8 +26,11 @@ export default async function StoreSettingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-y-3 p-6">
+    <div className="flex flex-col gap-y-6 p-6 max-w-5xl">
       <StoreGeneralSection vendor={admin.vendor} />
+      <StoreCurrencySection />
+      <StoreMetadataSection vendor={admin.vendor} />
+      <StoreJsonDrawer data={admin.vendor} />
     </div>
   )
 }

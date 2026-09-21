@@ -1,29 +1,61 @@
 "use client"
 
 import { listVendorRegions, type VendorRegion } from "@lib/data/vendor-client"
-import { Buildings, GlobeEurope, InformationCircleSolid } from "@medusajs/icons"
+import { GlobeEurope, InformationCircleSolid, PlusMini } from "@medusajs/icons"
 import {
   Badge,
+  Button,
   Container,
   createDataTableColumnHelper,
   DataTable,
+  DataTablePaginationState,
+  DataTableSortingState,
   Heading,
+  Select,
   Text,
   useDataTable,
 } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
+import { RegionCreateModal } from "./region-create-modal"
 
 const columnHelper = createDataTableColumnHelper<VendorRegion>()
 
 export const RegionsTable = () => {
-  const { data, isLoading } = useQuery({
-    queryKey: ["vendor-regions"],
-    queryFn: () => listVendorRegions(),
+  const [search, setSearch] = useState("")
+  const [currencyFilter, setCurrencyFilter] = useState("all")
+  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [pagination, setPagination] = useState<DataTablePaginationState>({
+    pageIndex: 0,
+    pageSize: 20,
   })
+
+  const order = sorting
+    ? (sorting.desc ? "-" : "") + sorting.id
+    : undefined
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["vendor-regions", { q: search, currency: currencyFilter, order }],
+    queryFn: () =>
+      listVendorRegions({
+        q: search || undefined,
+        currency_code: currencyFilter !== "all" ? currencyFilter : undefined,
+        order,
+      }),
+  })
+
+  const allRegions = data?.regions ?? []
+
+  // Extract unique currency codes for filtering
+  const availableCurrencies = Array.from(
+    new Set(allRegions.map((r) => r.currency_code.toLowerCase()))
+  )
 
   const columns = [
     columnHelper.accessor("name", {
       header: "Region",
+      enableSorting: true,
       cell: ({ row }) => (
         <div className="flex items-center gap-x-2">
           <GlobeEurope className="text-ui-fg-subtle h-4 w-4" />
@@ -35,6 +67,7 @@ export const RegionsTable = () => {
     }),
     columnHelper.accessor("currency_code", {
       header: "Currency",
+      enableSorting: true,
       cell: ({ row }) => (
         <Badge size="small" color="blue">
           {row.original.currency_code?.toUpperCase()}
@@ -79,10 +112,13 @@ export const RegionsTable = () => {
 
   const table = useDataTable({
     columns,
-    data: data?.regions ?? [],
-    rowCount: data?.regions?.length ?? 0,
+    data: allRegions,
+    rowCount: allRegions.length,
     getRowId: (row) => row.id,
     isLoading,
+    pagination: { state: pagination, onPaginationChange: setPagination },
+    search: { state: search, onSearchChange: setSearch },
+    sorting: { state: sorting, onSortingChange: setSorting },
   })
 
   return (
@@ -95,24 +131,60 @@ export const RegionsTable = () => {
           </Text>
           <Text size="small" className="text-ui-fg-subtle">
             Regions define the markets, currencies, and tax rules where your products can be purchased.
-            These are managed at the platform level and automatically apply to your catalog pricing.
+            These apply across your sales channels and catalog pricing.
           </Text>
         </div>
       </div>
 
       <Container className="p-0">
         <DataTable instance={table}>
-          <DataTable.Toolbar className="flex items-center justify-between gap-x-2 px-6 py-4">
+          <DataTable.Toolbar className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-4">
             <div>
               <Heading level="h2">Regions</Heading>
               <Text size="small" className="text-ui-fg-subtle">
                 Available store regions and supported customer currencies.
               </Text>
             </div>
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <DataTable.Search placeholder="Search regions..." />
+
+              {availableCurrencies.length > 0 && (
+                <div className="w-36">
+                  <Select size="small" value={currencyFilter} onValueChange={setCurrencyFilter}>
+                    <Select.Trigger>
+                      <Select.Value placeholder="Currency" />
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="all">All Currencies</Select.Item>
+                      {availableCurrencies.map((code) => (
+                        <Select.Item key={code} value={code}>
+                          {code.toUpperCase()}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select>
+                </div>
+              )}
+
+              <Button
+                size="small"
+                variant="secondary"
+                onClick={() => setIsCreateOpen(true)}
+                className="shrink-0"
+              >
+                <PlusMini /> Create Region
+              </Button>
+            </div>
           </DataTable.Toolbar>
           <DataTable.Table />
+          <DataTable.Pagination />
         </DataTable>
       </Container>
+
+      <RegionCreateModal
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+      />
     </div>
   )
 }

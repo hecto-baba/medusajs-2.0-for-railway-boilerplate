@@ -22,6 +22,31 @@ export const GetVendorProductsSchema = z.object({
     .transform((value) =>
       value === undefined ? undefined : Array.isArray(value) ? value : [value]
     ),
+  collection_id: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((val) =>
+      val === undefined ? undefined : Array.isArray(val) ? val : [val]
+    ),
+  type_id: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((val) =>
+      val === undefined ? undefined : Array.isArray(val) ? val : [val]
+    ),
+  tag_id: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((val) =>
+      val === undefined ? undefined : Array.isArray(val) ? val : [val]
+    ),
+  sales_channel_id: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((val) =>
+      val === undefined ? undefined : Array.isArray(val) ? val : [val]
+    ),
+  created_at_gte: z.string().optional(),
   order: z.string().optional(),
 })
 
@@ -169,9 +194,18 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, status, order } = req.validatedQuery as unknown as z.infer<
-    typeof GetVendorProductsSchema
-  >
+  const {
+    limit,
+    offset,
+    q,
+    status,
+    collection_id,
+    type_id,
+    tag_id,
+    sales_channel_id,
+    created_at_gte,
+    order,
+  } = req.validatedQuery as unknown as z.infer<typeof GetVendorProductsSchema>
 
   const {
     data: [vendorAdmin],
@@ -192,6 +226,21 @@ export const GET = async (
     return
   }
 
+  const filters: Record<string, any> = {
+    id: productIds,
+    ...(q ? { title: { $ilike: `%${q}%` } } : {}),
+    ...(status?.length ? { status } : {}),
+    ...(collection_id?.length ? { collection_id } : {}),
+    ...(type_id?.length ? { type_id } : {}),
+    ...(tag_id?.length ? { tags: { id: tag_id } } : {}),
+    ...(sales_channel_id?.length
+      ? { sales_channels: { id: sales_channel_id } }
+      : {}),
+    ...(created_at_gte
+      ? { created_at: { $gte: new Date(created_at_gte) } }
+      : {}),
+  }
+
   const { data: products, metadata } = await query.graph({
     entity: "product",
     fields: [
@@ -204,16 +253,17 @@ export const GET = async (
       "updated_at",
       "collection.id",
       "collection.title",
+      "type.id",
+      "type.value",
+      "tags.id",
+      "tags.value",
       "sales_channels.id",
       "sales_channels.name",
       "variants.id",
       "variants.title",
+      "variants.sku",
     ],
-    filters: {
-      id: productIds,
-      ...(q ? { title: { $ilike: `%${q}%` } } : {}),
-      ...(status?.length ? { status } : {}),
-    },
+    filters,
     pagination: {
       skip: offset,
       take: limit,

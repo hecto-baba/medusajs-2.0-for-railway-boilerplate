@@ -9,7 +9,9 @@ import {
   Button,
   Container,
   createDataTableColumnHelper,
+  createDataTableFilterHelper,
   DataTable,
+  DataTableFilteringState,
   DataTablePaginationState,
   DataTableSortingState,
   Heading,
@@ -28,6 +30,18 @@ import { CreateGroupModal } from "./create-group-modal"
 import { GroupDrawer } from "./group-drawer"
 
 const columnHelper = createDataTableColumnHelper<VendorCustomerGroup>()
+const filterHelper = createDataTableFilterHelper<VendorCustomerGroup>()
+
+const extractFilterVal = (val: any): string | undefined => {
+  if (!val) return undefined
+  if (typeof val === "string") return val
+  if (Array.isArray(val)) return val[0]
+  if (typeof val === "object") {
+    const flat = Object.values(val).flat()
+    return (flat[0] as string) || undefined
+  }
+  return undefined
+}
 
 export const CustomerGroupsTable = () => {
   const queryClient = useQueryClient()
@@ -38,6 +52,7 @@ export const CustomerGroupsTable = () => {
     pageIndex: 0,
     pageSize: 20,
   })
+  const [filtering, setFiltering] = useState<DataTableFilteringState>({})
   const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
   const [search, setSearch] = useState<string>("")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -49,13 +64,40 @@ export const CustomerGroupsTable = () => {
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
+  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
+  const createdAtGte = useMemo(() => {
+    if (!dateFilterVal) return undefined
+    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [dateFilterVal])
+
+  const filters = useMemo(
+    () => [
+      filterHelper.custom({
+        id: "created_at_gte",
+        label: "Date Created",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      }),
+    ],
+    []
+  )
+
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-customer-groups", { limit, offset, q: search, order }],
+    queryKey: [
+      "vendor-customer-groups",
+      { limit, offset, q: search, created_at_gte: createdAtGte, order },
+    ],
     queryFn: () =>
       listVendorCustomerGroups({
         limit,
         offset,
         q: search || undefined,
+        created_at_gte: createdAtGte,
         order,
       }),
   })
@@ -163,6 +205,7 @@ export const CustomerGroupsTable = () => {
     rowCount: count,
     getRowId: (row) => row.id,
     isLoading,
+    filters,
     pagination: {
       state: pagination,
       onPaginationChange: setPagination,
@@ -170,6 +213,10 @@ export const CustomerGroupsTable = () => {
     search: {
       state: search,
       onSearchChange: setSearch,
+    },
+    filtering: {
+      state: filtering,
+      onFilteringChange: setFiltering,
     },
     sorting: {
       state: sorting,
@@ -194,8 +241,13 @@ export const CustomerGroupsTable = () => {
       {/* Data Table */}
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between">
-          <DataTable.Search placeholder="Search" />
+          <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search" />
+            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTable.SortingMenu tooltip="Sort" />
+          </div>
         </DataTable.Toolbar>
+        <DataTable.FilterBar />
         <DataTable.Table
           emptyState={{
             empty: {

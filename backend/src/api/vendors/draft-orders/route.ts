@@ -12,6 +12,8 @@ export const GetVendorDraftOrdersSchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   q: z.string().optional(),
   order: z.string().optional(),
+  created_at_gte: z.string().optional(),
+  currency_code: z.string().optional(),
 })
 
 export const CreateVendorDraftOrderSchema = z.object({
@@ -102,11 +104,9 @@ export const POST = async (
       vendor_admin_id: req.auth_context.actor_id,
       order: {
         ...input,
-        currency_code: currencyCode || "eur",
+        currency_code: currencyCode || "usd",
         region_id: regionId,
         sales_channel_id: salesChannelId,
-        status: "draft" as any,
-        is_draft_order: true,
       } as any,
     },
   })
@@ -119,9 +119,8 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q } = req.validatedQuery as unknown as z.infer<
-    typeof GetVendorDraftOrdersSchema
-  >
+  const { limit, offset, q, order, created_at_gte, currency_code } =
+    req.validatedQuery as unknown as z.infer<typeof GetVendorDraftOrdersSchema>
 
   const {
     data: [vendorAdmin],
@@ -192,11 +191,46 @@ export const GET = async (
     )
   }
 
-  // Sort and slice for pagination
-  const sorted = filtered.sort(
-    (a: any, b: any) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  )
+  // Filter by created_at_gte
+  if (created_at_gte) {
+    const gteTime = new Date(created_at_gte).getTime()
+    filtered = filtered.filter(
+      (o: any) => new Date(o.created_at).getTime() >= gteTime
+    )
+  }
+
+  // Filter by currency_code
+  if (currency_code && currency_code !== "all") {
+    filtered = filtered.filter(
+      (o: any) =>
+        o.currency_code?.toLowerCase() === currency_code.toLowerCase()
+    )
+  }
+
+  // Dynamic sorting
+  const sortField = order
+    ? order.startsWith("-")
+      ? order.slice(1)
+      : order
+    : "created_at"
+  const isDesc = order ? order.startsWith("-") : true
+
+  const sorted = filtered.sort((a: any, b: any) => {
+    let valA = a[sortField]
+    let valB = b[sortField]
+
+    if (sortField === "created_at") {
+      valA = new Date(valA || 0).getTime()
+      valB = new Date(valB || 0).getTime()
+    } else if (sortField === "display_id" || sortField === "total") {
+      valA = Number(valA) || 0
+      valB = Number(valB) || 0
+    }
+
+    if (valA < valB) return isDesc ? 1 : -1
+    if (valA > valB) return isDesc ? -1 : 1
+    return 0
+  })
 
   const count = sorted.length
   const paged = sorted.slice(offset, offset + limit)

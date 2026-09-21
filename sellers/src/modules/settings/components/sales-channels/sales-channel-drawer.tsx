@@ -37,17 +37,17 @@ export const SalesChannelDrawer = ({
 
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
-  const [isDisabled, setIsDisabled] = useState(false)
+  const [isEnabled, setIsEnabled] = useState(true)
 
   useEffect(() => {
     if (salesChannel) {
       setName(salesChannel.name || "")
       setDescription(salesChannel.description || "")
-      setIsDisabled(!!salesChannel.is_disabled)
+      setIsEnabled(!salesChannel.is_disabled)
     } else {
       setName("")
       setDescription("")
-      setIsDisabled(false)
+      setIsEnabled(true)
     }
   }, [salesChannel, open])
 
@@ -57,13 +57,13 @@ export const SalesChannelDrawer = ({
         return updateVendorSalesChannel(salesChannel!.id, {
           name: name.trim(),
           description: description.trim() || undefined,
-          is_disabled: isDisabled,
+          is_disabled: !isEnabled,
         })
       } else {
         return createVendorSalesChannel({
           name: name.trim(),
           description: description.trim() || undefined,
-          is_disabled: isDisabled,
+          is_disabled: !isEnabled,
         })
       }
     },
@@ -141,15 +141,15 @@ export const SalesChannelDrawer = ({
             <div className="flex items-center justify-between rounded-lg border p-4 bg-ui-bg-subtle">
               <div className="flex flex-col gap-y-0.5 pr-4">
                 <Label size="small" weight="plus">
-                  Disabled
+                  Enabled
                 </Label>
                 <Text size="xsmall" className="text-ui-fg-subtle">
-                  Disabled channels won&apos;t process orders or publish products.
+                  Active sales channels can process orders and publish products.
                 </Text>
               </div>
               <Switch
-                checked={isDisabled}
-                onCheckedChange={setIsDisabled}
+                checked={isEnabled}
+                onCheckedChange={setIsEnabled}
               />
             </div>
           </Drawer.Body>

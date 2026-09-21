@@ -40,14 +40,20 @@ const formatDate = (dateString?: string | null) => {
 
 const formatBudget = (campaign: VendorCampaign) => {
   if (!campaign.budget) return "—"
-  const { type, limit, currency_code } = campaign.budget
+  const { type, limit, currency_code, attribute } = campaign.budget
   if (limit === null || limit === undefined) {
     return type === "spend" ? "Spend (No limit)" : "Usage (No limit)"
   }
   if (type === "spend") {
     return `${limit} ${currency_code?.toUpperCase() ?? ""}`.trim()
   }
-  return `${limit} uses`
+  const scope =
+    attribute === "customer_id"
+      ? " per customer"
+      : attribute === "customer_email"
+        ? " per email"
+        : ""
+  return `${limit} uses${scope}`
 }
 
 const useColumns = (onDelete: (campaign: VendorCampaign) => void) => [
@@ -166,14 +172,16 @@ export const CampaignsTable = () => {
 
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
+  const order = sorting ? (sorting.desc ? "-" : "") + sorting.id : undefined
 
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-campaigns", limit, offset, search],
+    queryKey: ["vendor-campaigns", limit, offset, search, order],
     queryFn: () =>
       listVendorCampaigns({
         limit,
         offset,
         q: search || undefined,
+        order,
       }),
     placeholderData: (previous) => previous,
   })
@@ -265,7 +273,10 @@ export const CampaignsTable = () => {
     },
     sorting: {
       state: sorting,
-      onSortingChange: setSorting,
+      onSortingChange: (value) => {
+        setSorting(value)
+        setPagination((state) => ({ ...state, pageIndex: 0 }))
+      },
     },
     pagination: {
       state: pagination,

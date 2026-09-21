@@ -36,6 +36,9 @@ export const CampaignForm = () => {
   const [endsAt, setEndsAt] = useState("")
   const [budgetType, setBudgetType] = useState<"usage" | "spend">("usage")
   const [budgetLimit, setBudgetLimit] = useState("")
+  const [budgetAttribute, setBudgetAttribute] = useState<
+    "" | "customer_id" | "customer_email"
+  >("")
   const [currencyCode, setCurrencyCode] = useState("usd")
 
   const { mutateAsync: createCampaign, isPending } = useMutation({
@@ -81,11 +84,15 @@ export const CampaignForm = () => {
         type: budgetType,
         limit: limitNum,
         currency_code: budgetType === "spend" ? currencyCode : undefined,
+        attribute:
+          budgetType === "usage" ? budgetAttribute || undefined : undefined,
       }
     } else {
       payload.budget = {
         type: budgetType,
         currency_code: budgetType === "spend" ? currencyCode : undefined,
+        attribute:
+          budgetType === "usage" ? budgetAttribute || undefined : undefined,
       }
     }
 
@@ -219,7 +226,13 @@ export const CampaignForm = () => {
           </Label>
           <RadioGroup
             value={budgetType}
-            onValueChange={(val: string) => setBudgetType(val as "usage" | "spend")}
+            onValueChange={(val: string) => {
+              const next = val as "usage" | "spend"
+              setBudgetType(next)
+              if (next === "spend") {
+                setBudgetAttribute("")
+              }
+            }}
             className="flex flex-col gap-y-2.5"
           >
             <div className="flex items-start gap-x-3 p-3 rounded-lg border border-ui-border-base bg-ui-bg-subtle hover:bg-ui-bg-base cursor-pointer transition">
@@ -247,6 +260,39 @@ export const CampaignForm = () => {
             </div>
           </RadioGroup>
         </div>
+
+        {budgetType === "usage" && (
+          <div className="space-y-1.5">
+            <Label htmlFor="budget-attribute" size="small" weight="plus">
+              Limit usage per
+            </Label>
+            <Select
+              value={budgetAttribute || "total"}
+              onValueChange={(value) =>
+                setBudgetAttribute(
+                  value === "total"
+                    ? ""
+                    : (value as "customer_id" | "customer_email")
+                )
+              }
+            >
+              <Select.Trigger id="budget-attribute">
+                <Select.Value />
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value="total">
+                  Total uses (across all customers)
+                </Select.Item>
+                <Select.Item value="customer_id">Per customer</Select.Item>
+                <Select.Item value="customer_email">Per email</Select.Item>
+              </Select.Content>
+            </Select>
+            <Text size="small" className="text-ui-fg-subtle">
+              Total counts every redemption. Per customer and per email count
+              separately for each person.
+            </Text>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
           <div className="space-y-1.5">

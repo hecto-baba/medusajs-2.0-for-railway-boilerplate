@@ -46,10 +46,25 @@ class OnboardingStore {
   }
 
   private getDatabaseUrl(): string | undefined {
+    if (!process.env.DATABASE_URL) {
+      try {
+        const envPath = path.resolve(process.cwd(), ".env")
+        if (fs.existsSync(envPath)) {
+          const content = fs.readFileSync(envPath, "utf-8")
+          const match = content.match(/^DATABASE_URL=(.*)$/m)
+          if (match && match[1]) {
+            process.env.DATABASE_URL = match[1].trim()
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
     return process.env.DATABASE_URL
   }
 
   private initDatabase() {
+    if (this.pool) return
     const dbUrl = this.getDatabaseUrl()
     if (!dbUrl) return
 
@@ -86,13 +101,16 @@ class OnboardingStore {
 
       // 2. Load all records from database into memory
       const { rows } = await this.pool.query(`
-        SELECT vendor_id, data FROM vendor_onboarding_application;
+        SELECT vendor_id, status, data FROM vendor_onboarding_application;
       `)
 
       for (const row of rows) {
         if (row.vendor_id && row.data) {
           const rec = row.data as VendorApplicationRecord
           rec.vendorId = row.vendor_id
+          if (row.status) {
+            rec.status = row.status as OnboardingStatus
+          }
           this.records.set(row.vendor_id, rec)
         }
       }
@@ -105,6 +123,9 @@ class OnboardingStore {
           await this.persistToDb(record).catch(() => {})
         }
       }
+
+      // 4. Update file cache with database authoritative state
+      this.persistToFile()
 
       this.dbReady = true
       this.initialized = true
@@ -173,9 +194,37 @@ class OnboardingStore {
   }
 
   public async ensureLoaded(): Promise<void> {
+    if (!this.pool) {
+      this.initDatabase()
+    }
     if (this.initPromise) {
       await this.initPromise
     }
+  }
+
+  public async getAsync(vendorId: string): Promise<VendorApplicationRecord> {
+    await this.ensureLoaded()
+    if (this.pool) {
+      try {
+        const { rows } = await this.pool.query(
+          `SELECT vendor_id, status, data FROM vendor_onboarding_application WHERE vendor_id = $1`,
+          [vendorId]
+        )
+        if (rows.length > 0 && rows[0].data) {
+          const rec = rows[0].data as VendorApplicationRecord
+          rec.vendorId = rows[0].vendor_id
+          if (rows[0].status) {
+            rec.status = rows[0].status as OnboardingStatus
+          }
+          this.records.set(vendorId, rec)
+          this.persistToFile()
+          return rec
+        }
+      } catch (err) {
+        console.warn(`[OnboardingStore] Failed direct DB fetch for ${vendorId}:`, err)
+      }
+    }
+    return this.get(vendorId)
   }
 
   public get(vendorId: string): VendorApplicationRecord {

@@ -33,7 +33,7 @@ export const GET = async (
   if (!effectiveVendorCategoryId && !effectiveVendorCategoryCode) {
     try {
       const vendorId = await getVendorId(req)
-      const localRecord = onboardingStore.get(vendorId)
+      const localRecord = await onboardingStore.getAsync(vendorId)
       if (localRecord?.vendorCategory?.code) {
         effectiveVendorCategoryCode = localRecord.vendorCategory.code
       } else if (localRecord?.vendorCategoryId) {

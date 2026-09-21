@@ -13,6 +13,7 @@ import {
   createDataTableColumnHelper,
   DataTable,
   DataTablePaginationState,
+  DataTableSortingState,
   Heading,
   Text,
   toast,
@@ -30,6 +31,8 @@ export const TeamTable = () => {
   const queryClient = useQueryClient()
   const prompt = usePrompt()
 
+  const [search, setSearch] = useState("")
+  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -41,9 +44,13 @@ export const TeamTable = () => {
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
 
+  const order = sorting
+    ? (sorting.desc ? "-" : "") + sorting.id
+    : undefined
+
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-team", limit, offset],
-    queryFn: () => listVendorTeam({ limit, offset }),
+    queryKey: ["vendor-team", { limit, offset, q: search, order }],
+    queryFn: () => listVendorTeam({ limit, offset, q: search || undefined, order }),
     placeholderData: (previous) => previous,
   })
 
@@ -85,6 +92,7 @@ export const TeamTable = () => {
   const columns = [
     columnHelper.accessor("first_name", {
       header: "Member",
+      enableSorting: true,
       cell: ({ row }) => {
         const member = row.original
         const name =
@@ -113,6 +121,7 @@ export const TeamTable = () => {
     }),
     columnHelper.accessor("email", {
       header: "Email",
+      enableSorting: true,
       cell: ({ row }) => (
         <Text size="small" className="text-ui-fg-subtle">
           {row.original.email}
@@ -121,6 +130,7 @@ export const TeamTable = () => {
     }),
     columnHelper.accessor("created_at", {
       header: "Joined",
+      enableSorting: true,
       cell: ({ row }) => {
         const date = row.original.created_at
           ? new Date(row.original.created_at).toLocaleDateString(undefined, {
@@ -162,26 +172,32 @@ export const TeamTable = () => {
     getRowId: (row) => row.id,
     isLoading,
     pagination: { state: pagination, onPaginationChange: setPagination },
+    search: { state: search, onSearchChange: setSearch },
+    sorting: { state: sorting, onSortingChange: setSorting },
   })
 
   return (
     <Container className="p-0">
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between gap-x-2 px-6 py-4">
+        <DataTable.Toolbar className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-4">
           <div>
             <Heading level="h2">Team Members</Heading>
             <Text size="small" className="text-ui-fg-subtle">
               Manage your store administrators and team members.
             </Text>
           </div>
-          <Button
-            size="small"
-            variant="secondary"
-            onClick={() => setInviteOpen(true)}
-          >
-            <PlusMini />
-            Invite Member
-          </Button>
+          <div className="flex items-center gap-x-2 w-full sm:w-auto">
+            <DataTable.Search placeholder="Search members by name or email..." />
+            <Button
+              size="small"
+              variant="secondary"
+              onClick={() => setInviteOpen(true)}
+              className="shrink-0"
+            >
+              <PlusMini />
+              Invite Member
+            </Button>
+          </div>
         </DataTable.Toolbar>
         <DataTable.Table />
         <DataTable.Pagination />
