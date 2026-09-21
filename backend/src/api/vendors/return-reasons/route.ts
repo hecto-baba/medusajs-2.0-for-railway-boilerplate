@@ -11,6 +11,8 @@ import { createVendorReturnReasonWorkflow } from "../../../workflows/create-vend
 export const GetVendorReturnReasonsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
+  q: z.string().optional(),
+  order: z.string().optional(),
 })
 
 /**
@@ -25,7 +27,7 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  const { limit, offset } = req.validatedQuery as unknown as z.infer<
+  const { limit, offset, q, order } = req.validatedQuery as unknown as z.infer<
     typeof GetVendorReturnReasonsSchema
   >
 
@@ -38,14 +40,34 @@ export const GET = async (
 
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
+  const filters: Record<string, any> = { id: ownedIds }
+  if (q) {
+    filters.$or = [
+      { label: { $ilike: `%${q}%` } },
+      { value: { $ilike: `%${q}%` } },
+      { description: { $ilike: `%${q}%` } },
+    ]
+  }
+
+  let orderConfig: Record<string, "ASC" | "DESC"> | undefined
+  if (order) {
+    const isDesc = order.startsWith("-")
+    const field = isDesc ? order.slice(1) : order
+    orderConfig = { [field]: isDesc ? "DESC" : "ASC" }
+  }
+
   const {
     data: return_reasons,
     metadata: { count } = { count: 0 },
   } = await query.graph({
     entity: "return_reason",
     fields: ["id", "value", "label", "description", "created_at", "updated_at"],
-    filters: { id: ownedIds },
-    pagination: { skip: offset, take: limit },
+    filters,
+    pagination: {
+      skip: offset,
+      take: limit,
+      ...(orderConfig ? { order: orderConfig } : {}),
+    },
   })
 
   res.json({ return_reasons, count, limit, offset })

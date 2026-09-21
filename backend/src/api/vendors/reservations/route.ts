@@ -16,6 +16,7 @@ export const GetVendorReservationsSchema = z.object({
   q: z.string().optional(),
   inventory_item_id: z.union([z.string(), z.array(z.string())]).optional(),
   location_id: z.union([z.string(), z.array(z.string())]).optional(),
+  created_at_gte: z.string().optional(),
   order: z.string().optional(),
 })
 
@@ -33,7 +34,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, inventory_item_id, location_id, order } = (
+  const { limit, offset, q, inventory_item_id, location_id, created_at_gte, order } = (
     req.validatedQuery ?? {}
   ) as z.infer<typeof GetVendorReservationsSchema>
 
@@ -74,6 +75,10 @@ export const GET = async (
     filters.location_id = Array.isArray(location_id) ? location_id : [location_id]
   }
 
+  if (created_at_gte) {
+    filters.created_at = { $gte: created_at_gte }
+  }
+
   if (q && q.trim()) {
     const searchTerm = q.trim()
     const { data: matchingItems } = await query.graph({
@@ -100,9 +105,12 @@ export const GET = async (
     }
   }
 
-  const orderConfig = order
-    ? { [order.replace(/^-/, "")]: order.startsWith("-") ? "DESC" : "ASC" }
-    : { created_at: "DESC" }
+  const sortField = order ? order.replace(/^-/, "") : "created_at"
+  const isDesc = order ? order.startsWith("-") : true
+  let orderConfig: any = { created_at: "DESC" }
+  if (sortField === "quantity" || sortField === "created_at" || sortField === "description") {
+    orderConfig = { [sortField]: isDesc ? "DESC" : "ASC" }
+  }
 
   const { data: reservations, metadata } = await query.graph({
     entity: "reservation",

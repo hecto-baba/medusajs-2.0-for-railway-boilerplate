@@ -3,16 +3,60 @@
 import { listVendorOrders, type VendorOrder } from "@lib/data/vendor-client"
 import {
   createDataTableColumnHelper,
+  createDataTableFilterHelper,
   DataTable,
+  DataTableFilteringState,
   DataTablePaginationState,
+  DataTableSortingState,
   Heading,
   StatusBadge,
   useDataTable,
 } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
+import { OrderExportButton } from "./order-export-button"
 
 const columnHelper = createDataTableColumnHelper<VendorOrder>()
+const filterHelper = createDataTableFilterHelper<VendorOrder>()
+
+const filters = [
+  filterHelper.accessor("status", {
+    label: "Status",
+    type: "select",
+    options: [
+      { label: "Pending", value: "pending" },
+      { label: "Completed", value: "completed" },
+      { label: "Canceled", value: "canceled" },
+      { label: "Requires Action", value: "requires_action" },
+    ],
+  }),
+  filterHelper.custom({
+    id: "payment_status",
+    label: "Payment Status",
+    type: "select",
+    options: [
+      { label: "Captured", value: "captured" },
+      { label: "Completed", value: "completed" },
+      { label: "Authorized", value: "authorized" },
+      { label: "Not Paid", value: "not_paid" },
+      { label: "Partially Refunded", value: "partially_refunded" },
+      { label: "Refunded", value: "refunded" },
+    ],
+  }),
+  filterHelper.custom({
+    id: "fulfillment_status",
+    label: "Fulfillment Status",
+    type: "select",
+    options: [
+      { label: "Not Fulfilled", value: "not_fulfilled" },
+      { label: "Partially Fulfilled", value: "partially_fulfilled" },
+      { label: "Fulfilled", value: "fulfilled" },
+      { label: "Shipped", value: "shipped" },
+      { label: "Delivered", value: "delivered" },
+      { label: "Canceled", value: "canceled" },
+    ],
+  }),
+]
 
 /**
  * Amounts arrive as major units already (450 means €450.00), so this only
@@ -21,7 +65,7 @@ const columnHelper = createDataTableColumnHelper<VendorOrder>()
 const formatAmount = (amount: number, currency: string) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: currency.toUpperCase(),
+    currency: (currency || "usd").toUpperCase(),
   }).format(amount ?? 0)
 
 const paymentBadge = (order: VendorOrder) => {
@@ -61,11 +105,21 @@ const fulfillmentBadge = (order: VendorOrder) => {
 
 const columns = [
   columnHelper.accessor("display_id", {
+    id: "display_id",
     header: "Order",
+    enableSorting: true,
+    sortLabel: "Order #",
+    sortAscLabel: "Ascending",
+    sortDescLabel: "Descending",
     cell: ({ getValue }) => `#${getValue()}`,
   }),
   columnHelper.accessor("created_at", {
+    id: "created_at",
     header: "Date",
+    enableSorting: true,
+    sortLabel: "Date",
+    sortAscLabel: "Oldest first",
+    sortDescLabel: "Newest first",
     cell: ({ getValue }) =>
       new Date(getValue()).toLocaleDateString("en-US", {
         month: "short",
@@ -93,15 +147,33 @@ const columns = [
     header: "Fulfillment",
     cell: ({ row }) => fulfillmentBadge(row.original),
   }),
-  columnHelper.display({
+  columnHelper.accessor("total", {
     id: "total",
     header: "Order Total",
+    enableSorting: true,
+    sortLabel: "Total",
+    sortAscLabel: "Lowest first",
+    sortDescLabel: "Highest first",
     cell: ({ row }) =>
       formatAmount(row.original.total, row.original.currency_code),
   }),
 ]
 
+const extractFilterValue = (val: any): string | undefined => {
+  if (!val) return undefined
+  if (typeof val === "string") return val
+  if (Array.isArray(val)) return val[0]
+  if (typeof val === "object") {
+    const flat = Object.values(val).flat()
+    return (flat[0] as string) || undefined
+  }
+  return undefined
+}
+
 export const OrdersTable = () => {
+  const [search, setSearch] = useState("")
+  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [filtering, setFiltering] = useState<DataTableFilteringState>({})
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -110,9 +182,35 @@ export const OrdersTable = () => {
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
 
+  const order = sorting
+    ? (sorting.desc ? "-" : "") + sorting.id
+    : undefined
+
+  const status = extractFilterValue(filtering.status)
+  const paymentStatus = extractFilterValue(filtering.payment_status)
+  const fulfillmentStatus = extractFilterValue(filtering.fulfillment_status)
+
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-orders", limit, offset],
-    queryFn: () => listVendorOrders({ limit, offset }),
+    queryKey: [
+      "vendor-orders",
+      limit,
+      offset,
+      search,
+      order,
+      status,
+      paymentStatus,
+      fulfillmentStatus,
+    ],
+    queryFn: () =>
+      listVendorOrders({
+        limit,
+        offset,
+        q: search || undefined,
+        order,
+        status,
+        payment_status: paymentStatus,
+        fulfillment_status: fulfillmentStatus,
+      }),
     // Without this the table empties on every page change and the row area
     // collapses, which reads as a flash of "no results" mid-navigation.
     placeholderData: (previous) => previous,
@@ -124,6 +222,25 @@ export const OrdersTable = () => {
     getRowId: (order) => order.id,
     rowCount: data?.count ?? 0,
     isLoading,
+    search: {
+      state: search,
+      onSearchChange: (value) => {
+        setSearch(value)
+        setPagination((state) => ({ ...state, pageIndex: 0 }))
+      },
+    },
+    sorting: {
+      state: sorting,
+      onSortingChange: setSorting,
+    },
+    filtering: {
+      state: filtering,
+      onFilteringChange: (value) => {
+        setFiltering(value)
+        setPagination((state) => ({ ...state, pageIndex: 0 }))
+      },
+    },
+    filters,
     pagination: {
       state: pagination,
       onPaginationChange: setPagination,
@@ -134,12 +251,29 @@ export const OrdersTable = () => {
     <DataTable instance={table}>
       <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
         <Heading level="h2">Orders</Heading>
+        <div className="flex items-center gap-x-2">
+          <DataTable.Search placeholder="Search orders..." />
+          <DataTable.FilterMenu tooltip="Filter" />
+          <DataTable.SortingMenu tooltip="Sort" />
+          <OrderExportButton
+            search={search}
+            status={status}
+            paymentStatus={paymentStatus}
+            fulfillmentStatus={fulfillmentStatus}
+            order={order}
+          />
+        </div>
       </DataTable.Toolbar>
+      <DataTable.FilterBar />
       <DataTable.Table
         emptyState={{
           empty: {
             heading: "No orders yet",
             description: "Orders containing your products will appear here.",
+          },
+          filtered: {
+            heading: "No matches",
+            description: "No orders match the selected filters or search query.",
           },
         }}
       />
@@ -147,3 +281,4 @@ export const OrdersTable = () => {
     </DataTable>
   )
 }
+

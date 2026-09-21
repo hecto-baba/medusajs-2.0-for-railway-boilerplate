@@ -86,6 +86,7 @@ import {
   GetVendorTeamSchema,
   InviteVendorMemberSchema,
 } from "./vendors/team/route";
+import { CreateVendorInviteSchema } from "./vendors/team/invites/route";
 import { UpdateVendorMemberSchema } from "./vendors/team/[id]/route";
 import {
   GetVendorStockLocationsSchema,
@@ -108,12 +109,22 @@ import {
   GetVendorProductTagsSchema,
   CreateVendorProductTagSchema,
 } from "./vendors/product-tags/route";
+import {
+  GetVendorRegionsSchema,
+  CreateVendorRegionSchema,
+} from "./vendors/regions/route";
+import {
+  GetVendorTaxRegionsSchema,
+  CreateVendorTaxRegionSchema,
+} from "./vendors/tax-regions/route";
+import { UpdateVendorTaxRateSchema } from "./vendors/tax-regions/[id]/route";
 import { UpdateVendorProductTagSchema } from "./vendors/product-tags/[id]/route";
 import {
   GetVendorApiKeysSchema,
   CreateVendorApiKeySchema,
 } from "./vendors/api-keys/route";
 import { UpdateVendorApiKeySchema } from "./vendors/api-keys/[id]/route";
+import { GetVendorWorkflowExecutionsSchema } from "./vendors/workflow-executions/route";
 import {
   AdminCreateReturnReason,
   AdminUpdateReturnReason
@@ -643,6 +654,15 @@ export default defineMiddlewares({
       ]
     },
     {
+      matcher: "/vendors/promotions/:id/rules/batch",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(
+          createBatchBody(AdminCreatePromotionRule, AdminUpdatePromotionRule)
+        )
+      ]
+    },
+    {
       matcher: "/vendors/promotions/:id/target-rules/batch",
       methods: ["POST"],
       middlewares: [
@@ -1099,6 +1119,13 @@ export default defineMiddlewares({
       ]
     },
     {
+      matcher: "/vendors/team/invites",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorInviteSchema)
+      ]
+    },
+    {
       matcher: "/vendors/team/:id",
       methods: ["POST"],
       middlewares: [
@@ -1258,6 +1285,48 @@ export default defineMiddlewares({
       matcher: "/vendors/api-keys/:id/*",
       middlewares: [
         authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/workflow-executions",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorWorkflowExecutionsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/regions",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorRegionsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/regions",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorRegionSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/tax-regions",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorTaxRegionsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/tax-regions",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorTaxRegionSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/tax-regions/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorTaxRateSchema)
       ]
     },
     {

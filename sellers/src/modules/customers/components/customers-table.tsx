@@ -42,6 +42,17 @@ const filterHelper = createDataTableFilterHelper<VendorCustomer>()
 
 const PAGE_SIZE = 20
 
+const extractFilterVal = (val: any): string | undefined => {
+  if (!val) return undefined
+  if (typeof val === "string") return val
+  if (Array.isArray(val)) return val[0]
+  if (typeof val === "object") {
+    const flat = Object.values(val).flat()
+    return (flat[0] as string) || undefined
+  }
+  return undefined
+}
+
 export const CustomersTable = () => {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -64,7 +75,16 @@ export const CustomersTable = () => {
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
 
-  const accountFilter = filtering.has_account as boolean | undefined
+  const rawAccount = extractFilterVal(filtering.has_account)
+  const accountFilter =
+    rawAccount === "true" ? true : rawAccount === "false" ? false : undefined
+
+  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
+  const createdAtGte = useMemo(() => {
+    if (!dateFilterVal) return undefined
+    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [dateFilterVal])
 
   const order = sorting
     ? (sorting.desc ? "-" : "") + sorting.id
@@ -73,7 +93,7 @@ export const CustomersTable = () => {
   const { data, isLoading } = useQuery({
     queryKey: [
       "vendor-customers",
-      { limit, offset, q: search, has_account: accountFilter, order },
+      { limit, offset, q: search, has_account: accountFilter, created_at_gte: createdAtGte, order },
     ],
     queryFn: () =>
       listVendorCustomers({
@@ -81,6 +101,7 @@ export const CustomersTable = () => {
         offset,
         q: search || undefined,
         has_account: accountFilter,
+        created_at_gte: createdAtGte,
         order,
       }),
   })
@@ -126,6 +147,16 @@ export const CustomersTable = () => {
         options: [
           { label: "Registered", value: "true" },
           { label: "Guest", value: "false" },
+        ],
+      }),
+      filterHelper.custom({
+        id: "created_at_gte",
+        label: "Date Created",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
         ],
       }),
     ],
@@ -243,9 +274,11 @@ export const CustomersTable = () => {
         <DataTable.Toolbar className="flex items-center justify-between">
           <div className="flex items-center gap-x-2">
             <DataTable.Search placeholder="Search" />
-            <DataTable.FilterMenu />
+            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTable.SortingMenu tooltip="Sort" />
           </div>
         </DataTable.Toolbar>
+        <DataTable.FilterBar />
         <DataTable.Table
           emptyState={{
             empty: {

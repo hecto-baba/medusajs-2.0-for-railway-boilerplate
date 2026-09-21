@@ -38,6 +38,7 @@ const SECTIONS = [
     heading: "Developer",
     items: [
       { href: "/settings/api-keys", label: "API Key Management" },
+      { href: "/settings/workflows", label: "Workflows" },
     ],
   },
   {

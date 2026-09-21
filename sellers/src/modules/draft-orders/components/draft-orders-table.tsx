@@ -10,7 +10,9 @@ import {
   Badge,
   Button,
   createDataTableColumnHelper,
+  createDataTableFilterHelper,
   DataTable,
+  DataTableFilteringState,
   DataTablePaginationState,
   DataTableSortingState,
   Heading,
@@ -29,6 +31,44 @@ import { ActionMenu, PlaceholderCell } from "@modules/common"
 import { DraftOrderModal } from "./forms/draft-order-modal"
 
 const columnHelper = createDataTableColumnHelper<VendorDraftOrder>()
+const filterHelper = createDataTableFilterHelper<VendorDraftOrder>()
+
+const filters = [
+  filterHelper.custom({
+    id: "created_at_gte",
+    label: "Date Created",
+    type: "select",
+    options: [
+      { label: "Last 7 days", value: "7d" },
+      { label: "Last 30 days", value: "30d" },
+      { label: "Last 90 days", value: "90d" },
+    ],
+  }),
+  filterHelper.custom({
+    id: "currency_code",
+    label: "Currency",
+    type: "select",
+    options: [
+      { label: "USD ($)", value: "usd" },
+      { label: "EUR (€)", value: "eur" },
+      { label: "GBP (£)", value: "gbp" },
+      { label: "CAD ($)", value: "cad" },
+      { label: "AUD ($)", value: "aud" },
+      { label: "INR (₹)", value: "inr" },
+    ],
+  }),
+]
+
+const extractFilterVal = (val: any): string | undefined => {
+  if (!val) return undefined
+  if (typeof val === "string") return val
+  if (Array.isArray(val)) return val[0]
+  if (typeof val === "object") {
+    const flat = Object.values(val).flat()
+    return (flat[0] as string) || undefined
+  }
+  return undefined
+}
 
 export const DraftOrdersTable = () => {
   const router = useRouter()
@@ -37,6 +77,7 @@ export const DraftOrdersTable = () => {
 
   const [search, setSearch] = useState("")
   const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [filtering, setFiltering] = useState<DataTableFilteringState>({})
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -51,14 +92,28 @@ export const DraftOrdersTable = () => {
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
+  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
+  const createdAtGte = useMemo(() => {
+    if (!dateFilterVal) return undefined
+    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [dateFilterVal])
+
+  const currencyCode = extractFilterVal(filtering.currency_code)
+
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-draft-orders", { limit, offset, q: search, order }],
+    queryKey: [
+      "vendor-draft-orders",
+      { limit, offset, q: search, order, created_at_gte: createdAtGte, currency_code: currencyCode },
+    ],
     queryFn: () =>
       listVendorDraftOrders({
         limit,
         offset,
         q: search || undefined,
         order,
+        created_at_gte: createdAtGte,
+        currency_code: currencyCode,
       }),
   })
 
@@ -255,9 +310,20 @@ export const DraftOrdersTable = () => {
       state: sorting,
       onSortingChange: setSorting,
     },
+    filtering: {
+      state: filtering,
+      onFilteringChange: (value) => {
+        setFiltering(value)
+        setPagination((state) => ({ ...state, pageIndex: 0 }))
+      },
+    },
+    filters,
     search: {
       state: search,
-      onSearchChange: setSearch,
+      onSearchChange: (value) => {
+        setSearch(value)
+        setPagination((state) => ({ ...state, pageIndex: 0 }))
+      },
     },
   })
 
@@ -279,7 +345,12 @@ export const DraftOrdersTable = () => {
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between">
           <DataTable.Search placeholder="Search draft orders..." />
+          <div className="flex items-center gap-x-2">
+            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTable.SortingMenu tooltip="Sort" />
+          </div>
         </DataTable.Toolbar>
+        <DataTable.FilterBar />
 
         <DataTable.Table />
 

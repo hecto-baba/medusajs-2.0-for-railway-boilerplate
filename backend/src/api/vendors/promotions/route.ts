@@ -25,6 +25,13 @@ export const GetVendorPromotionsSchema = z.object({
     .transform((value) =>
       value === undefined ? undefined : Array.isArray(value) ? value : [value]
     ),
+  type: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) =>
+      value === undefined ? undefined : Array.isArray(value) ? value : [value]
+    ),
+  created_at_gte: z.string().optional(),
   order: z.string().optional(),
 })
 
@@ -61,7 +68,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, status, order } = req.validatedQuery as unknown as z.infer<
+  const { limit, offset, q, status, type, created_at_gte, order } = req.validatedQuery as unknown as z.infer<
     typeof GetVendorPromotionsSchema
   >
 
@@ -83,6 +90,16 @@ export const GET = async (
     return
   }
 
+  const desc = order?.startsWith("-") ?? false
+  const orderField = order ? (desc ? order.slice(1) : order) : undefined
+  const allowedOrder =
+    orderField === "code" ||
+    orderField === "status" ||
+    orderField === "type" ||
+    orderField === "created_at"
+      ? orderField
+      : undefined
+
   const { data: promotions, metadata } = await query.graph({
     entity: "promotion",
     fields: [
@@ -100,12 +117,14 @@ export const GET = async (
       id: promotionIds,
       ...(q ? { code: { $ilike: `%${q}%` } } : {}),
       ...(status?.length ? { status } : {}),
+      ...(type?.length ? { type } : {}),
+      ...(created_at_gte ? { created_at: { $gte: created_at_gte } } : {}),
     },
     pagination: {
       skip: offset,
       take: limit,
-      order: order
-        ? { [order.replace(/^-/, "")]: order.startsWith("-") ? "DESC" : "ASC" }
+      order: allowedOrder
+        ? { [allowedOrder]: desc ? "DESC" : "ASC" }
         : { created_at: "DESC" },
     },
   })

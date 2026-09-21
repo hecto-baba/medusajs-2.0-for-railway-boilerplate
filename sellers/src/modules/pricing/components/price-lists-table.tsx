@@ -59,6 +59,17 @@ export const getPriceListStatus = (priceList: {
 const columnHelper = createDataTableColumnHelper<VendorPriceList>()
 const filterHelper = createDataTableFilterHelper<VendorPriceList>()
 
+const extractFilterVal = (val: any): string | undefined => {
+  if (!val) return undefined
+  if (typeof val === "string") return val
+  if (Array.isArray(val)) return val[0]
+  if (typeof val === "object") {
+    const flat = Object.values(val).flat()
+    return (flat[0] as string) || undefined
+  }
+  return undefined
+}
+
 export const PriceListsTable = () => {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -79,8 +90,14 @@ export const PriceListsTable = () => {
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
 
-  const statusFilter = filtering.status as VendorPriceListStatus | undefined
-  const typeFilter = filtering.type as VendorPriceListType | undefined
+  const statusFilter = extractFilterVal(filtering.status)
+  const typeFilter = extractFilterVal(filtering.type)
+  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
+  const createdAtGte = useMemo(() => {
+    if (!dateFilterVal) return undefined
+    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [dateFilterVal])
 
   const order = sorting
     ? (sorting.desc ? "-" : "") + sorting.id
@@ -89,7 +106,7 @@ export const PriceListsTable = () => {
   const { data, isLoading } = useQuery({
     queryKey: [
       "vendor-price-lists",
-      { limit, offset, q: search, status: statusFilter, type: typeFilter, order },
+      { limit, offset, q: search, status: statusFilter, type: typeFilter, created_at_gte: createdAtGte, order },
     ],
     queryFn: () =>
       listVendorPriceLists({
@@ -98,6 +115,7 @@ export const PriceListsTable = () => {
         q: search || undefined,
         status: statusFilter,
         type: typeFilter,
+        created_at_gte: createdAtGte,
         order,
       }),
   })
@@ -148,6 +166,16 @@ export const PriceListsTable = () => {
         options: [
           { label: "Sale", value: "sale" },
           { label: "Override", value: "override" },
+        ],
+      }),
+      filterHelper.custom({
+        id: "created_at_gte",
+        label: "Date Created",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
         ],
       }),
     ],
@@ -269,9 +297,11 @@ export const PriceListsTable = () => {
         <DataTable.Toolbar className="flex items-center justify-between">
           <div className="flex items-center gap-x-2">
             <DataTable.Search placeholder="Search price lists..." />
-            <DataTable.FilterMenu />
+            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTable.SortingMenu tooltip="Sort" />
           </div>
         </DataTable.Toolbar>
+        <DataTable.FilterBar />
 
         <DataTable.Table />
 

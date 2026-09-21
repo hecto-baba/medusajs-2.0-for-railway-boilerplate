@@ -39,14 +39,20 @@ export const POST = async (
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const query = req.scope.resolve("query")
 
-  // Filters live on req.filterableFields, not req.queryConfig. The query
-  // validator splits the parsed query string in two - fields and pagination
-  // onto queryConfig, every other parameter onto filterableFields - so
-  // spreading queryConfig alone returns the list unfiltered.
+  const filters: Record<string, any> = { ...req.filterableFields }
+  const q = req.query?.q as string | undefined
+  if (q?.trim()) {
+    delete filters.q
+    filters.$or = [
+      { name: { $ilike: `%${q.trim()}%` } },
+      { address: { $ilike: `%${q.trim()}%` } },
+    ]
+  }
+
   const { data: venues, metadata } = await query.graph({
     entity: "venue",
     fields: req.queryConfig.fields,
-    filters: req.filterableFields,
+    filters,
     pagination: req.queryConfig.pagination,
   })
 

@@ -2,7 +2,11 @@
 
 import {
   deleteVendorProduct,
+  listVendorCollections,
   listVendorProducts,
+  listVendorProductTags,
+  listVendorProductTypes,
+  listVendorSalesChannels,
   type VendorProduct,
 } from "@lib/data/vendor-client"
 import {
@@ -24,7 +28,7 @@ import { Plus } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import {
   ListSummaryCell,
   PlaceholderCell,
@@ -39,28 +43,16 @@ const columnHelper = createDataTableColumnHelper<VendorProduct>()
 const filterHelper = createDataTableFilterHelper<VendorProduct>()
 const commandHelper = createDataTableCommandHelper()
 
-/**
- * Status is the only filter offered.
- *
- * The admin also filters by type, tag and sales channel, but those read the
- * store's full lists of each - a vendor must not see another vendor's tags,
- * and sales channels are chosen by the platform, not the seller. Status is
- * self-contained and is the one a seller actually acts on.
- */
-const filters = [
-  filterHelper.accessor("status", {
-    label: "Status",
-    // multiselect rather than select: a seller filtering their catalogue
-    // usually wants more than one status at once (draft + proposed, say).
-    type: "multiselect",
-    options: [
-      { label: "Draft", value: "draft" },
-      { label: "Proposed", value: "proposed" },
-      { label: "Published", value: "published" },
-      { label: "Rejected", value: "rejected" },
-    ],
-  }),
-]
+const extractFilterVal = (val: any): string | undefined => {
+  if (!val) return undefined
+  if (typeof val === "string") return val
+  if (Array.isArray(val)) return val[0]
+  if (typeof val === "object") {
+    const flat = Object.values(val).flat()
+    return (flat[0] as string) || undefined
+  }
+  return undefined
+}
 
 /**
  * Column set and order copied from the admin's useProductTableColumns:
@@ -168,6 +160,115 @@ export const ProductsTable = () => {
   const offset = pagination.pageIndex * limit
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false)
 
+  // Fetch filter options
+  const { data: collectionsData } = useQuery({
+    queryKey: ["vendor-collections-filter"],
+    queryFn: () => listVendorCollections({ limit: 100, offset: 0 }),
+  })
+  const { data: typesData } = useQuery({
+    queryKey: ["vendor-types-filter"],
+    queryFn: () => listVendorProductTypes({ limit: 100, offset: 0 }),
+  })
+  const { data: tagsData } = useQuery({
+    queryKey: ["vendor-tags-filter"],
+    queryFn: () => listVendorProductTags({ limit: 100, offset: 0 }),
+  })
+  const { data: salesChannelsData } = useQuery({
+    queryKey: ["vendor-channels-filter"],
+    queryFn: () => listVendorSalesChannels({ limit: 100, offset: 0 }),
+  })
+
+  // Dynamic filter definitions
+  const filters = useMemo(() => {
+    const list: any[] = [
+      filterHelper.accessor("status", {
+        label: "Status",
+        type: "multiselect",
+        options: [
+          { label: "Draft", value: "draft" },
+          { label: "Proposed", value: "proposed" },
+          { label: "Published", value: "published" },
+          { label: "Rejected", value: "rejected" },
+        ],
+      }),
+    ]
+
+    const collections = collectionsData?.collections ?? []
+    if (collections.length > 0) {
+      list.push(
+        filterHelper.custom({
+          id: "collection_id",
+          label: "Collection",
+          type: "select",
+          options: collections.map((c) => ({
+            label: c.title,
+            value: c.id,
+          })),
+        })
+      )
+    }
+
+    const types = typesData?.product_types ?? []
+    if (types.length > 0) {
+      list.push(
+        filterHelper.custom({
+          id: "type_id",
+          label: "Type",
+          type: "select",
+          options: types.map((t) => ({
+            label: t.value,
+            value: t.id,
+          })),
+        })
+      )
+    }
+
+    const tags = tagsData?.product_tags ?? []
+    if (tags.length > 0) {
+      list.push(
+        filterHelper.custom({
+          id: "tag_id",
+          label: "Tag",
+          type: "select",
+          options: tags.map((t) => ({
+            label: t.value,
+            value: t.id,
+          })),
+        })
+      )
+    }
+
+    const channels = salesChannelsData?.sales_channels ?? []
+    if (channels.length > 0) {
+      list.push(
+        filterHelper.custom({
+          id: "sales_channel_id",
+          label: "Sales Channel",
+          type: "select",
+          options: channels.map((sc) => ({
+            label: sc.name,
+            value: sc.id,
+          })),
+        })
+      )
+    }
+
+    list.push(
+      filterHelper.custom({
+        id: "created_at_gte",
+        label: "Date Created",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      })
+    )
+
+    return list
+  }, [collectionsData, typesData, tagsData, salesChannelsData])
+
   // A select filter's value arrives either as a bare array or wrapped in an
   // operator object depending on how it was set, so it is normalised here.
   const statusFilter = filtering.status
@@ -177,13 +278,36 @@ export const ProductsTable = () => {
       ? (Object.values(statusFilter).flat() as string[])
       : undefined
 
+  const collectionId = extractFilterVal(filtering.collection_id)
+  const typeId = extractFilterVal(filtering.type_id)
+  const tagId = extractFilterVal(filtering.tag_id)
+  const salesChannelId = extractFilterVal(filtering.sales_channel_id)
+  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
+  const createdAtGte = useMemo(() => {
+    if (!dateFilterVal) return undefined
+    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [dateFilterVal])
+
   // The backend reads a leading "-" as descending, matching the admin.
   const order = sorting
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-products", limit, offset, search, status, order],
+    queryKey: [
+      "vendor-products",
+      limit,
+      offset,
+      search,
+      status,
+      order,
+      collectionId,
+      typeId,
+      tagId,
+      salesChannelId,
+      createdAtGte,
+    ],
     queryFn: () =>
       listVendorProducts({
         limit,
@@ -191,6 +315,11 @@ export const ProductsTable = () => {
         q: search || undefined,
         status: status?.length ? status : undefined,
         order,
+        collection_id: collectionId,
+        type_id: typeId,
+        tag_id: tagId,
+        sales_channel_id: salesChannelId,
+        created_at_gte: createdAtGte,
       }),
     placeholderData: (previous) => previous,
   })

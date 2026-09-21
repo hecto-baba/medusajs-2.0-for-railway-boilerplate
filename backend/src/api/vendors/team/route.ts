@@ -10,6 +10,7 @@ export const GetVendorTeamSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
   q: z.string().optional(),
+  order: z.string().optional(),
 })
 
 export const InviteVendorMemberSchema = z.object({
@@ -23,7 +24,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q } = req.validatedQuery as unknown as z.infer<
+  const { limit, offset, q, order } = req.validatedQuery as unknown as z.infer<
     typeof GetVendorTeamSchema
   >
 
@@ -41,6 +42,13 @@ export const GET = async (
   if (!vendorId) {
     res.status(404).json({ message: "Vendor not found." })
     return
+  }
+
+  let orderObj: Record<string, "ASC" | "DESC"> = { created_at: "ASC" }
+  if (order) {
+    const isDesc = order.startsWith("-")
+    const field = isDesc ? order.slice(1) : order
+    orderObj = { [field]: isDesc ? "DESC" : "ASC" }
   }
 
   const { data: members, metadata } = await query.graph({
@@ -68,7 +76,7 @@ export const GET = async (
     pagination: {
       skip: offset,
       take: limit,
-      order: { created_at: "ASC" },
+      order: orderObj,
     },
   })
 

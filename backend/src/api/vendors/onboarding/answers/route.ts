@@ -17,7 +17,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const vendorId = await getVendorId(req)
-  const localRecord = onboardingStore.get(vendorId)
+  const localRecord = await onboardingStore.getAsync(vendorId)
 
   try {
     const remote = await fetchOnboardingAnswers(vendorId).catch(() => null)

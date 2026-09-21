@@ -62,15 +62,13 @@ export const getVendorId = async (
 }
 
 /**
- * The only promotion rule attribute a vendor is ever allowed to touch.
+ * The only attribute allowed on application_method target_rules and buy_rules.
  *
- * Every other attribute (customer_group, region, country, sales_channel,
- * currency_code, shipping_option_type, and the product-adjacent taxonomy
- * attributes - category/collection/type/tag) is platform-wide: no vendor owns
- * a customer group or a shared product category, so none of them can be
- * scoped per-vendor. Restricting to "product" is what makes the rest of the
- * isolation model below sufficient - it is the only attribute whose value can
- * even in principle belong to a vendor.
+ * Those rules decide which items the discount applies to, so they stay on
+ * "product" and the product ids are checked against the vendor's catalogue.
+ * Top-level eligibility rules (who can use the code) are a separate path:
+ * customer_group_id is allowed there, after the group ids are checked against
+ * the vendor's own customer groups.
  */
 export const VENDOR_ALLOWED_RULE_ATTRIBUTE = "product"
 
@@ -80,13 +78,10 @@ type PromotionRuleInput = {
 }
 
 /**
- * Rejects any rule that touches an attribute other than "product".
+ * Rejects any product-targeting rule whose attribute is not "product".
  *
- * Applies to the top-level `rules` array and to `application_method`'s
- * `target_rules` / `buy_rules`. Without this a vendor could build a promotion
- * scoped to e.g. a customer_group or region - platform-wide concepts a vendor
- * has no business gating on, and a vector for the vendor panel to be used to
- * probe or manipulate store-wide targeting it was never meant to touch.
+ * Call this on application_method.target_rules and buy_rules only. Top-level
+ * eligibility rules are checked by assertEligibilityRulesBelongToVendor.
  */
 export const assertOnlyProductRules = (rules?: PromotionRuleInput[]): void => {
   const disallowed = (rules ?? []).find(
@@ -152,8 +147,44 @@ export const assertProductIdsBelongToVendor = async (
   }
 }
 
+import { getVendorCustomerGroupIds } from "../customers/helpers"
+
+export const assertEligibilityRulesBelongToVendor = async (
+  req: AuthenticatedMedusaRequest,
+  rules?: PromotionRuleInput[]
+): Promise<void> => {
+  if (!rules?.length) return
+
+  const customerGroupIds: string[] = []
+  for (const rule of rules) {
+    if (!rule.attribute) continue
+    if (rule.attribute === "customer_group_id" || rule.attribute === "customer_group") {
+      const vals = Array.isArray(rule.values) ? rule.values : [rule.values]
+      customerGroupIds.push(...vals.filter((v): v is string => Boolean(v)))
+    } else if (rule.attribute === "currency_code") {
+      continue
+    } else {
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        `Vendors can only scope eligibility rules to "customer_group_id" or "currency_code". "${rule.attribute}" is not allowed.`
+      )
+    }
+  }
+
+  if (customerGroupIds.length) {
+    const ownedGroupIds = new Set(await getVendorCustomerGroupIds(req))
+    const foreignId = customerGroupIds.find((id) => !ownedGroupIds.has(id))
+    if (foreignId) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        "One or more customer groups were not found in this vendor's account."
+      )
+    }
+  }
+}
+
 /**
- * Runs the two checks above against every rule array a promotion payload can
+ * Runs the checks above against every rule array a promotion payload can
  * carry: the top-level `rules`, and application_method's `target_rules` /
  * `buy_rules`. Intended to be called on both create and update, since update
  * can introduce new rules just as easily as create can.
@@ -162,13 +193,16 @@ export const assertPromotionRulesAreVendorScoped = async (
   req: AuthenticatedMedusaRequest,
   body: Record<string, any>
 ): Promise<void> => {
-  const ruleSets: (PromotionRuleInput[] | undefined)[] = [
-    body.rules,
+  if (body.rules) {
+    await assertEligibilityRulesBelongToVendor(req, body.rules)
+  }
+
+  const productRuleSets: (PromotionRuleInput[] | undefined)[] = [
     body.application_method?.target_rules,
     body.application_method?.buy_rules,
   ]
 
-  for (const rules of ruleSets) {
+  for (const rules of productRuleSets) {
     assertOnlyProductRules(rules)
     await assertProductIdsBelongToVendor(req, rules)
   }

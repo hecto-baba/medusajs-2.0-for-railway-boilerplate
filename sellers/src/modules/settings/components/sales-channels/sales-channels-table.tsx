@@ -12,7 +12,9 @@ import {
   createDataTableColumnHelper,
   DataTable,
   DataTablePaginationState,
+  DataTableSortingState,
   Heading,
+  Select,
   StatusBadge,
   Text,
   toast,
@@ -35,15 +37,31 @@ export const SalesChannelsTable = () => {
     pageIndex: 0,
     pageSize: 20,
   })
+  const [search, setSearch] = useState("")
+  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled">("all")
+
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedChannel, setSelectedChannel] = useState<VendorSalesChannel | null>(null)
 
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
+  const order = sorting?.id
+    ? sorting.desc
+      ? `-${sorting.id}`
+      : sorting.id
+    : undefined
 
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-sales-channels", limit, offset],
-    queryFn: () => listVendorSalesChannels({ limit, offset }),
+    queryKey: ["vendor-sales-channels", limit, offset, search, order, statusFilter],
+    queryFn: () =>
+      listVendorSalesChannels({
+        limit,
+        offset,
+        q: search.trim() || undefined,
+        order,
+        status: statusFilter !== "all" ? statusFilter : undefined,
+      }),
     placeholderData: (previous) => previous,
   })
 
@@ -80,6 +98,7 @@ export const SalesChannelsTable = () => {
   const columns = [
     columnHelper.accessor("name", {
       header: "Sales Channel",
+      enableSorting: true,
       cell: ({ row }) => (
         <div
           className="flex items-center gap-x-3 cursor-pointer hover:underline"
@@ -112,6 +131,7 @@ export const SalesChannelsTable = () => {
     }),
     columnHelper.accessor("created_at", {
       header: "Created",
+      enableSorting: true,
       cell: ({ row }) => {
         const date = row.original.created_at
           ? new Date(row.original.created_at).toLocaleDateString(undefined, {
@@ -158,29 +178,51 @@ export const SalesChannelsTable = () => {
     getRowId: (row) => row.id,
     isLoading,
     pagination: { state: pagination, onPaginationChange: setPagination },
+    search: { state: search, onSearchChange: setSearch },
+    sorting: { state: sorting, onSortingChange: setSorting },
   })
 
   return (
     <Container className="p-0">
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between gap-x-2 px-6 py-4">
+        <DataTable.Toolbar className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-4">
           <div>
             <Heading level="h2">Sales Channels</Heading>
             <Text size="small" className="text-ui-fg-subtle">
               Manage where your products are published and sold.
             </Text>
           </div>
-          <Button
-            size="small"
-            variant="secondary"
-            onClick={() => {
-              setSelectedChannel(null)
-              setDrawerOpen(true)
-            }}
-          >
-            <PlusMini />
-            Create Channel
-          </Button>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <DataTable.Search placeholder="Search sales channels..." />
+            <div className="w-36">
+              <Select
+                size="small"
+                value={statusFilter}
+                onValueChange={(val) => setStatusFilter(val as "all" | "enabled" | "disabled")}
+              >
+                <Select.Trigger>
+                  <Select.Value placeholder="Status" />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Item value="all">All Channels</Select.Item>
+                  <Select.Item value="enabled">Active</Select.Item>
+                  <Select.Item value="disabled">Disabled</Select.Item>
+                </Select.Content>
+              </Select>
+            </div>
+            <Button
+              size="small"
+              variant="secondary"
+              onClick={() => {
+                setSelectedChannel(null)
+                setDrawerOpen(true)
+              }}
+              className="shrink-0"
+            >
+              <PlusMini />
+              Create Channel
+            </Button>
+          </div>
         </DataTable.Toolbar>
         <DataTable.Table />
         <DataTable.Pagination />

@@ -6,6 +6,7 @@ export const Vendor = model.define("vendor", {
   handle: model.text().unique(),
   name: model.text(),
   logo: model.text().nullable(),
+  metadata: model.json().nullable(),
   admins: model.hasMany(() => VendorAdmin, {
     mappedBy: "vendor",
   }),

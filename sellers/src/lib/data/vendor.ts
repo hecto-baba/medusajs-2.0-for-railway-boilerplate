@@ -15,6 +15,7 @@ export type Vendor = {
   name: string
   handle: string
   logo: string | null
+  metadata?: Record<string, unknown> | null
 }
 
 export type VendorAdmin = {
@@ -300,6 +301,29 @@ export async function updateVendorStore(
 
   revalidatePath("/", "layout")
 
+  return { error: null, success: true }
+}
+
+/**
+ * Updates the signed-in vendor's custom metadata.
+ */
+export async function updateVendorMetadata(
+  metadata: Record<string, unknown> | null
+): Promise<{ error: string | null; success: boolean }> {
+  try {
+    await sdk.client.fetch("/vendors/me", {
+      method: "PATCH",
+      headers: { ...(await getVendorAuthHeaders()) },
+      body: { metadata },
+    })
+  } catch (error) {
+    return {
+      error: toMessage(error, "Could not save metadata. Please try again."),
+      success: false,
+    }
+  }
+
+  revalidatePath("/settings")
   return { error: null, success: true }
 }
 
