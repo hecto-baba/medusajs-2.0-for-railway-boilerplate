@@ -11,6 +11,7 @@ import { placeOrder } from "@lib/data/cart"
 import { HttpTypes } from "@medusajs/types"
 import { isManual, isPaypal, isStripe } from "@lib/constants"
 import { isTicketLineItem } from "types/ticket"
+import { B2BApprovalButton } from "../b2b-approval-button"
 
 type PaymentButtonProps = {
   cart: HttpTypes.StoreCart
@@ -56,7 +57,7 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
       )
     case isManual(paymentSession?.provider_id):
       return (
-        <ManualTestPaymentButton notReady={notReady} data-testid={dataTestId} />
+        <ManualTestPaymentButton notReady={notReady} cart={cart} data-testid={dataTestId} />
       )
     case isPaypal(paymentSession?.provider_id):
       return (
@@ -178,6 +179,12 @@ const StripePaymentButton = ({
       })
   }
 
+  const isB2BApprovalRequired =
+    Boolean(errorMessage && (
+      errorMessage.toLowerCase().includes("spending limit") ||
+      errorMessage.toLowerCase().includes("approval")
+    ))
+
   return (
     <>
       <Button
@@ -193,6 +200,9 @@ const StripePaymentButton = ({
         error={errorMessage}
         data-testid="stripe-payment-error-message"
       />
+      {isB2BApprovalRequired && cart && (
+        <B2BApprovalButton cartId={cart.id} />
+      )}
     </>
   )
 }
@@ -267,7 +277,13 @@ const PayPalPaymentButton = ({
   }
 }
 
-const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
+const ManualTestPaymentButton = ({
+  notReady,
+  cart,
+}: {
+  notReady: boolean
+  cart: HttpTypes.StoreCart
+}) => {
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -287,6 +303,12 @@ const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
     onPaymentCompleted()
   }
 
+  const isB2BApprovalRequired =
+    Boolean(errorMessage && (
+      errorMessage.toLowerCase().includes("spending limit") ||
+      errorMessage.toLowerCase().includes("approval")
+    ))
+
   return (
     <>
       <Button
@@ -302,6 +324,9 @@ const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
         error={errorMessage}
         data-testid="manual-payment-error-message"
       />
+      {isB2BApprovalRequired && cart && (
+        <B2BApprovalButton cartId={cart.id} />
+      )}
     </>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { Button } from "@medusajs/ui"
+import { Badge, Button } from "@medusajs/ui"
 import { useMemo } from "react"
 
 import Thumbnail from "@modules/products/components/thumbnail"
@@ -13,6 +13,9 @@ type OrderCardProps = {
 }
 
 const OrderCard = ({ order }: OrderCardProps) => {
+  const fulfillmentStatus = ((order as any).fulfillment_status || "not_fulfilled").toLowerCase()
+  const paymentStatus = ((order as any).payment_status || "not_paid").toLowerCase()
+
   const numberOfLines = useMemo(() => {
     return (
       order.items?.reduce((acc, item) => {
@@ -26,9 +29,44 @@ const OrderCard = ({ order }: OrderCardProps) => {
   }, [order])
 
   return (
-    <div className="bg-white flex flex-col" data-testid="order-card">
-      <div className="uppercase text-large-semi mb-1">
-        #<span data-testid="order-display-id">{order.display_id}</span>
+    <div className="bg-white flex flex-col p-4 sm:p-6 rounded-lg border shadow-sm" data-testid="order-card">
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+        <div className="uppercase text-large-semi font-mono">
+          #<span data-testid="order-display-id">{order.display_id}</span>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {fulfillmentStatus === "delivered" ? (
+            <Badge color="green" size="xsmall" className="gap-1 font-semibold">
+              🚚 Delivered
+            </Badge>
+          ) : (fulfillmentStatus === "shipped" || fulfillmentStatus === "partially_shipped") ? (
+            <Badge color="blue" size="xsmall" className="gap-1 font-semibold">
+              📦 In Transit
+            </Badge>
+          ) : (fulfillmentStatus === "fulfilled" || fulfillmentStatus === "partially_fulfilled") ? (
+            <Badge color="purple" size="xsmall" className="gap-1 font-semibold">
+              📦 Packed
+            </Badge>
+          ) : (
+            <Badge color="grey" size="xsmall" className="gap-1">
+              🕒 Confirmed
+            </Badge>
+          )}
+
+          {(paymentStatus === "captured" || paymentStatus === "paid") ? (
+            <Badge color="green" size="xsmall" className="gap-1 font-semibold">
+              💳 Paid
+            </Badge>
+          ) : (paymentStatus === "authorized" || paymentStatus === "partially_authorized") ? (
+            <Badge color="blue" size="xsmall" className="gap-1">
+              💳 Authorized
+            </Badge>
+          ) : (
+            <Badge color="orange" size="xsmall" className="gap-1">
+              ⏳ Awaiting Payment
+            </Badge>
+          )}
+        </div>
       </div>
       <div className="flex items-center divide-x divide-gray-200 text-small-regular text-ui-fg-base">
         <span className="pr-2" data-testid="order-created-at">

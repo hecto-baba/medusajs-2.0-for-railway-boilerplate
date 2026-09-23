@@ -132,5 +132,52 @@ completeCartWorkflow.hooks.validate(
         )
       }
     }
+
+    // B2B Employee Spending Limit Check
+    try {
+      const { data: [cartCustomer] } = await query.graph({
+        entity: "cart",
+        fields: [
+          "id",
+          "total",
+          "currency_code",
+          "customer.employee.id",
+          "customer.employee.is_admin",
+          "customer.employee.spending_limit",
+        ],
+        filters: { id: cart.id },
+      })
+
+      const employee = (cartCustomer as any)?.customer?.employee
+      if (employee && !employee.is_admin && employee.spending_limit) {
+        const spendingLimit = Number(employee.spending_limit)
+        const cartTotal = Number(cartCustomer.total)
+        if (cartTotal > spendingLimit) {
+          // Check if cart has already been approved by a manager
+          try {
+            const { data: approvals } = await query.graph({
+              entity: "approval",
+              fields: ["id", "cart_id", "statuses.*"],
+              filters: { cart_id: cart.id },
+            })
+            const isApproved = approvals?.some((app: any) =>
+              app.statuses?.some((s: any) => s.status === "approved")
+            )
+            if (isApproved) {
+              return
+            }
+          } catch {}
+
+          throw new MedusaError(
+            MedusaError.Types.NOT_ALLOWED,
+            `Cart total (${cartTotal} ${cartCustomer.currency_code?.toUpperCase()}) exceeds your company spending limit of ${spendingLimit} ${cartCustomer.currency_code?.toUpperCase()}. Please reduce your order or submit it to your manager for approval.`
+          )
+        }
+      }
+    } catch (b2bErr) {
+      if (b2bErr instanceof MedusaError) {
+        throw b2bErr
+      }
+    }
   }
 )

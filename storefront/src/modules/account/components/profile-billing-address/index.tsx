@@ -74,12 +74,18 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
           {billingAddress.postal_code}, {billingAddress.city}
         </span>
         <span>{country}</span>
+        {billingAddress.phone && <span>{billingAddress.phone}</span>}
       </div>
     )
   }, [billingAddress, regionOptions])
 
   return (
     <form action={formAction} onReset={() => clearState()} className="w-full">
+      <input
+        type="hidden"
+        name="addressId"
+        value={billingAddress?.id || ""}
+      />
       <AccountInfo
         label="Billing address"
         currentInfo={currentInfo}
@@ -145,6 +151,12 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
             name="billing_address.province"
             defaultValue={billingAddress?.province || undefined}
             data-testid="billing-province-input"
+          />
+          <Input
+            label="Phone"
+            name="billing_address.phone"
+            defaultValue={billingAddress?.phone || undefined}
+            data-testid="billing-phone-input"
           />
           <NativeSelect
             name="billing_address.country_code"

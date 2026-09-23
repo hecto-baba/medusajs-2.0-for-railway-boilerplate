@@ -1,4 +1,10 @@
+import path from 'path';
+import { createRequire } from 'module';
 import { loadEnv, Modules, defineConfig } from '@medusajs/utils';
+
+const require = createRequire(import.meta.url);
+const localPackageDir = (pkg) =>
+  path.dirname(require.resolve(`${pkg}/package.json`));
 import {
   ADMIN_CORS,
   AUTH_CORS,
@@ -61,6 +67,39 @@ const medusaConfig = {
   admin: {
     backendUrl: BACKEND_URL,
     disable: SHOULD_DISABLE_ADMIN,
+    vite: () => ({
+      resolve: {
+        alias: {
+          react: localPackageDir('react'),
+          'react-dom': localPackageDir('react-dom'),
+        },
+        dedupe: ['react', 'react-dom'],
+      },
+      plugins: [
+        {
+          name: 'hide-core-sidebar-routes',
+          transformIndexHtml(html) {
+            // Hide the native core route sidebar entries (Orders, Products,
+            // Inventory, Customers, Promotions, Price Lists) because they are
+            // already grouped inside the Commerce Infra hub.
+            // React Router renders <NavLink to="/orders"> as href="/orders"
+            // (the /app basename is NOT included in the rendered href attribute).
+            const style = `<style>
+/* Hide native core sidebar routes - grouped under Commerce Infra instead */
+nav div:has(> a[href="/orders"]),
+nav div:has(> a[href="/products"]),
+nav div:has(> a[href="/inventory"]),
+nav div:has(> a[href="/customers"]),
+nav div:has(> a[href="/promotions"]),
+nav div:has(> a[href="/price-lists"]) {
+  display: none !important;
+}
+</style>`;
+            return html.replace('</head>', `${style}\n</head>`);
+          },
+        },
+      ],
+    }),
   },
   modules: [
     {
@@ -70,10 +109,28 @@ const medusaConfig = {
       resolve: './src/modules/ticket-booking'
     },
     {
-      resolve: './src/modules/marketplace'
+      resolve: './src/modules/restaurant',
     },
     {
-      resolve: './src/modules/transaction-type'
+      resolve: './src/modules/delivery',
+    },
+    {
+      resolve: './src/modules/digital-product',
+    },
+    {
+      resolve: './src/modules/company',
+    },
+    {
+      resolve: './src/modules/approval',
+    },
+    {
+      resolve: './src/modules/quote',
+    },
+    {
+      resolve: './src/modules/marketplace',
+    },
+    {
+      resolve: './src/modules/transaction-type',
     },
     {
       key: Modules.FILE,
@@ -126,21 +183,12 @@ const medusaConfig = {
         }
       }
     }] : []),
-    ...(SENDGRID_API_KEY && SENDGRID_FROM_EMAIL || RESEND_API_KEY && RESEND_FROM_EMAIL ? [{
+    ...(RESEND_API_KEY && RESEND_FROM_EMAIL ? [{
       key: Modules.NOTIFICATION,
       resolve: '@medusajs/notification',
       options: {
         providers: [
-          ...(SENDGRID_API_KEY && SENDGRID_FROM_EMAIL ? [{
-            resolve: '@medusajs/notification-sendgrid',
-            id: 'sendgrid',
-            options: {
-              channels: ['email'],
-              api_key: SENDGRID_API_KEY,
-              from: SENDGRID_FROM_EMAIL,
-            }
-          }] : []),
-          ...(RESEND_API_KEY && RESEND_FROM_EMAIL ? [{
+          {
             resolve: './src/modules/email-notifications',
             id: 'resend',
             options: {
@@ -148,7 +196,23 @@ const medusaConfig = {
               api_key: RESEND_API_KEY,
               from: RESEND_FROM_EMAIL,
             },
-          }] : []),
+          },
+        ]
+      }
+    }] : SENDGRID_API_KEY && SENDGRID_FROM_EMAIL ? [{
+      key: Modules.NOTIFICATION,
+      resolve: '@medusajs/notification',
+      options: {
+        providers: [
+          {
+            resolve: '@medusajs/notification-sendgrid',
+            id: 'sendgrid',
+            options: {
+              channels: ['email'],
+              api_key: SENDGRID_API_KEY,
+              from: SENDGRID_FROM_EMAIL,
+            },
+          },
         ]
       }
     }] : []),

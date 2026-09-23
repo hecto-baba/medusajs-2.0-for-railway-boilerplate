@@ -17,7 +17,7 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import Spinner from "@modules/common/icons/spinner"
 import Thumbnail from "@modules/products/components/thumbnail"
 import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
+import { useState, useEffect, useTransition } from "react"
 
 type ItemProps = {
   item: HttpTypes.StoreCartLineItem
@@ -33,6 +33,21 @@ const Item = ({ item, type = "full" }: ItemProps) => {
   const { handle } = item.variant?.product ?? {}
 
   const isTicket = isTicketLineItem(item.metadata)
+  const [localQty, setLocalQty] = useState<string>(String(item.quantity))
+
+  useEffect(() => {
+    setLocalQty(String(item.quantity))
+  }, [item.quantity])
+
+  const handleQtyCommit = (val: number) => {
+    if (isNaN(val) || val < 1) {
+      setLocalQty(String(item.quantity))
+      return
+    }
+    if (val !== item.quantity) {
+      changeQuantity(val)
+    }
+  }
 
   const changeQuantity = async (quantity: number) => {
     setError(null)
@@ -93,6 +108,11 @@ const Item = ({ item, type = "full" }: ItemProps) => {
           metadata={item.metadata}
           data-testid="product-seat-info"
         />
+        {typeof item.metadata?.restaurant_name === "string" && (
+          <Text className="txt-compact-xsmall text-ui-fg-subtle mt-0.5">
+            Restaurant: {String(item.metadata.restaurant_name)}
+          </Text>
+        )}
       </Table.Cell>
 
       {type === "full" && (
@@ -104,26 +124,50 @@ const Item = ({ item, type = "full" }: ItemProps) => {
             {isTicket ? (
               <Text className="text-ui-fg-subtle">1</Text>
             ) : (
-              <CartItemSelect
-                value={item.quantity}
-                onChange={(value) =>
-                  changeQuantity(parseInt(value.target.value))
-                }
-                className="w-14 h-10 p-4"
-                data-testid="product-select-button"
-              >
-                {/* TODO: Update this with the v2 way of managing inventory */}
-                {Array.from(
-                  {
-                    length: Math.min(maxQuantity, 10),
-                  },
-                  (_, i) => (
-                    <option value={i + 1} key={i}>
-                      {i + 1}
-                    </option>
-                  )
-                )}
-              </CartItemSelect>
+              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white shadow-xs">
+                <button
+                  type="button"
+                  disabled={updating || Number(localQty) <= 1}
+                  onClick={() => {
+                    const newQty = Math.max(1, Number(localQty) - 1)
+                    setLocalQty(String(newQty))
+                    handleQtyCommit(newQty)
+                  }}
+                  className="w-7 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-30 text-sm font-semibold transition-colors select-none"
+                  aria-label="Decrease quantity"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  min="1"
+                  value={localQty}
+                  disabled={updating}
+                  onChange={(e) => setLocalQty(e.target.value)}
+                  onBlur={() => handleQtyCommit(parseInt(localQty))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleQtyCommit(parseInt(localQty))
+                    }
+                  }}
+                  className="w-12 h-8 text-center text-xs font-semibold text-gray-900 border-x border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  data-testid="product-quantity-input"
+                  aria-label="Quantity"
+                />
+                <button
+                  type="button"
+                  disabled={updating}
+                  onClick={() => {
+                    const newQty = (Number(localQty) || 0) + 1
+                    setLocalQty(String(newQty))
+                    handleQtyCommit(newQty)
+                  }}
+                  className="w-7 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-30 text-sm font-semibold transition-colors select-none"
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
             )}
             {updating && <Spinner />}
           </div>

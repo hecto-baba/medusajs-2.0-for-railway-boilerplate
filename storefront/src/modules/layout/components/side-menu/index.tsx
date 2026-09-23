@@ -10,17 +10,43 @@ import CountrySelect from "../country-select"
 import { HttpTypes } from "@medusajs/types"
 import { getStoreName } from "@lib/util/env"
 
+type SideMenuGroup = {
+  title?: string
+  items: {
+    name: string
+    href: string
+  }[]
+}
+
+const SideMenuGroups: SideMenuGroup[] = [
+  {
+    title: "Catalog",
+    items: [
+      { name: "Home", href: "/" },
+      { name: "Store", href: "/store" },
+      { name: "Digital Products", href: "/digital-products" },
+      { name: "Restaurants", href: "/restaurants" },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      { name: "Account", href: "/account" },
+      { name: "My Digital Library", href: "/account/digital-products" },
+    ],
+  },
+  {
+    title: "Cart & Search",
+    items: [
+      { name: "Search", href: "/search" },
+      { name: "Cart", href: "/cart" },
+    ],
+  },
+]
+
 type SideMenuProps = {
   regions: HttpTypes.StoreRegion[] | null
   customerInfo?: { first_name?: string | null; email?: string | null } | null
-}
-
-const SideMenuItems: Record<string, string> = {
-  Home: "/",
-  Store: "/store",
-  Search: "/search",
-  Account: "/account",
-  Cart: "/cart",
 }
 
 const SideMenu = ({
@@ -57,7 +83,7 @@ const SideMenu = ({
                 <Popover.Panel className="flex flex-col absolute w-full pr-4 sm:pr-0 sm:w-1/3 2xl:w-1/4 sm:min-w-min h-[calc(100vh-1rem)] z-[60] inset-x-0 text-sm text-ui-fg-on-color m-2 backdrop-blur-2xl">
                   <div
                     data-testid="nav-menu-popup"
-                    className="flex flex-col h-full bg-[rgba(3,7,18,0.7)] rounded-rounded justify-between p-6 overflow-y-auto"
+                    className="flex flex-col h-full bg-[rgba(3,7,18,0.7)] rounded-rounded justify-between p-6 overflow-hidden"
                   >
                     <div className="flex justify-between items-center pb-4 border-b border-white/10" id="xmark">
                       {customerInfo ? (
@@ -80,23 +106,33 @@ const SideMenu = ({
                         <XMark />
                       </button>
                     </div>
-
-                    <ul className="flex flex-col gap-5 items-start justify-start py-6">
-                      {Object.entries(SideMenuItems).map(([name, href]) => {
-                        return (
-                          <li key={name} className="w-full">
-                            <LocalizedClientLink
-                              href={href}
-                              className="text-2xl font-medium leading-9 hover:text-white text-white/90 transition flex items-center justify-between w-full"
-                              onClick={close}
-                              data-testid={`${name.toLowerCase().replace(/\s+/g, "-")}-link`}
-                            >
-                              <span>{name}</span>
-                            </LocalizedClientLink>
-                          </li>
-                        )
-                      })}
-                    </ul>
+                    <div className="flex flex-col gap-6 overflow-y-auto pr-1 my-4">
+                      {SideMenuGroups.map((group, groupIdx) => (
+                        <div key={groupIdx} className="flex flex-col gap-y-2">
+                          {group.title && (
+                            <span className="text-xs uppercase tracking-wider text-ui-fg-muted font-semibold pb-1 border-b border-white/10">
+                              {group.title}
+                            </span>
+                          )}
+                          <ul className="flex flex-col gap-2.5 items-start justify-start">
+                            {group.items.map(({ name, href }) => {
+                              return (
+                                <li key={name}>
+                                  <LocalizedClientLink
+                                    href={href}
+                                    className="text-2xl leading-8 hover:text-ui-fg-disabled transition-colors"
+                                    onClick={close}
+                                    data-testid={`${name.toLowerCase().replace(/\s+/g, "-")}-link`}
+                                  >
+                                    {name}
+                                  </LocalizedClientLink>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
 
                     <div className="flex flex-col gap-y-6 pt-4 border-t border-white/10">
                       <div
@@ -134,4 +170,3 @@ const SideMenu = ({
 }
 
 export default SideMenu
-

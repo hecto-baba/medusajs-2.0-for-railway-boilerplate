@@ -1,4 +1,4 @@
-﻿"use server"
+"use server"
 
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
@@ -239,28 +239,54 @@ export const updateCustomerAddress = async (
   currentState: Record<string, unknown>,
   formData: FormData
 ): Promise<any> => {
-  const addressId = currentState.addressId as string
+  const addressId =
+    (formData.get("addressId") as string) ||
+    (currentState.addressId as string) ||
+    ""
+
+  const getField = (name: string) =>
+    (formData.get(name) as string) ||
+    (formData.get(`billing_address.${name}`) as string) ||
+    ""
 
   const address = {
-    first_name: formData.get("first_name") as string,
-    last_name: formData.get("last_name") as string,
-    company: formData.get("company") as string,
-    address_1: formData.get("address_1") as string,
-    address_2: formData.get("address_2") as string,
-    city: formData.get("city") as string,
-    postal_code: formData.get("postal_code") as string,
-    province: formData.get("province") as string,
-    country_code: formData.get("country_code") as string,
-    phone: formData.get("phone") as string,
+    first_name: getField("first_name"),
+    last_name: getField("last_name"),
+    company: getField("company"),
+    address_1: getField("address_1"),
+    address_2: getField("address_2"),
+    city: getField("city"),
+    postal_code: getField("postal_code"),
+    province: getField("province"),
+    country_code: getField("country_code"),
+    phone: getField("phone"),
   }
 
-  return sdk.store.customer
-    .updateAddress(addressId, address, {}, await getAuthHeaders())
-    .then(async () => {
-      await revalidateCacheTag("customers")
-      return { success: true, error: null }
-    })
-    .catch((err) => {
-      return { success: false, error: err.toString() }
-    })
+  const authHeaders = await getAuthHeaders()
+
+  if (addressId) {
+    return sdk.store.customer
+      .updateAddress(addressId, address, {}, authHeaders)
+      .then(async () => {
+        await revalidateCacheTag("customers")
+        return { success: true, error: null }
+      })
+      .catch((err) => {
+        return { success: false, error: err.toString() }
+      })
+  } else {
+    return sdk.store.customer
+      .createAddress(
+        { ...address, is_default_billing: true },
+        {},
+        authHeaders
+      )
+      .then(async () => {
+        await revalidateCacheTag("customers")
+        return { success: true, error: null }
+      })
+      .catch((err) => {
+        return { success: false, error: err.toString() }
+      })
+  }
 }

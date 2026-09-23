@@ -13,7 +13,7 @@ import {
 } from "@medusajs/ui"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { sdk } from "../lib/sdk"
-import { DetailWidgetProps, AdminOrder } from "@medusajs/framework/types"
+import type { DetailWidgetProps, AdminOrder } from "@medusajs/framework/types"
 import { useEffect, useState } from "react"
 
 type Rental = {
