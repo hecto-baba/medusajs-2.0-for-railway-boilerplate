@@ -351,6 +351,7 @@ export default function RestaurantDetailPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             {restaurant.image_url && (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={restaurant.image_url}
                 alt={restaurant.name}
@@ -468,6 +469,7 @@ export default function RestaurantDetailPage() {
 
                       {product.thumbnail && (
                         <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border border-ui-border-base">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={product.thumbnail}
                             alt={product.title}

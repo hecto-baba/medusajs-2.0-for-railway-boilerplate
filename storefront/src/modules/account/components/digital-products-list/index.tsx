@@ -31,7 +31,7 @@ export const DigitalProductsList = ({
     return (
       <div className="w-full text-center py-8">
         <p className="text-base-regular text-ui-fg-subtle">
-          You haven't purchased any digital products yet.
+          You haven&apos;t purchased any digital products yet.
         </p>
       </div>
     )

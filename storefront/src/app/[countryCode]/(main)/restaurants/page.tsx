@@ -229,6 +229,7 @@ export default function RestaurantsPage() {
             <div>
               {restaurant.image_url && (
                 <div className="mb-4 overflow-hidden rounded-lg max-h-44">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={restaurant.image_url}
                     alt={restaurant.name}
