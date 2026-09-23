@@ -1,10 +1,4 @@
-import path from 'path';
-import { createRequire } from 'module';
 import { loadEnv, Modules, defineConfig } from '@medusajs/utils';
-
-const require = createRequire(import.meta.url);
-const localPackageDir = (pkg) =>
-  path.dirname(require.resolve(`${pkg}/package.json`));
 import {
   ADMIN_CORS,
   AUTH_CORS,
@@ -68,13 +62,6 @@ const medusaConfig = {
     backendUrl: BACKEND_URL,
     disable: SHOULD_DISABLE_ADMIN,
     vite: () => ({
-      resolve: {
-        alias: {
-          react: localPackageDir('react'),
-          'react-dom': localPackageDir('react-dom'),
-        },
-        dedupe: ['react', 'react-dom'],
-      },
       plugins: [
         {
           name: 'hide-core-sidebar-routes',
