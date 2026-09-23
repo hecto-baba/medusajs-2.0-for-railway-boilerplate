@@ -134,7 +134,7 @@ export const QuotesList = ({ initialQuotes, countryCode }: QuotesListProps) => {
             No Quotes Requested
           </Text>
           <Text size="small" className="text-ui-fg-subtle">
-            You haven't requested any custom wholesale price negotiations yet.
+            You haven&apos;t requested any custom wholesale price negotiations yet.
           </Text>
         </div>
       </div>
