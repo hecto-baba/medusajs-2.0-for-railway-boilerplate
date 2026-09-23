@@ -1,7 +1,7 @@
 "use client"
 
 import { clx } from "@medusajs/ui"
-import { ArrowRightOnRectangle } from "@medusajs/icons"
+import { ArrowRightOnRectangle, Photo, Buildings, CheckCircle, DocumentText } from "@medusajs/icons"
 import { useParams, usePathname } from "next/navigation"
 
 import ChevronDown from "@modules/common/icons/chevron-down"
@@ -89,6 +89,64 @@ const AccountNav = ({
                   </LocalizedClientLink>
                 </li>
                 <li>
+                  <LocalizedClientLink
+                    href="/account/digital-products"
+                    className="flex items-center justify-between py-4 border-b border-gray-200 px-8"
+                    data-testid="digital-products-link"
+                  >
+                    <div className="flex items-center gap-x-2">
+                      <Photo />
+                      <span>Digital Products</span>
+                    </div>
+                    <ChevronDown className="transform -rotate-90" />
+                  </LocalizedClientLink>
+                </li>
+                {/* Dedicated B2B Section */}
+                <li className="pt-6 pb-2 px-8 bg-gray-50 border-t border-b border-gray-200">
+                  <div className="flex items-center gap-x-2 text-xs font-bold uppercase tracking-wider text-ui-fg-muted">
+                    <span>🏢 B2B Organization</span>
+                  </div>
+                </li>
+                <li>
+                  <LocalizedClientLink
+                    href="/account/company"
+                    className="flex items-center justify-between py-4 border-b border-gray-200 px-8"
+                    data-testid="company-link"
+                  >
+                    <div className="flex items-center gap-x-2">
+                      <Buildings />
+                      <span>Company</span>
+                    </div>
+                    <ChevronDown className="transform -rotate-90" />
+                  </LocalizedClientLink>
+                </li>
+                <li>
+                  <LocalizedClientLink
+                    href="/account/quotes"
+                    className="flex items-center justify-between py-4 border-b border-gray-200 px-8"
+                    data-testid="quotes-link"
+                  >
+                    <div className="flex items-center gap-x-2">
+                      <DocumentText />
+                      <span>Quotes</span>
+                    </div>
+                    <ChevronDown className="transform -rotate-90" />
+                  </LocalizedClientLink>
+                </li>
+                <li>
+                  <LocalizedClientLink
+                    href="/account/approvals"
+                    className="flex items-center justify-between py-4 border-b border-gray-200 px-8"
+                    data-testid="approvals-link"
+                  >
+                    <div className="flex items-center gap-x-2">
+                      <CheckCircle />
+                      <span>Approvals</span>
+                    </div>
+                    <ChevronDown className="transform -rotate-90" />
+                  </LocalizedClientLink>
+                </li>
+                <li>
                   <button
                     type="button"
                     className="flex items-center justify-between py-4 border-b border-gray-200 px-8 w-full"
@@ -150,16 +208,75 @@ const AccountNav = ({
                   Orders
                 </AccountNavLink>
               </li>
-              <li className="text-grey-700">
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  data-testid="logout-button"
+              <li>
+                <AccountNavLink
+                  href="/account/digital-products"
+                  route={route!}
+                  data-testid="digital-products-link"
                 >
-                  Log out
-                </button>
+                  Digital Products
+                </AccountNavLink>
               </li>
             </ul>
+          </div>
+
+          {/* Dedicated B2B Section */}
+          <div className="pt-6 border-t border-gray-200 mt-6">
+            <div className="pb-3 flex items-center gap-x-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-ui-fg-muted">
+                B2B Organization
+              </h3>
+            </div>
+            <div className="text-base-regular">
+              <ul className="flex mb-0 justify-start items-start flex-col gap-y-4">
+                <li>
+                  <AccountNavLink
+                    href="/account/company"
+                    route={route!}
+                    data-testid="company-link"
+                  >
+                    <span className="flex items-center gap-x-2">
+                      <Buildings className="w-4 h-4 text-ui-fg-subtle" />
+                      <span>Company</span>
+                    </span>
+                  </AccountNavLink>
+                </li>
+                <li>
+                  <AccountNavLink
+                    href="/account/quotes"
+                    route={route!}
+                    data-testid="quotes-link"
+                  >
+                    <span className="flex items-center gap-x-2">
+                      <DocumentText className="w-4 h-4 text-ui-fg-subtle" />
+                      <span>Quotes</span>
+                    </span>
+                  </AccountNavLink>
+                </li>
+                <li>
+                  <AccountNavLink
+                    href="/account/approvals"
+                    route={route!}
+                    data-testid="approvals-link"
+                  >
+                    <span className="flex items-center gap-x-2">
+                      <CheckCircle className="w-4 h-4 text-ui-fg-subtle" />
+                      <span>Approvals</span>
+                    </span>
+                  </AccountNavLink>
+                </li>
+                <li className="text-grey-700 pt-2 border-t border-gray-100 w-full">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    data-testid="logout-button"
+                    className="hover:text-ui-fg-base"
+                  >
+                    Log out
+                  </button>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>

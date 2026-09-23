@@ -1,1 +1,8 @@
 .idea/
+cookies.txt
+.env*
+node_modules/
+.next/
+.medusa/
+dist/
+*.log

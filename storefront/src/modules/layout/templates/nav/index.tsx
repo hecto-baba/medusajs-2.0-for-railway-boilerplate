@@ -32,6 +32,20 @@ export default async function Nav() {
 
           <div className="flex items-center gap-x-6 h-full flex-1 basis-0 justify-end">
             <div className="hidden small:flex items-center gap-x-6 h-full">
+              <LocalizedClientLink
+                className="hover:text-ui-fg-base"
+                href="/digital-products"
+                data-testid="nav-digital-products-link"
+              >
+                Digital Products
+              </LocalizedClientLink>
+              <LocalizedClientLink
+                className="hover:text-ui-fg-base"
+                href="/restaurants"
+                data-testid="nav-restaurants-link"
+              >
+                Restaurants
+              </LocalizedClientLink>
               {isSearchEnabled() && (
                 <LocalizedClientLink
                   className="hover:text-ui-fg-base"

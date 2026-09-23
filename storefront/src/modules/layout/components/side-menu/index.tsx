@@ -10,13 +10,39 @@ import CountrySelect from "../country-select"
 import { HttpTypes } from "@medusajs/types"
 import { getStoreName } from "@lib/util/env"
 
-const SideMenuItems = {
-  Home: "/",
-  Store: "/store",
-  Search: "/search",
-  Account: "/account",
-  Cart: "/cart",
+type SideMenuGroup = {
+  title?: string
+  items: {
+    name: string
+    href: string
+  }[]
 }
+
+const SideMenuGroups: SideMenuGroup[] = [
+  {
+    title: "Catalog",
+    items: [
+      { name: "Home", href: "/" },
+      { name: "Store", href: "/store" },
+      { name: "Digital Products", href: "/digital-products" },
+      { name: "Restaurants", href: "/restaurants" },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      { name: "Account", href: "/account" },
+      { name: "My Digital Library", href: "/account/digital-products" },
+    ],
+  },
+  {
+    title: "Cart & Search",
+    items: [
+      { name: "Search", href: "/search" },
+      { name: "Cart", href: "/cart" },
+    ],
+  },
+]
 
 const SideMenu = ({ regions }: { regions: HttpTypes.StoreRegion[] | null }) => {
   const toggleState = useToggleState()
@@ -53,7 +79,7 @@ const SideMenu = ({ regions }: { regions: HttpTypes.StoreRegion[] | null }) => {
                 <Popover.Panel className="flex flex-col absolute w-full pr-4 sm:pr-0 sm:w-1/3 2xl:w-1/4 sm:min-w-min h-[calc(100vh-1rem)] z-[60] inset-x-0 text-sm text-ui-fg-on-color m-2 backdrop-blur-2xl">
                   <div
                     data-testid="nav-menu-popup"
-                    className="flex flex-col h-full bg-[rgba(3,7,18,0.5)] rounded-rounded justify-between p-6"
+                    className="flex flex-col h-full bg-[rgba(3,7,18,0.5)] rounded-rounded justify-between p-6 overflow-hidden"
                   >
                     <div className="flex justify-end" id="xmark">
                       {/* Icon-only, so without a label it is announced as
@@ -67,22 +93,33 @@ const SideMenu = ({ regions }: { regions: HttpTypes.StoreRegion[] | null }) => {
                         <XMark />
                       </button>
                     </div>
-                    <ul className="flex flex-col gap-6 items-start justify-start">
-                      {Object.entries(SideMenuItems).map(([name, href]) => {
-                        return (
-                          <li key={name}>
-                            <LocalizedClientLink
-                              href={href}
-                              className="text-3xl leading-10 hover:text-ui-fg-disabled"
-                              onClick={close}
-                              data-testid={`${name.toLowerCase()}-link`}
-                            >
-                              {name}
-                            </LocalizedClientLink>
-                          </li>
-                        )
-                      })}
-                    </ul>
+                    <div className="flex flex-col gap-6 overflow-y-auto pr-1 my-4">
+                      {SideMenuGroups.map((group, groupIdx) => (
+                        <div key={groupIdx} className="flex flex-col gap-y-2">
+                          {group.title && (
+                            <span className="text-xs uppercase tracking-wider text-ui-fg-muted font-semibold pb-1 border-b border-white/10">
+                              {group.title}
+                            </span>
+                          )}
+                          <ul className="flex flex-col gap-2.5 items-start justify-start">
+                            {group.items.map(({ name, href }) => {
+                              return (
+                                <li key={name}>
+                                  <LocalizedClientLink
+                                    href={href}
+                                    className="text-2xl leading-8 hover:text-ui-fg-disabled transition-colors"
+                                    onClick={close}
+                                    data-testid={`${name.toLowerCase().replace(/\s+/g, "-")}-link`}
+                                  >
+                                    {name}
+                                  </LocalizedClientLink>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
                     <div className="flex flex-col gap-y-6">
                       <div
                         className="flex justify-between"

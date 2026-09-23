@@ -155,9 +155,4 @@ const TicketProductsPage = () => {
   )
 }
 
-export const config = defineRouteConfig({
-  label: "Shows",
-  icon: ReceiptPercent,
-})
-
 export default TicketProductsPage

@@ -54,3 +54,48 @@ execSync(detected.install, {
   cwd: MEDUSA_SERVER_PATH,
   stdio: 'inherit'
 });
+
+// Ensure allowFields middleware exists in framework within .medusa/server
+try {
+  const frameworkMiddlewaresDir = path.join(
+    MEDUSA_SERVER_PATH,
+    'node_modules',
+    '@medusajs',
+    'framework',
+    'dist',
+    'http',
+    'middlewares'
+  );
+  if (fs.existsSync(frameworkMiddlewaresDir)) {
+    const allowFieldsFile = path.join(frameworkMiddlewaresDir, 'allow-fields-middleware.js');
+    if (!fs.existsSync(allowFieldsFile)) {
+      fs.writeFileSync(
+        allowFieldsFile,
+        `"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.allowFields = void 0;
+const allowFields = (...fields) => {
+  const fieldsToAllow = fields.flat();
+  return (req, _res, next) => {
+    req.allowed = req.allowed ?? [];
+    req.allowed.push(...fieldsToAllow);
+    next();
+  };
+};
+exports.allowFields = allowFields;
+`
+      );
+      const indexPath = path.join(frameworkMiddlewaresDir, 'index.js');
+      if (fs.existsSync(indexPath)) {
+        let content = fs.readFileSync(indexPath, 'utf8');
+        if (!content.includes('allow-fields-middleware')) {
+          content += '\n__exportStar(require("./allow-fields-middleware"), exports);\n';
+          fs.writeFileSync(indexPath, content);
+        }
+      }
+    }
+  }
+} catch (e) {
+  console.warn('Warning: Could not sync allowFields into .medusa/server:', e.message);
+}
+

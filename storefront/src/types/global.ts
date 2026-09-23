@@ -1,3 +1,5 @@
+import { StoreProductVariant } from "@medusajs/types"
+
 export type FeaturedProduct = {
   id: string
   title: string
@@ -13,4 +15,26 @@ export type VariantPrice = {
   currency_code: string
   price_type: string
   percentage_diff: string
+}
+
+export type DigitalProduct = {
+  id: string
+  name: string
+  medias?: DigitalProductMedia[]
+}
+
+export type DigitalProductMedia = {
+  id: string
+  fileId: string
+  type: "preview" | "main"
+  mimeType: string
+  digitalProduct?: DigitalProduct[]
+}
+
+export type DigitalProductPreview = DigitalProductMedia & {
+  url: string
+}
+
+export type VariantWithDigitalProduct = StoreProductVariant & {
+  digital_product?: DigitalProduct
 }

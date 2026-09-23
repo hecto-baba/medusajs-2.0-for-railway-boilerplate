@@ -18,6 +18,8 @@ import { HttpTypes } from "@medusajs/types"
 import { RentalConfiguration, RentalSelection } from "types/rental"
 import RentalDatePicker from "../rental-date-picker"
 import { convertToLocale } from "@lib/util/money"
+import { VariantWithDigitalProduct } from "types/global"
+import { getDigitalProductPreview } from "@lib/data/digital-products"
 
 type ProductActionsProps = {
   product: HttpTypes.StoreProduct
@@ -41,6 +43,8 @@ export default function ProductActions({
 }: ProductActionsProps) {
   const [options, setOptions] = useState<Record<string, string | undefined>>({})
   const [isAdding, setIsAdding] = useState(false)
+  const [quantity, setQuantity] = useState<number>(1)
+  const [isDownloadingPreview, setIsDownloadingPreview] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rentalSelection, setRentalSelection] = useState<RentalSelection | null>(
     null
@@ -67,7 +71,51 @@ export default function ProductActions({
       const variantOptions = optionsAsKeymap(v.options)
       return isEqual(variantOptions, options)
     })
-  }, [product.variants, options])
+  }, [product.variants, options]) as VariantWithDigitalProduct | undefined
+
+  const handleDownloadPreview = async () => {
+    if (!selectedVariant?.digital_product) {
+      return
+    }
+
+    try {
+      setIsDownloadingPreview(true)
+      const downloadUrl = await getDigitalProductPreview({
+        id: selectedVariant.digital_product.id,
+      })
+
+      if (!downloadUrl || !downloadUrl.length) {
+        return
+      }
+
+      // Trigger direct file download
+      try {
+        const res = await fetch(downloadUrl)
+        if (res.ok) {
+          const blob = await res.blob()
+          const filename =
+            downloadUrl.split("/").pop()?.replace(/^\d+-/, "") || "preview-file"
+          const objectUrl = window.URL.createObjectURL(blob)
+          const link = document.createElement("a")
+          link.href = objectUrl
+          link.download = filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(objectUrl)
+          return
+        }
+      } catch {
+        // Fall back to opening directly if fetch fails
+      }
+
+      window.open(downloadUrl, "_blank")
+    } catch (err) {
+      console.error("Error downloading preview:", err)
+    } finally {
+      setIsDownloadingPreview(false)
+    }
+  }
 
   // update the options when a variant is selected
   const setOptionValue = (title: string, value: string) => {
@@ -162,7 +210,7 @@ export default function ProductActions({
       } else {
         await addToCart({
           variantId: selectedVariant.id,
-          quantity: 1,
+          quantity: Math.max(1, quantity),
           countryCode,
         })
       }
@@ -244,6 +292,52 @@ export default function ProductActions({
             )}
             <Divider />
           </>
+        )}
+
+        {selectedVariant?.digital_product && (
+          <Button
+            onClick={handleDownloadPreview}
+            variant="secondary"
+            className="w-full h-10 mb-2"
+            isLoading={isDownloadingPreview}
+          >
+            Download Preview
+          </Button>
+        )}
+
+        {!isRental && (
+          <div className="flex items-center justify-between gap-x-3 my-2 py-1">
+            <span className="text-sm font-medium text-ui-fg-base">Quantity:</span>
+            <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white shadow-xs">
+              <button
+                type="button"
+                disabled={quantity <= 1 || isAdding}
+                onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
+                className="w-8 h-9 flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-30 font-semibold select-none transition-colors"
+                aria-label="Decrease quantity"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min="1"
+                value={quantity}
+                disabled={isAdding}
+                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-16 h-9 text-center text-xs font-semibold text-gray-900 border-x border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                aria-label="Quantity"
+              />
+              <button
+                type="button"
+                disabled={isAdding}
+                onClick={() => setQuantity((prev) => prev + 1)}
+                className="w-8 h-9 flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-30 font-semibold select-none transition-colors"
+                aria-label="Increase quantity"
+              >
+                +
+              </button>
+            </div>
+          </div>
         )}
 
         <Button
