@@ -45,7 +45,11 @@ export const listOrders = cache(async function (
     })
     .then(({ orders }) => orders)
     .catch((err) => {
-      if (err?.status === 401) {
+      // A 401 or 404 here means the auth cookie was not available in this render
+      // pass (e.g. immediately after login before the cookie is committed,
+      // or a stale cached render). Return null so the dashboard still
+      // renders rather than crashing the page.
+      if (err && (err.status === 401 || err.status === 404)) {
         return null
       }
       return medusaError(err)

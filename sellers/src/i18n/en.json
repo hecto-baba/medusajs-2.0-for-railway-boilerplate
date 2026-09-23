@@ -1,0 +1,52 @@
+{
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "enable": "Enable",
+    "disable": "Disable",
+    "close": "Close",
+    "continue": "Continue",
+    "copy": "Copy",
+    "copied": "Copied"
+  },
+  "profile": {
+    "domain": "Profile",
+    "manageYourProfileDetails": "Manage your profile details",
+    "fields": {
+      "languageLabel": "Language"
+    },
+    "edit": {
+      "languageHint": "This only changes the language of the vendor panel.",
+      "languagePlaceholder": "Select language"
+    },
+    "toast": {
+      "edit": "Profile updated"
+    },
+    "mfa": {
+      "title": "Two-factor authentication",
+      "description": "Add an extra layer of security to your account",
+      "status": "Status",
+      "method": "Method",
+      "enabled": "Enabled",
+      "pending": "Pending",
+      "disabled": "Disabled",
+      "authenticatorApp": "Authenticator app",
+      "noMethod": "No method configured",
+      "setupTitle": "Set up two-factor authentication",
+      "setupDescription": "Scan the QR code with your authenticator app, then enter the 6-digit code it generates.",
+      "setupError": "Could not start two-factor setup. Please try again.",
+      "verifyLabel": "Verification code",
+      "verifyPlaceholder": "000000",
+      "verifySuccess": "Two-factor authentication is now enabled",
+      "verifyError": "That code did not verify. Please try again.",
+      "recoveryTitle": "Save your recovery codes",
+      "recoveryDescription": "Store these somewhere safe. Each code can be used once if you lose access to your authenticator app.",
+      "disableTitle": "Disable two-factor authentication",
+      "disableDescription": "Your account will no longer require a verification code at sign-in.",
+      "disableSuccess": "Two-factor authentication disabled",
+      "disableError": "Could not disable two-factor authentication.",
+      "disableVerifyLabel": "Enter a verification code to confirm"
+    }
+  }
+}

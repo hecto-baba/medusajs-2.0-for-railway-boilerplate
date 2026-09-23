@@ -39,12 +39,21 @@ export const POST = async (
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const query = req.scope.resolve("query")
 
-  // Spread the whole queryConfig rather than picking fields and pagination out
-  // of it: it also carries the filters parsed from the query string, so
-  // narrowing it here silently dropped support for filtering the list.
+  const filters: Record<string, any> = { ...req.filterableFields }
+  const q = req.query?.q as string | undefined
+  if (q?.trim()) {
+    delete filters.q
+    filters.$or = [
+      { name: { $ilike: `%${q.trim()}%` } },
+      { address: { $ilike: `%${q.trim()}%` } },
+    ]
+  }
+
   const { data: venues, metadata } = await query.graph({
     entity: "venue",
-    ...req.queryConfig,
+    fields: req.queryConfig.fields,
+    filters,
+    pagination: req.queryConfig.pagination,
   })
 
   res.json({

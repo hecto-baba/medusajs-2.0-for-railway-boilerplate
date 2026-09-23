@@ -1,0 +1,8 @@
+export { ProductDetail } from "./components/detail/product-detail"
+export { ProductEditor } from "./components/product-editor"
+export { ProductExportButton } from "./components/product-export-button"
+export { ProductForm } from "./components/product-form"
+export { ProductImportModal } from "./components/product-import-modal"
+export { ProductsTable } from "./components/products-table"
+export { AddProductModal } from "./components/add-product-modal"
+export { NewProductView } from "./components/new-product-view"

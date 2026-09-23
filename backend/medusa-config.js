@@ -127,6 +127,12 @@ nav div:has(> a[href="/price-lists"]) {
       resolve: './src/modules/quote',
     },
     {
+      resolve: './src/modules/marketplace',
+    },
+    {
+      resolve: './src/modules/transaction-type',
+    },
+    {
       key: Modules.FILE,
       resolve: '@medusajs/file',
       options: {

@@ -39,7 +39,7 @@ export const createVenueWorkflow = createWorkflow(
       entity: "venue",
       fields: ["id", "name", "address", "rows.*"],
       filters: { id: venue.id },
-    })
+    }).config({ name: "retrieve-created-venue" })
 
     return new WorkflowResponse({ venue: venues[0] })
   }

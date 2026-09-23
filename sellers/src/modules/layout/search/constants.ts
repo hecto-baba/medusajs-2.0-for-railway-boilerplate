@@ -1,0 +1,46 @@
+export const SEARCH_AREAS = [
+  "all",
+  "order",
+  "product",
+  "productVariant",
+  "collection",
+  "category",
+  "inventory",
+  "customer",
+  "customerGroup",
+  "promotion",
+  "campaign",
+  "priceList",
+  "venue",
+  "show",
+  "location",
+  "returnReason",
+  "refundReason",
+  "command",
+  "navigation",
+] as const
+
+export const DEFAULT_SEARCH_LIMIT = 3
+export const SEARCH_LIMIT_INCREMENT = 20
+
+export const SEARCH_AREA_LABELS: Record<(typeof SEARCH_AREAS)[number], string> = {
+  all: "All areas",
+  customer: "Customers",
+  customerGroup: "Customer Groups",
+  product: "Products",
+  productVariant: "Product Variants",
+  inventory: "Inventory",
+  category: "Categories",
+  collection: "Collections",
+  order: "Orders",
+  promotion: "Promotions",
+  campaign: "Campaigns",
+  priceList: "Price Lists",
+  venue: "Venues",
+  show: "Shows",
+  location: "Locations",
+  returnReason: "Return Reasons",
+  refundReason: "Refund Reasons",
+  command: "Commands",
+  navigation: "Navigation",
+}

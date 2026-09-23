@@ -60,10 +60,21 @@ export const POST = async (
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const query = req.scope.resolve("query")
 
-  // See the venues route: the full queryConfig carries filters too.
+  const filters: Record<string, any> = { ...(req.filterableFields ?? {}) }
+  const q = req.query?.q as string | undefined
+  if (q?.trim()) {
+    delete filters.q
+    filters.$or = [
+      { product: { title: { $ilike: `%${q.trim()}%` } } },
+      { venue: { name: { $ilike: `%${q.trim()}%` } } },
+    ]
+  }
+
   const { data: ticket_products, metadata } = await query.graph({
     entity: "ticket_product",
-    ...req.queryConfig,
+    fields: req.queryConfig.fields,
+    filters,
+    pagination: req.queryConfig.pagination,
   })
 
   res.json({

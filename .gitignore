@@ -6,3 +6,4 @@ node_modules/
 .medusa/
 dist/
 *.log
+.claude/

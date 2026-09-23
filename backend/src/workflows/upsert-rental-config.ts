@@ -28,7 +28,7 @@ export const upsertRentalConfigWorkflow = createWorkflow(
       options: {
         throwIfKeyNotFound: true,
       },
-    })
+    }).config({ name: "retrieve-product-rental-config" })
 
     // If rental config doesn't exist, create it and link
     const createdConfig = when({ products }, (data) => {
