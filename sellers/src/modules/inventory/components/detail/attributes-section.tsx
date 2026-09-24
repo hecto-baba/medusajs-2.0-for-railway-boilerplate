@@ -42,10 +42,22 @@ export const AttributesSection = ({ item }: { item: VendorInventoryItem }) => {
           <Heading level="h2">Attributes</Heading>
           <ActionMenu groups={actions} />
         </div>
-        <SectionRow title="Height" value={item.height} />
-        <SectionRow title="Width" value={item.width} />
-        <SectionRow title="Length" value={item.length} />
-        <SectionRow title="Weight" value={item.weight} />
+        <SectionRow
+          title="Height"
+          value={item.height != null ? `${item.height} cm` : item.height}
+        />
+        <SectionRow
+          title="Width"
+          value={item.width != null ? `${item.width} cm` : item.width}
+        />
+        <SectionRow
+          title="Length"
+          value={item.length != null ? `${item.length} cm` : item.length}
+        />
+        <SectionRow
+          title="Weight"
+          value={item.weight != null ? `${item.weight} g` : item.weight}
+        />
         <SectionRow title="MID Code" value={item.mid_code} />
         <SectionRow title="Material" value={item.material} />
         <SectionRow title="HS Code" value={item.hs_code} />

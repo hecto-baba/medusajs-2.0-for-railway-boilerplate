@@ -3,6 +3,7 @@
 import {
   deleteVendorInventoryItem,
   listVendorInventoryItems,
+  listVendorStockLocations,
   type VendorInventoryItem,
   type VendorInventoryLevel,
 } from "@lib/data/vendor-client"
@@ -40,6 +41,42 @@ const columnHelper = createDataTableColumnHelper<VendorInventoryItem>()
 const filterHelper = createDataTableFilterHelper<VendorInventoryItem>()
 const commandHelper = createDataTableCommandHelper()
 
+const extractFilterVal = (val: unknown): string | undefined => {
+  if (!val) return undefined
+  if (typeof val === "string") return val
+  if (typeof val === "number") return String(val)
+  if (Array.isArray(val)) return val[0]
+  if (typeof val === "object") {
+    const flat = Object.values(val).flat()
+    return (flat[0] as string) || undefined
+  }
+  return undefined
+}
+
+const extractNumberFilterVal = (val: unknown): number | undefined => {
+  if (val === undefined || val === null || val === "") return undefined
+  if (typeof val === "number") return val
+  if (typeof val === "string") {
+    const num = parseFloat(val)
+    return isNaN(num) ? undefined : num
+  }
+  if (typeof val === "object") {
+    const obj = val as Record<string, unknown>
+    for (const k of ["$eq", "value", "$gte", "$lte", "$gt", "$lt"]) {
+      if (obj[k] !== undefined) {
+        const num = parseFloat(String(obj[k]))
+        if (!isNaN(num)) return num
+      }
+    }
+    const firstVal = Object.values(obj)[0]
+    if (firstVal !== undefined) {
+      const num = parseFloat(String(firstVal))
+      if (!isNaN(num)) return num
+    }
+  }
+  return undefined
+}
+
 export const InventoryTable = () => {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -73,6 +110,22 @@ export const InventoryTable = () => {
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
+  const { data: locationsData } = useQuery({
+    queryKey: ["vendor-stock-locations"],
+    queryFn: () => listVendorStockLocations({ limit: 100, offset: 0 }),
+  })
+  const stockLocations = locationsData?.stock_locations ?? []
+
+  const locationFilter = extractFilterVal(filtering.location_id)
+  const materialFilter = extractFilterVal(filtering.material)
+  const skuFilter = extractFilterVal(filtering.sku)
+  const midCodeFilter = extractFilterVal(filtering.mid_code)
+  const heightFilter = extractNumberFilterVal(filtering.height)
+  const widthFilter = extractNumberFilterVal(filtering.width)
+  const lengthFilter = extractNumberFilterVal(filtering.length)
+  const weightFilter = extractNumberFilterVal(filtering.weight)
+  const requiresShippingFilter = extractFilterVal(filtering.requires_shipping)
+
   const { data, isLoading } = useQuery({
     queryKey: [
       "vendor-inventory-items",
@@ -80,6 +133,15 @@ export const InventoryTable = () => {
       offset,
       search,
       order,
+      locationFilter,
+      materialFilter,
+      skuFilter,
+      midCodeFilter,
+      heightFilter,
+      widthFilter,
+      lengthFilter,
+      weightFilter,
+      requiresShippingFilter,
     ],
     queryFn: () =>
       listVendorInventoryItems({
@@ -87,6 +149,20 @@ export const InventoryTable = () => {
         offset,
         q: search || undefined,
         order,
+        location_id: locationFilter,
+        material: materialFilter,
+        sku: skuFilter,
+        mid_code: midCodeFilter,
+        height: heightFilter,
+        width: widthFilter,
+        length: lengthFilter,
+        weight: weightFilter,
+        requires_shipping:
+          requiresShippingFilter === "true"
+            ? true
+            : requiresShippingFilter === "false"
+            ? false
+            : undefined,
       }),
     placeholderData: (previous) => previous,
   })
@@ -124,16 +200,53 @@ export const InventoryTable = () => {
 
   const filters = useMemo(
     () => [
+      filterHelper.custom({
+        id: "location_id",
+        type: "select",
+        label: "Location",
+        options: stockLocations.map((loc) => ({
+          label: loc.name,
+          value: loc.id,
+        })),
+      }),
+      filterHelper.accessor("material", {
+        type: "string",
+        label: "Material",
+      }),
+      filterHelper.accessor("sku", {
+        type: "string",
+        label: "SKU",
+      }),
+      filterHelper.accessor("mid_code", {
+        type: "string",
+        label: "MID Code",
+      }),
+      filterHelper.accessor("height", {
+        type: "number",
+        label: "Height",
+      }),
+      filterHelper.accessor("width", {
+        type: "number",
+        label: "Width",
+      }),
+      filterHelper.accessor("length", {
+        type: "number",
+        label: "Length",
+      }),
+      filterHelper.accessor("weight", {
+        type: "number",
+        label: "Weight",
+      }),
       filterHelper.accessor("requires_shipping", {
         type: "select",
         options: [
           { label: "True", value: "true" },
           { label: "False", value: "false" },
         ],
-        label: "Requires shipping",
+        label: "Requires Shipping",
       }),
     ],
-    []
+    [stockLocations]
   )
 
   const columns = useMemo(
@@ -164,6 +277,8 @@ export const InventoryTable = () => {
         header: "Title",
         enableSorting: true,
         sortLabel: "Title",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           const title = row.original.title
           if (!title) {
@@ -181,6 +296,8 @@ export const InventoryTable = () => {
         header: "SKU",
         enableSorting: true,
         sortLabel: "SKU",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           const sku = row.original.sku
           if (!sku) {
@@ -193,36 +310,13 @@ export const InventoryTable = () => {
           )
         },
       }),
-      columnHelper.accessor("reserved_quantity", {
-        id: "reserved_quantity",
-        header: "Reserved",
-        enableSorting: true,
-        sortLabel: "Reserved",
-        cell: ({ row }) => {
-          const item = row.original
-          const count = item.location_levels?.length
-            ? item.location_levels.reduce(
-                (sum, lvl) => sum + Number(lvl.reserved_quantity ?? 0),
-                0
-              )
-            : Number(item.reserved_quantity ?? 0)
-
-          if (Number.isNaN(count)) {
-            return <PlaceholderCell />
-          }
-
-          return (
-            <div className="flex size-full items-center overflow-hidden">
-              <span className="truncate">{count}</span>
-            </div>
-          )
-        },
-      }),
       columnHelper.accessor("stocked_quantity", {
         id: "stocked_quantity",
         header: "In Stock",
         enableSorting: true,
         sortLabel: "In Stock",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           const item = row.original
           const stocked = item.location_levels?.length
@@ -239,6 +333,33 @@ export const InventoryTable = () => {
           return (
             <div className="flex size-full items-center overflow-hidden">
               <span className="truncate">{stocked}</span>
+            </div>
+          )
+        },
+      }),
+      columnHelper.accessor("reserved_quantity", {
+        id: "reserved_quantity",
+        header: "Reserved",
+        enableSorting: true,
+        sortLabel: "Reserved",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => {
+          const item = row.original
+          const count = item.location_levels?.length
+            ? item.location_levels.reduce(
+                (sum, lvl) => sum + Number(lvl.reserved_quantity ?? 0),
+                0
+              )
+            : Number(item.reserved_quantity ?? 0)
+
+          if (Number.isNaN(count)) {
+            return <PlaceholderCell />
+          }
+
+          return (
+            <div className="flex size-full items-center overflow-hidden">
+              <span className="truncate">{count}</span>
             </div>
           )
         },

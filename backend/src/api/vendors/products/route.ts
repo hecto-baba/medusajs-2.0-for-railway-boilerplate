@@ -47,6 +47,7 @@ export const GetVendorProductsSchema = z.object({
       val === undefined ? undefined : Array.isArray(val) ? val : [val]
     ),
   created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
   order: z.string().optional(),
 })
 
@@ -204,6 +205,7 @@ export const GET = async (
     tag_id,
     sales_channel_id,
     created_at_gte,
+    updated_at_gte,
     order,
   } = req.validatedQuery as unknown as z.infer<typeof GetVendorProductsSchema>
 
@@ -238,6 +240,9 @@ export const GET = async (
       : {}),
     ...(created_at_gte
       ? { created_at: { $gte: new Date(created_at_gte) } }
+      : {}),
+    ...(updated_at_gte
+      ? { updated_at: { $gte: new Date(updated_at_gte) } }
       : {}),
   }
 

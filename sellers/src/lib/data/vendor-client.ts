@@ -106,7 +106,7 @@ export type ListResponse<T> = {
 
 const request = async <T>(
   path: string,
-  params: Record<string, string | number | string[] | undefined> = {}
+  params: Record<string, string | number | boolean | string[] | undefined> = {}
 ) => {
   const search = new URLSearchParams()
 
@@ -128,6 +128,7 @@ const request = async <T>(
 
   const res = await fetch(`/api/vendors/${path}?${search.toString()}`, {
     headers: { accept: "application/json" },
+    credentials: "same-origin",
   })
 
   if (!res.ok) {
@@ -148,6 +149,7 @@ export const listVendorProducts = (params: {
   tag_id?: string | string[]
   sales_channel_id?: string | string[]
   created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ products: VendorProduct[] }>>(
@@ -231,6 +233,7 @@ const mutate = async <T>(
   const res = await fetch(`/api/vendors/${path}`, {
     method,
     headers: { "content-type": "application/json", accept: "application/json" },
+    credentials: "same-origin",
     ...(body ? { body: JSON.stringify(body) } : {}),
   })
 
@@ -407,7 +410,19 @@ export type VendorTaxonomy = {
   sales_channels: { id: string; name: string }[]
   shipping_profiles: { id: string; name: string; type: string }[]
   currencies: { code: string; is_default: boolean }[]
-  stock_locations: { id: string; name: string }[]
+  stock_locations: {
+    id: string
+    name: string
+    address?: {
+      id?: string
+      city?: string | null
+      country_code?: string | null
+      address_1?: string | null
+      address_2?: string | null
+      postal_code?: string | null
+      province?: string | null
+    } | null
+  }[]
 }
 
 /**
@@ -792,14 +807,22 @@ export const listVendorInventoryItems = (params: {
   limit: number
   offset: number
   q?: string
-  sku?: string[]
+  sku?: string | string[]
   origin_country?: string
-  location_id?: string
+  location_id?: string | string[]
+  material?: string | string[]
+  mid_code?: string
+  hs_code?: string
+  height?: number
+  width?: number
+  length?: number
+  weight?: number
+  requires_shipping?: boolean | string
   order?: string
 }) =>
   request<ListResponse<{ inventory_items: VendorInventoryItem[] }>>(
     "inventory-items",
-    params
+    params as Record<string, string | number | boolean | string[] | undefined>
   )
 
 export const getVendorInventoryItem = async (id: string) => {
@@ -1040,6 +1063,7 @@ export const listVendorPromotions = (params: {
   status?: string[]
   type?: string[]
   created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) => request<ListResponse<{ promotions: VendorPromotion[] }>>("promotions", params)
 
@@ -1209,7 +1233,9 @@ export const listVendorCustomers = (params: {
   offset: number
   q?: string
   has_account?: boolean | string
+  groups?: string | string[]
   created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) => {
   const queryParams: Record<string, string | number | string[] | undefined> = {
@@ -1220,7 +1246,9 @@ export const listVendorCustomers = (params: {
       typeof params.has_account === "boolean"
         ? String(params.has_account)
         : params.has_account,
+    groups: params.groups,
     created_at_gte: params.created_at_gte,
+    updated_at_gte: params.updated_at_gte,
     order: params.order,
   }
   return request<ListResponse<{ customers: VendorCustomer[] }>>(
@@ -1737,6 +1765,10 @@ export const listVendorCollections = (params: {
   limit: number
   offset: number
   q?: string
+  created_at?: any
+  updated_at?: any
+  created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ collections: VendorCollection[] }>>(
@@ -1884,6 +1916,7 @@ export type VendorProductOptionItem = {
   id: string
   title: string
   product_id?: string | null
+  is_exclusive?: boolean | null
   product?: {
     id: string
     title: string
@@ -1899,11 +1932,16 @@ export const listVendorProductOptions = (params: {
   offset: number
   q?: string
   product_id?: string
+  is_exclusive?: boolean | string
+  created_at?: any
+  updated_at?: any
+  created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ product_options: VendorProductOptionItem[] }>>(
     "product-options",
-    params as Record<string, string | number | undefined>
+    params as Record<string, string | number | boolean | undefined>
   )
 
 export const getVendorProductOption = async (id: string) => {
@@ -2125,8 +2163,8 @@ export type VendorStockLocation = {
 }
 
 export const listVendorStockLocations = (params: {
-  limit: number
-  offset: number
+  limit?: number
+  offset?: number
   q?: string
 }) =>
   request<ListResponse<{ stock_locations: VendorStockLocation[] }>>(

@@ -1114,6 +1114,7 @@ export default defineMiddlewares({
       matcher: "/vendors/collections",
       methods: ["GET"],
       middlewares: [
+        authenticate("vendor", ["session", "bearer"]),
         validateAndTransformQuery(GetVendorCollectionsSchema, {})
       ]
     },
@@ -1121,6 +1122,7 @@ export default defineMiddlewares({
       matcher: "/vendors/collections",
       methods: ["POST"],
       middlewares: [
+        authenticate("vendor", ["session", "bearer"]),
         validateAndTransformBody(CreateVendorCollectionSchema)
       ]
     },
@@ -1128,7 +1130,15 @@ export default defineMiddlewares({
       matcher: "/vendors/collections/:id",
       methods: ["POST"],
       middlewares: [
+        authenticate("vendor", ["session", "bearer"]),
         validateAndTransformBody(UpdateVendorCollectionSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/collections/:id",
+      methods: ["GET", "DELETE"],
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
       ]
     },
     {
@@ -1141,6 +1151,7 @@ export default defineMiddlewares({
       matcher: "/vendors/collections/:id/products",
       methods: ["POST"],
       middlewares: [
+        authenticate("vendor", ["session", "bearer"]),
         validateAndTransformBody(ManageCollectionProductsSchema)
       ]
     },

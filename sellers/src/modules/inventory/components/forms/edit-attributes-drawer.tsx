@@ -122,11 +122,12 @@ export const EditAttributesDrawer = ({
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-y-1.5">
                 <Label size="small" weight="plus">
-                  Height
+                  Height (cm)
                 </Label>
                 <Input
                   type="number"
                   min={0}
+                  placeholder="0"
                   value={height}
                   onChange={(e) => setHeight(e.target.value)}
                 />
@@ -134,11 +135,12 @@ export const EditAttributesDrawer = ({
 
               <div className="flex flex-col gap-y-1.5">
                 <Label size="small" weight="plus">
-                  Width
+                  Width (cm)
                 </Label>
                 <Input
                   type="number"
                   min={0}
+                  placeholder="0"
                   value={width}
                   onChange={(e) => setWidth(e.target.value)}
                 />
@@ -148,11 +150,12 @@ export const EditAttributesDrawer = ({
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-y-1.5">
                 <Label size="small" weight="plus">
-                  Length
+                  Length (cm)
                 </Label>
                 <Input
                   type="number"
                   min={0}
+                  placeholder="0"
                   value={length}
                   onChange={(e) => setLength(e.target.value)}
                 />
@@ -160,11 +163,12 @@ export const EditAttributesDrawer = ({
 
               <div className="flex flex-col gap-y-1.5">
                 <Label size="small" weight="plus">
-                  Weight
+                  Weight (g)
                 </Label>
                 <Input
                   type="number"
                   min={0}
+                  placeholder="0"
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
                 />

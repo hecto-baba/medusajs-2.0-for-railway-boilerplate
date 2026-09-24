@@ -20,7 +20,11 @@ export const GetVendorCustomersSchema = z.object({
   has_account: z
     .union([z.boolean(), z.string(), z.array(z.string())])
     .optional(),
+  groups: z
+    .union([z.string(), z.array(z.string())])
+    .optional(),
   created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
   order: z.string().optional(),
 })
 
@@ -39,7 +43,7 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const vendorId = await getVendorId(req)
-  const { limit, offset, q, has_account, created_at_gte, order } = (
+  const { limit, offset, q, has_account, groups, created_at_gte, updated_at_gte, order } = (
     req.validatedQuery ?? {}
   ) as z.infer<typeof GetVendorCustomersSchema>
 
@@ -68,8 +72,19 @@ export const GET = async (
     }
   }
 
+  if (groups) {
+    const groupIds = Array.isArray(groups) ? groups : [groups]
+    if (groupIds.length) {
+      filters.groups = { id: groupIds }
+    }
+  }
+
   if (created_at_gte) {
     filters.created_at = { $gte: created_at_gte }
+  }
+
+  if (updated_at_gte) {
+    filters.updated_at = { $gte: updated_at_gte }
   }
 
   if (q && q.trim()) {

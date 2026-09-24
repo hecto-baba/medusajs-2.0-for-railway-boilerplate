@@ -32,6 +32,7 @@ export const GetVendorPromotionsSchema = z.object({
       value === undefined ? undefined : Array.isArray(value) ? value : [value]
     ),
   created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
   order: z.string().optional(),
 })
 
@@ -68,7 +69,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, status, type, created_at_gte, order } = req.validatedQuery as unknown as z.infer<
+  const { limit, offset, q, status, type, created_at_gte, updated_at_gte, order } = req.validatedQuery as unknown as z.infer<
     typeof GetVendorPromotionsSchema
   >
 
@@ -96,7 +97,8 @@ export const GET = async (
     orderField === "code" ||
     orderField === "status" ||
     orderField === "type" ||
-    orderField === "created_at"
+    orderField === "created_at" ||
+    orderField === "updated_at"
       ? orderField
       : undefined
 
@@ -109,6 +111,7 @@ export const GET = async (
       "status",
       "is_automatic",
       "created_at",
+      "updated_at",
       "application_method.value",
       "application_method.type",
       "application_method.currency_code",
@@ -118,7 +121,8 @@ export const GET = async (
       ...(q ? { code: { $ilike: `%${q}%` } } : {}),
       ...(status?.length ? { status } : {}),
       ...(type?.length ? { type } : {}),
-      ...(created_at_gte ? { created_at: { $gte: created_at_gte } } : {}),
+      ...(created_at_gte ? { created_at: { $gte: new Date(created_at_gte) } } : {}),
+      ...(updated_at_gte ? { updated_at: { $gte: new Date(updated_at_gte) } } : {}),
     },
     pagination: {
       skip: offset,

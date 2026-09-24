@@ -10,11 +10,37 @@ import { cookies } from "next/headers"
  * domain later (shop.example.com plus vendors.example.com) cannot cause the
  * two sessions to overwrite each other.
  */
+import type { NextRequest } from "next/server"
+
 const VENDOR_TOKEN_COOKIE = "_medusa_vendor_jwt"
 
-export const getVendorToken = async (): Promise<string | undefined> => {
-  const cookiesStore = await cookies()
-  return cookiesStore.get(VENDOR_TOKEN_COOKIE)?.value
+export const getVendorToken = async (
+  req?: NextRequest
+): Promise<string | undefined> => {
+  if (req) {
+    const fromReqCookie = req.cookies.get(VENDOR_TOKEN_COOKIE)?.value
+    if (fromReqCookie) return fromReqCookie
+
+    const authHeader = req.headers.get("authorization")
+    if (authHeader?.startsWith("Bearer ")) {
+      return authHeader.slice(7).trim()
+    }
+
+    const rawCookie = req.headers.get("cookie")
+    if (rawCookie) {
+      const match = rawCookie.match(
+        new RegExp(`(?:^|;\\s*)${VENDOR_TOKEN_COOKIE}=([^;]*)`)
+      )
+      if (match && match[1]) return decodeURIComponent(match[1])
+    }
+  }
+
+  try {
+    const cookiesStore = await cookies()
+    return cookiesStore.get(VENDOR_TOKEN_COOKIE)?.value
+  } catch {
+    return undefined
+  }
 }
 
 export const getVendorAuthHeaders = async (): Promise<

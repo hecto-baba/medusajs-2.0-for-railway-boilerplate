@@ -9,7 +9,10 @@ import {
   Badge,
   Button,
   createDataTableColumnHelper,
+  createDataTableFilterHelper,
   DataTable,
+  DataTableDateComparisonOperator,
+  DataTableFilteringState,
   DataTablePaginationState,
   DataTableSortingState,
   Heading,
@@ -19,7 +22,12 @@ import {
   usePrompt,
 } from "@medusajs/ui"
 import { Eye, PencilSquare, Plus, Trash } from "@medusajs/icons"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
@@ -27,6 +35,74 @@ import { ActionMenu, PlaceholderCell } from "@modules/common"
 import { ProductOptionDrawer } from "./forms/product-option-drawer"
 
 const columnHelper = createDataTableColumnHelper<VendorProductOptionItem>()
+const filterHelper = createDataTableFilterHelper<VendorProductOptionItem>()
+
+const extractFilterVal = (val: unknown): string | undefined => {
+  if (!val) return undefined
+  if (typeof val === "string") return val
+  if (typeof val === "number") return String(val)
+  if (Array.isArray(val)) return val[0]
+  if (typeof val === "object") {
+    const flat = Object.values(val).flat()
+    return (flat[0] as string) || undefined
+  }
+  return undefined
+}
+
+const resolveDateFilter = (val: any): string | undefined => {
+  if (!val || val === "all") return undefined
+  if (typeof val === "object") {
+    if (val.$gte) return typeof val.$gte === "string" ? val.$gte : new Date(val.$gte).toISOString()
+    const flat = Object.values(val).flat()
+    val = flat[0]
+  }
+  if (Array.isArray(val)) val = val[0]
+  if (typeof val !== "string" || val === "all") return undefined
+  const now = new Date()
+  if (val === "7d") {
+    now.setDate(now.getDate() - 7)
+    return now.toISOString()
+  }
+  if (val === "30d") {
+    now.setDate(now.getDate() - 30)
+    return now.toISOString()
+  }
+  if (val === "90d") {
+    now.setDate(now.getDate() - 90)
+    return now.toISOString()
+  }
+  if (!isNaN(Date.parse(val))) {
+    return new Date(val).toISOString()
+  }
+  return undefined
+}
+
+const dateFilterOptions = [
+  {
+    label: "Today",
+    value: {
+      $gte: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+    },
+  },
+  {
+    label: "Last 7 days",
+    value: {
+      $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  },
+  {
+    label: "Last 30 days",
+    value: {
+      $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  },
+  {
+    label: "Last 90 days",
+    value: {
+      $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  },
+]
 
 export const ProductOptionsTable = () => {
   const router = useRouter()
@@ -34,7 +110,13 @@ export const ProductOptionsTable = () => {
   const prompt = usePrompt()
 
   const [search, setSearch] = useState("")
+  const [filtering, setFiltering] = useState<DataTableFilteringState>({})
   const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [columnVisibility, setColumnVisibility] = useState<
+    Record<string, boolean>
+  >({
+    updated_at: false,
+  })
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -52,15 +134,33 @@ export const ProductOptionsTable = () => {
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
+  const typeFilterVal = extractFilterVal(filtering.is_exclusive)
+  const isExclusive =
+    typeFilterVal === "true"
+      ? true
+      : typeFilterVal === "false"
+      ? false
+      : undefined
+
+  const created_at_gte = resolveDateFilter(filtering.created_at)
+  const updated_at_gte = resolveDateFilter(filtering.updated_at)
+
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-product-options", { limit, offset, q: search, order }],
+    queryKey: [
+      "vendor-product-options",
+      { limit, offset, q: search, order, isExclusive, created_at_gte, updated_at_gte },
+    ],
     queryFn: () =>
       listVendorProductOptions({
         limit,
         offset,
         q: search || undefined,
+        is_exclusive: isExclusive,
+        created_at_gte,
+        updated_at_gte,
         order,
       }),
+    placeholderData: keepPreviousData,
   })
 
   const options = data?.product_options ?? []
@@ -91,11 +191,44 @@ export const ProductOptionsTable = () => {
     }
   }
 
+  const filters = useMemo(
+    () => [
+      filterHelper.accessor("is_exclusive", {
+        type: "radio",
+        label: "Type",
+        options: [
+          {
+            label: "Product-specific",
+            value: "true",
+          },
+          {
+            label: "Global",
+            value: "false",
+          },
+        ],
+      }),
+      filterHelper.accessor("created_at", {
+        type: "date",
+        label: "Created",
+        options: dateFilterOptions,
+      }),
+      filterHelper.accessor("updated_at", {
+        type: "date",
+        label: "Updated",
+        options: dateFilterOptions,
+      }),
+    ],
+    []
+  )
+
   const columns = useMemo(
     () => [
       columnHelper.accessor("title", {
         header: "Option Title",
         enableSorting: true,
+        sortLabel: "Title",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           const opt = row.original
           return (
@@ -160,6 +293,29 @@ export const ProductOptionsTable = () => {
       columnHelper.accessor("created_at", {
         header: "Created",
         enableSorting: true,
+        sortLabel: "Created",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ getValue }) => {
+          const date = getValue()
+          if (!date) return <PlaceholderCell />
+          return (
+            <Text size="small" className="text-ui-fg-subtle">
+              {new Date(date).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </Text>
+          )
+        },
+      }),
+      columnHelper.accessor("updated_at", {
+        header: "Updated",
+        enableSorting: true,
+        sortLabel: "Updated",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ getValue }) => {
           const date = getValue()
           if (!date) return <PlaceholderCell />
@@ -218,6 +374,14 @@ export const ProductOptionsTable = () => {
   const table = useDataTable({
     data: options,
     columns,
+    filters,
+    filtering: {
+      state: filtering,
+      onFilteringChange: (val) => {
+        setFiltering(val)
+        setPagination((p) => ({ ...p, pageIndex: 0 }))
+      },
+    },
     rowCount: count,
     getRowId: (row) => row.id,
     isLoading,
@@ -231,7 +395,14 @@ export const ProductOptionsTable = () => {
     },
     search: {
       state: search,
-      onSearchChange: setSearch,
+      onSearchChange: (value) => {
+        setSearch(value)
+        setPagination((state) => ({ ...state, pageIndex: 0 }))
+      },
+    },
+    columnVisibility: {
+      state: columnVisibility,
+      onColumnVisibilityChange: setColumnVisibility,
     },
   })
 
@@ -253,7 +424,12 @@ export const ProductOptionsTable = () => {
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between">
           <DataTable.Search placeholder="Search options..." />
+          <div className="flex items-center gap-x-2">
+            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTable.SortingMenu tooltip="Sort" />
+          </div>
         </DataTable.Toolbar>
+        <DataTable.FilterBar />
 
         <DataTable.Table />
 

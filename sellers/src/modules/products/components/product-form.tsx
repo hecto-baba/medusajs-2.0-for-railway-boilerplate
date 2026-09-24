@@ -8,7 +8,9 @@ import {
   listVendorProductTags,
   listVendorProductTypes,
   listVendorSalesChannels,
+  listVendorShippingProfiles,
   updateVendorProduct,
+  uploadVendorImages,
   type VendorCollection,
   type VendorProduct,
   type VendorProductTagItem,
@@ -20,6 +22,7 @@ import {
   Button,
   Checkbox,
   Heading,
+  IconButton,
   Input,
   Label,
   Select,
@@ -29,11 +32,11 @@ import {
   Textarea,
   toast,
 } from "@medusajs/ui"
-import { Plus, Trash, Sparkles } from "@medusajs/icons"
+import { Photo, Plus, Trash, Sparkles, XMark } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { PriceFields } from "./detail/variant-drawer"
 import { TrustClawCategoryPicker } from "./detail/trustclaw-category-picker"
 import { TrustClawAttributesSection } from "./detail/trustclaw-attributes-section"
@@ -96,27 +99,38 @@ const Field = ({
 
 /**
  * A numeric field that keeps its value as a string.
+ * Pass `unit` to show a read-only unit badge inside the input row (e.g. "g", "cm").
  */
 const NumberField = ({
   id,
   label,
   value,
   onChange,
+  unit,
 }: {
   id: string
   label: string
   value: string
   onChange: (value: string) => void
+  unit?: string
 }) => (
   <Field id={id} label={label}>
-    <Input
-      id={id}
-      type="number"
-      min="0"
-      step="any"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-    />
+    <div className="flex items-center gap-2">
+      <Input
+        id={id}
+        type="number"
+        min="0"
+        step="any"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="flex-1"
+      />
+      {unit && (
+        <span className="shrink-0 rounded-md border border-ui-border-base bg-ui-bg-subtle px-2.5 py-1.5 text-xs font-medium text-ui-fg-subtle select-none">
+          {unit}
+        </span>
+      )}
+    </div>
   </Field>
 )
 
@@ -179,6 +193,9 @@ export const ProductForm = ({ product }: ProductFormProps) => {
   const [selectedSalesChannelIds, setSelectedSalesChannelIds] = useState<string[]>(
     product?.sales_channels?.map((sc) => sc.id) ?? []
   )
+  const [selectedShippingProfileId, setSelectedShippingProfileId] = useState<string>(
+    product?.shipping_profile?.id ?? ""
+  )
 
   // Fetch organize datasets
   const { data: typesData } = useQuery({
@@ -201,11 +218,17 @@ export const ProductForm = ({ product }: ProductFormProps) => {
     queryFn: () => listVendorSalesChannels({ limit: 100, offset: 0 }),
     staleTime: 5 * 60 * 1000,
   })
+  const { data: shippingProfilesData } = useQuery({
+    queryKey: ["vendor-shipping-profiles"],
+    queryFn: () => listVendorShippingProfiles(),
+    staleTime: 10 * 60 * 1000,
+  })
 
   const productTypes = useMemo(() => typesData?.product_types ?? [], [typesData?.product_types])
   const collections = useMemo(() => collectionsData?.collections ?? [], [collectionsData?.collections])
   const existingTags = useMemo(() => tagsData?.product_tags ?? [], [tagsData?.product_tags])
   const salesChannels = useMemo(() => salesChannelsData?.sales_channels ?? [], [salesChannelsData?.sales_channels])
+  const shippingProfiles = useMemo(() => shippingProfilesData?.shipping_profiles ?? [], [shippingProfilesData?.shipping_profiles])
 
   // Initialize default sales channel if creating and channels loaded
   useEffect(() => {
@@ -216,7 +239,10 @@ export const ProductForm = ({ product }: ProductFormProps) => {
   }, [isEdit, salesChannels])
 
   // 3. Variants & Options Configuration
-  const [variantMode, setVariantMode] = useState<"single" | "multi">("single")
+  // hasVariants mirrors Backend Production's "Variants" toggle in the Details section
+  const [hasVariants, setHasVariants] = useState<boolean>(false)
+  const variantMode = hasVariants ? "multi" : "single"
+  const setVariantMode = (mode: "single" | "multi") => setHasVariants(mode === "multi")
   
   // Single variant price
   const [prices, setPrices] = useState<Record<string, string>>({
@@ -335,6 +361,13 @@ export const ProductForm = ({ product }: ProductFormProps) => {
     product?.origin_country ?? ""
   )
 
+  // 5. Media (staged for create; edit uses MediaSection which saves immediately)
+  const [mediaImages, setMediaImages] = useState<{ url: string }[]>(
+    product?.images?.map((img) => ({ url: img.url })) ?? []
+  )
+  const [mediaUploading, setMediaUploading] = useState(false)
+  const mediaInputRef = useRef<HTMLInputElement>(null)
+
   const [error, setError] = useState<string | null>(null)
 
   const { mutateAsync: save, isPending } = useMutation({
@@ -347,6 +380,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
         discountable,
         type_id: selectedTypeId || undefined,
         collection_id: selectedCollectionId || undefined,
+        shipping_profile_id: selectedShippingProfileId || undefined,
         material: text(material),
         hs_code: text(hsCode),
         mid_code: text(midCode),
@@ -434,6 +468,13 @@ export const ProductForm = ({ product }: ProductFormProps) => {
           : {}),
         options: payloadOptions,
         variants: payloadVariants,
+        // Attach staged media — images field is replace-semantics on the API
+        ...(mediaImages.length > 0
+          ? {
+              images: mediaImages,
+              thumbnail: mediaImages[0].url,
+            }
+          : {}),
       })
     },
     onSuccess: () => {
@@ -603,12 +644,147 @@ export const ProductForm = ({ product }: ProductFormProps) => {
           </div>
           <Switch checked={discountable} onCheckedChange={setDiscountable} />
         </div>
+
+        {!isEdit && (
+          <>
+            <div className="flex items-center justify-between rounded-lg border border-ui-border-base p-3">
+              <div className="flex flex-col">
+                <Label size="small" weight="plus">
+                  This product has variants
+                </Label>
+                <Text size="small" className="text-ui-fg-subtle">
+                  Enable to define options (e.g. Size, Color) and generate a variant matrix.
+                </Text>
+              </div>
+              <Switch
+                checked={hasVariants}
+                onCheckedChange={setHasVariants}
+              />
+            </div>
+          </>
+        )}
       </Card>
 
-      {/* 3. Organize (Product Type, Collection, Tags, Sales Channels) */}
+      {/* Media card — shown for both create and edit; for create, images are staged */}
+      <Card
+        title="Media"
+        description="Upload product images. The first image will be used as the thumbnail."
+        action={
+          <>
+            <input
+              ref={mediaInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={async (e) => {
+                const files = e.target.files
+                if (!files?.length) return
+                e.target.value = ""
+
+                if (isEdit) {
+                  // Edit mode: upload and save to the product immediately
+                  setMediaUploading(true)
+                  try {
+                    const uploaded = await uploadVendorImages(Array.from(files))
+                    const existing = product!.images?.map((img) => ({ url: img.url })) ?? []
+                    const next = [
+                      ...existing,
+                      ...uploaded.map((f) => ({ url: f.url })),
+                    ]
+                    await updateVendorProduct(product!.id, {
+                      images: next,
+                      ...(!product!.thumbnail ? { thumbnail: uploaded[0]?.url } : {}),
+                    })
+                    queryClient.invalidateQueries({ queryKey: ["vendor-product", product!.id] })
+                    toast.success(uploaded.length === 1 ? "Image added." : `${uploaded.length} images added.`)
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Could not upload images.")
+                  } finally {
+                    setMediaUploading(false)
+                  }
+                } else {
+                  // Create mode: upload files and stage the URLs; they are sent with the product on submit
+                  setMediaUploading(true)
+                  try {
+                    const uploaded = await uploadVendorImages(Array.from(files))
+                    setMediaImages((prev) => [
+                      ...prev,
+                      ...uploaded.map((f) => ({ url: f.url })),
+                    ])
+                    toast.success(uploaded.length === 1 ? "Image ready." : `${uploaded.length} images ready.`)
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Could not upload images.")
+                  } finally {
+                    setMediaUploading(false)
+                  }
+                }
+              }}
+            />
+            <Button
+              size="small"
+              variant="secondary"
+              type="button"
+              isLoading={mediaUploading}
+              onClick={() => mediaInputRef.current?.click()}
+            >
+              Add images
+            </Button>
+          </>
+        }
+      >
+        {mediaImages.length > 0 ? (
+          <div className="flex flex-wrap gap-3">
+            {mediaImages.map((img, idx) => (
+              <div
+                key={img.url}
+                className="group relative h-28 w-28 overflow-hidden rounded-lg border border-ui-border-base"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={img.url}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+                {idx === 0 && (
+                  <span className="absolute left-1 top-1 rounded bg-ui-bg-base px-1.5 py-0.5 text-[10px] font-medium text-ui-fg-subtle">
+                    Thumbnail
+                  </span>
+                )}
+                <IconButton
+                  size="small"
+                  variant="transparent"
+                  type="button"
+                  disabled={mediaUploading}
+                  onClick={() =>
+                    setMediaImages((prev) => prev.filter((_, i) => i !== idx))
+                  }
+                  className="absolute right-1 top-1 hidden bg-ui-bg-base group-hover:flex"
+                >
+                  <XMark />
+                </IconButton>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={mediaUploading}
+            onClick={() => mediaInputRef.current?.click()}
+            className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ui-border-base bg-ui-bg-subtle p-8 text-ui-fg-muted transition-colors hover:border-ui-border-strong hover:bg-ui-bg-base"
+          >
+            <Photo className="size-8 opacity-40" />
+            <Text size="small">
+              Click to upload images — first image becomes the thumbnail
+            </Text>
+          </button>
+        )}
+      </Card>
+
+      {/* 3. Organize (Product Type, Collection, Shipping Profile, Tags, Sales Channels) */}
       <Card
         title="Organize"
-        description="Categorize your product with collections, product types, tags, and sales channels."
+        description="Categorize your product with collections, product types, shipping profile, tags, and sales channels."
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Product Type */}
@@ -659,6 +835,37 @@ export const ProductForm = ({ product }: ProductFormProps) => {
                   ))}
               </Select.Content>
             </Select>
+          </div>
+
+          {/* Shipping Profile */}
+          <div className="col-span-1 md:col-span-2 flex flex-col gap-y-2">
+            <Label size="small" weight="plus">
+              Shipping Profile
+            </Label>
+            <Select
+              value={selectedShippingProfileId || "default"}
+              onValueChange={(val) =>
+                setSelectedShippingProfileId(val === "default" ? "" : val)
+              }
+            >
+              <Select.Trigger>
+                <Select.Value placeholder="Select a shipping profile..." />
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value="default">Default (auto-assigned)</Select.Item>
+                {shippingProfiles.map((sp) => (
+                  <Select.Item key={sp.id} value={sp.id}>
+                    {sp.name}
+                    {sp.type ? (
+                      <span className="ml-1 text-ui-fg-muted text-xs">({sp.type})</span>
+                    ) : null}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select>
+            <Text size="xsmall" className="text-ui-fg-subtle">
+              Determines the shipping methods available at checkout. Leave on default if unsure.
+            </Text>
           </div>
 
           {/* Tags */}
@@ -721,42 +928,55 @@ export const ProductForm = ({ product }: ProductFormProps) => {
             <Label size="small" weight="plus">
               Sales Channels
             </Label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-              {salesChannels.map((sc) => {
-                const isChecked = selectedSalesChannelIds.includes(sc.id)
-                return (
-                  <div
-                    key={sc.id}
-                    onClick={() => {
-                      if (isChecked) {
-                        setSelectedSalesChannelIds(
-                          selectedSalesChannelIds.filter((id) => id !== sc.id)
-                        )
-                      } else {
-                        setSelectedSalesChannelIds([...selectedSalesChannelIds, sc.id])
-                      }
-                    }}
-                    className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      isChecked
-                        ? "bg-ui-bg-base border-ui-border-interactive ring-1 ring-ui-border-interactive"
-                        : "bg-ui-bg-subtle border-ui-border-base hover:border-ui-border-strong"
-                    }`}
-                  >
-                    <Checkbox checked={isChecked} />
-                    <div className="flex flex-col">
-                      <Text size="small" weight="plus">
-                        {sc.name}
-                      </Text>
-                      {sc.description && (
-                        <Text size="xsmall" className="text-ui-fg-muted line-clamp-1">
-                          {sc.description}
+            {salesChannels.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-ui-border-base bg-ui-bg-subtle p-4">
+                <div className="flex flex-col gap-1">
+                  <Text size="small" weight="plus" className="text-ui-fg-base">
+                    Default sales channel will be used
+                  </Text>
+                  <Text size="small" className="text-ui-fg-subtle">
+                    No additional sales channels have been configured in the store. The product will be available in the default sales channel once created. You can manage channels from the Sales Channels section after saving.
+                  </Text>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {salesChannels.map((sc) => {
+                  const isChecked = selectedSalesChannelIds.includes(sc.id)
+                  return (
+                    <div
+                      key={sc.id}
+                      onClick={() => {
+                        if (isChecked) {
+                          setSelectedSalesChannelIds(
+                            selectedSalesChannelIds.filter((id) => id !== sc.id)
+                          )
+                        } else {
+                          setSelectedSalesChannelIds([...selectedSalesChannelIds, sc.id])
+                        }
+                      }}
+                      className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        isChecked
+                          ? "bg-ui-bg-base border-ui-border-interactive ring-1 ring-ui-border-interactive"
+                          : "bg-ui-bg-subtle border-ui-border-base hover:border-ui-border-strong"
+                      }`}
+                    >
+                      <Checkbox checked={isChecked} />
+                      <div className="flex flex-col">
+                        <Text size="small" weight="plus">
+                          {sc.name}
                         </Text>
-                      )}
+                        {sc.description && (
+                          <Text size="xsmall" className="text-ui-fg-muted line-clamp-1">
+                            {sc.description}
+                          </Text>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       </Card>
@@ -1079,10 +1299,10 @@ export const ProductForm = ({ product }: ProductFormProps) => {
         description="Used for shipping rates and customs paperwork. All optional."
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <NumberField id="weight" label="Weight" value={weight} onChange={setWeight} />
-          <NumberField id="length" label="Length" value={length} onChange={setLength} />
-          <NumberField id="height" label="Height" value={height} onChange={setHeight} />
-          <NumberField id="width" label="Width" value={width} onChange={setWidth} />
+          <NumberField id="weight" label="Weight (g)" unit="g" value={weight} onChange={setWeight} />
+          <NumberField id="length" label="Length (cm)" unit="cm" value={length} onChange={setLength} />
+          <NumberField id="height" label="Height (cm)" unit="cm" value={height} onChange={setHeight} />
+          <NumberField id="width" label="Width (cm)" unit="cm" value={width} onChange={setWidth} />
         </div>
 
         <Field id="material" label="Material">

@@ -327,7 +327,7 @@ export function TrustClawCategoryPicker({
           )}
 
           {/* ── Step 2: Category Hierarchy Navigation ── */}
-          {selectedSegmentCode && (
+          {selectedSegmentCode ? (
             <div className="flex flex-col gap-2 pt-1 border-t border-ui-border-base">
               {/* Breadcrumb path navigation bar */}
               <div className="flex items-center justify-between gap-2 py-1">
@@ -436,6 +436,14 @@ export function TrustClawCategoryPicker({
                   ))
                 )}
               </div>
+            </div>
+          ) : !isVendorScoped && (
+            /* Shown when the segment selector is present but nothing selected yet */
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-ui-border-base bg-ui-bg-subtle p-6 text-center pt-2 border-t border-ui-border-base">
+              <Folder className="h-8 w-8 text-ui-fg-disabled" />
+              <Text size="small" className="text-ui-fg-subtle">
+                Select an industry segment above to browse available product categories.
+              </Text>
             </div>
           )}
         </div>

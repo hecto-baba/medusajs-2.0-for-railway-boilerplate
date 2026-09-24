@@ -23,7 +23,7 @@ const forward = async (
   path: string[],
   method: "GET" | "POST" | "PATCH" | "DELETE"
 ) => {
-  const token = await getVendorToken()
+  const token = await getVendorToken(req)
 
   if (!token) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 })

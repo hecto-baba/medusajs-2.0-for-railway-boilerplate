@@ -30,6 +30,22 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
+  const {
+    data: [vendorAdmin],
+  } = await query.graph({
+    entity: "vendor_admin",
+    fields: ["vendor.id", "vendor.stock_locations.id"],
+    filters: { id: [req.auth_context.actor_id] },
+  }).catch(() => ({ data: [] }))
+
+  const vendorLocationIds = (vendorAdmin?.vendor?.stock_locations || [])
+    .map((l: any) => l?.id)
+    .filter(Boolean)
+
+  const stockLocationFilters = vendorLocationIds.length
+    ? { id: vendorLocationIds }
+    : {}
+
   const [
     collections,
     categories,
@@ -81,8 +97,9 @@ export const GET = async (
     }),
     query.graph({
       entity: "stock_location",
-      fields: ["id", "name"],
-      pagination: { order: { name: "ASC" } },
+      fields: ["id", "name", "address.*"],
+      filters: stockLocationFilters,
+      pagination: { order: { created_at: "ASC" } },
     }),
   ])
 

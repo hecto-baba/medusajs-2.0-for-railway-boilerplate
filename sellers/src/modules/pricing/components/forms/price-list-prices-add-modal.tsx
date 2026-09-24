@@ -3,9 +3,11 @@
 import {
   batchVendorPriceListPrices,
   listVendorCollections,
+  listVendorProductTags,
   listVendorProductTypes,
   listVendorProducts,
   listVendorRegions,
+  listVendorSalesChannels,
   type VendorPriceList,
   type VendorProduct,
 } from "@lib/data/vendor-client"
@@ -42,6 +44,17 @@ const extractFilterVal = (val: any): string | undefined => {
   if (typeof val === "object") {
     const flat = Object.values(val).flat()
     return (flat[0] as string) || undefined
+  }
+  return undefined
+}
+
+const extractMultiFilterVal = (val: any): string[] | undefined => {
+  if (!val) return undefined
+  if (Array.isArray(val)) return val.length ? val : undefined
+  if (typeof val === "string") return [val]
+  if (typeof val === "object") {
+    const flat = Object.values(val).flat() as string[]
+    return flat.length ? flat : undefined
   }
   return undefined
 }
@@ -124,7 +137,7 @@ export const PriceListPricesAddModal = ({
     }
   }, [availableCurrencies, selectedCurrency])
 
-  // Fetch collections & types for filter options
+  // Fetch filter options
   const { data: collectionsData } = useQuery({
     queryKey: ["vendor-collections-filter"],
     queryFn: () => listVendorCollections({ limit: 100, offset: 0 }),
@@ -133,6 +146,16 @@ export const PriceListPricesAddModal = ({
   const { data: typesData } = useQuery({
     queryKey: ["vendor-types-filter"],
     queryFn: () => listVendorProductTypes({ limit: 100, offset: 0 }),
+    enabled: open,
+  })
+  const { data: tagsData } = useQuery({
+    queryKey: ["vendor-tags-filter"],
+    queryFn: () => listVendorProductTags({ limit: 100, offset: 0 }),
+    enabled: open,
+  })
+  const { data: salesChannelsData } = useQuery({
+    queryKey: ["vendor-channels-filter"],
+    queryFn: () => listVendorSalesChannels({ limit: 100, offset: 0 }),
     enabled: open,
   })
 
@@ -153,23 +176,42 @@ export const PriceListPricesAddModal = ({
   }, [productFiltering])
 
   const typeFilter = useMemo(() => {
-    return extractFilterVal(productFiltering["type_id"])
+    return extractMultiFilterVal(productFiltering["type_id"])
   }, [productFiltering])
 
-  const dateFilter = useMemo(() => {
-    const val = extractFilterVal(productFiltering["created_at_gte"])
-    if (!val) return undefined
+  const tagFilter = useMemo(() => {
+    return extractMultiFilterVal(productFiltering["tag_id"])
+  }, [productFiltering])
+
+  const salesChannelFilter = useMemo(() => {
+    return extractMultiFilterVal(productFiltering["sales_channel_id"])
+  }, [productFiltering])
+
+  const resolveDateFilter = (val: any): string | undefined => {
+    const raw = extractFilterVal(val)
+    if (!raw || raw === "all") return undefined
     const now = new Date()
-    if (val === "7d") {
+    if (raw === "7d") {
       return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
     }
-    if (val === "30d") {
+    if (raw === "30d") {
       return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
     }
-    if (val === "90d") {
+    if (raw === "90d") {
       return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString()
     }
-    return val
+    if (!isNaN(Date.parse(raw))) {
+      return new Date(raw).toISOString()
+    }
+    return undefined
+  }
+
+  const createdDateFilter = useMemo(() => {
+    return resolveDateFilter(productFiltering["created_at_gte"] ?? productFiltering["created_at"])
+  }, [productFiltering])
+
+  const updatedDateFilter = useMemo(() => {
+    return resolveDateFilter(productFiltering["updated_at_gte"] ?? productFiltering["updated_at"])
   }, [productFiltering])
 
   const productOrder = useMemo(() => {
@@ -191,7 +233,10 @@ export const PriceListPricesAddModal = ({
         status: statusFilter,
         collection_id: collectionFilter,
         type_id: typeFilter,
-        created_at_gte: dateFilter,
+        tag_id: tagFilter,
+        sales_channel_id: salesChannelFilter,
+        created_at_gte: createdDateFilter,
+        updated_at_gte: updatedDateFilter,
         order: productOrder,
       },
     ],
@@ -203,7 +248,10 @@ export const PriceListPricesAddModal = ({
         status: statusFilter,
         collection_id: collectionFilter,
         type_id: typeFilter,
-        created_at_gte: dateFilter,
+        tag_id: tagFilter,
+        sales_channel_id: salesChannelFilter,
+        created_at_gte: createdDateFilter,
+        updated_at_gte: updatedDateFilter,
         order: productOrder,
       }),
     enabled: open,
@@ -328,7 +376,38 @@ export const PriceListPricesAddModal = ({
   )
 
   const productFilters = useMemo(() => {
+    const types = typesData?.product_types ?? []
+    const tags = tagsData?.product_tags ?? []
+    const channels = salesChannelsData?.sales_channels ?? []
+
     const list: any[] = [
+      productFilterHelper.custom({
+        id: "type_id",
+        label: "Type",
+        type: "select",
+        options: types.map((t) => ({
+          label: t.value,
+          value: t.id,
+        })),
+      }),
+      productFilterHelper.custom({
+        id: "tag_id",
+        label: "Tag",
+        type: "select",
+        options: tags.map((t) => ({
+          label: t.value,
+          value: t.id,
+        })),
+      }),
+      productFilterHelper.custom({
+        id: "sales_channel_id",
+        label: "Sales Channel",
+        type: "select",
+        options: channels.map((sc) => ({
+          label: sc.name,
+          value: sc.id,
+        })),
+      }),
       productFilterHelper.accessor("status", {
         label: "Status",
         type: "multiselect",
@@ -339,53 +418,30 @@ export const PriceListPricesAddModal = ({
           { label: "Rejected", value: "rejected" },
         ],
       }),
-    ]
-
-    const collections = collectionsData?.collections ?? []
-    if (collections.length > 0) {
-      list.push(
-        productFilterHelper.custom({
-          id: "collection_id",
-          label: "Collection",
-          type: "select",
-          options: collections.map((c) => ({
-            label: c.title,
-            value: c.id,
-          })),
-        })
-      )
-    }
-
-    const types = typesData?.product_types ?? []
-    if (types.length > 0) {
-      list.push(
-        productFilterHelper.custom({
-          id: "type_id",
-          label: "Type",
-          type: "select",
-          options: types.map((t) => ({
-            label: t.value,
-            value: t.id,
-          })),
-        })
-      )
-    }
-
-    list.push(
       productFilterHelper.custom({
         id: "created_at_gte",
-        label: "Date Created",
+        label: "Created",
         type: "select",
         options: [
           { label: "Last 7 days", value: "7d" },
           { label: "Last 30 days", value: "30d" },
           { label: "Last 90 days", value: "90d" },
         ],
-      })
-    )
+      }),
+      productFilterHelper.custom({
+        id: "updated_at_gte",
+        label: "Updated",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      }),
+    ]
 
     return list
-  }, [collectionsData, typesData, productFilterHelper])
+  }, [typesData, tagsData, salesChannelsData, productFilterHelper])
 
   const productColumns = useMemo(
     () => [
@@ -420,8 +476,8 @@ export const PriceListPricesAddModal = ({
         header: "Product",
         enableSorting: true,
         sortLabel: "Title",
-        sortAscLabel: "A-Z",
-        sortDescLabel: "Z-A",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           const prod = row.original
           return (
@@ -446,6 +502,8 @@ export const PriceListPricesAddModal = ({
         header: "Status",
         enableSorting: true,
         sortLabel: "Status",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ getValue }) => {
           const status = getValue()
           return (
@@ -460,6 +518,7 @@ export const PriceListPricesAddModal = ({
       }),
       productColumnHelper.accessor("variants", {
         header: "Variants",
+        enableSorting: false,
         cell: ({ getValue }) => {
           const count = getValue()?.length ?? 0
           return (
@@ -474,14 +533,30 @@ export const PriceListPricesAddModal = ({
         header: "Created",
         enableSorting: true,
         sortLabel: "Created",
-        sortAscLabel: "Oldest first",
-        sortDescLabel: "Newest first",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ getValue }) =>
           new Date(getValue()).toLocaleDateString(undefined, {
             year: "numeric",
             month: "short",
             day: "numeric",
           }),
+      }),
+      productColumnHelper.accessor("updated_at", {
+        id: "updated_at",
+        header: "Updated",
+        enableSorting: true,
+        sortLabel: "Updated",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ getValue }) =>
+          getValue()
+            ? new Date(getValue()).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })
+            : "-",
       }),
     ],
     [selectedProducts, products, allPageProductsSelected, somePageProductsSelected]

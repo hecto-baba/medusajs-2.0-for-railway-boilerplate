@@ -3,6 +3,7 @@
 import {
   createVendorInventoryItem,
   getVendorTaxonomy,
+  listVendorStockLocations,
 } from "@lib/data/vendor-client"
 import {
   Button,
@@ -57,10 +58,24 @@ export const InventoryCreateForm = () => {
     Record<string, number>
   >({})
 
+  const { data: stockLocationsData, isLoading: isLoadingStockLocations } =
+    useQuery({
+      queryKey: ["vendor-stock-locations"],
+      queryFn: () => listVendorStockLocations({ limit: 100, offset: 0 }),
+    })
+
   const { data: taxonomy, isLoading: isLoadingTaxonomy } = useQuery({
     queryKey: ["vendor-taxonomy"],
     queryFn: getVendorTaxonomy,
   })
+
+  const stockLocations =
+    stockLocationsData?.stock_locations &&
+    stockLocationsData.stock_locations.length > 0
+      ? stockLocationsData.stock_locations
+      : taxonomy?.stock_locations ?? []
+
+  const isLoadingLocations = isLoadingStockLocations && isLoadingTaxonomy
 
   const { mutateAsync: createItem, isPending } = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
@@ -227,44 +242,48 @@ export const InventoryCreateForm = () => {
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               <div className="flex flex-col gap-y-1.5">
                 <Label size="small" weight="plus">
-                  Height
+                  Height (cm)
                 </Label>
                 <Input
                   type="number"
                   min={0}
+                  placeholder="0"
                   value={height}
                   onChange={(e) => setHeight(e.target.value)}
                 />
               </div>
               <div className="flex flex-col gap-y-1.5">
                 <Label size="small" weight="plus">
-                  Width
+                  Width (cm)
                 </Label>
                 <Input
                   type="number"
                   min={0}
+                  placeholder="0"
                   value={width}
                   onChange={(e) => setWidth(e.target.value)}
                 />
               </div>
               <div className="flex flex-col gap-y-1.5">
                 <Label size="small" weight="plus">
-                  Length
+                  Length (cm)
                 </Label>
                 <Input
                   type="number"
                   min={0}
+                  placeholder="0"
                   value={length}
                   onChange={(e) => setLength(e.target.value)}
                 />
               </div>
               <div className="flex flex-col gap-y-1.5">
                 <Label size="small" weight="plus">
-                  Weight
+                  Weight (g)
                 </Label>
                 <Input
                   type="number"
                   min={0}
+                  placeholder="0"
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
                 />
@@ -294,17 +313,17 @@ export const InventoryCreateForm = () => {
             Availability
           </Heading>
 
-          {isLoadingTaxonomy ? (
+          {isLoadingLocations ? (
             <Text size="small" className="text-ui-fg-subtle">
               Loading locations...
             </Text>
-          ) : (taxonomy?.stock_locations ?? []).length === 0 ? (
+          ) : stockLocations.length === 0 ? (
             <Text size="small" className="text-ui-fg-subtle">
               No stock locations available.
             </Text>
           ) : (
             <div className="border-ui-border-base divide-ui-border-base divide-y rounded-lg border">
-              {(taxonomy?.stock_locations ?? []).map((loc) => (
+              {stockLocations.map((loc) => (
                 <div
                   key={loc.id}
                   className="flex items-center justify-between p-3.5"
@@ -313,9 +332,9 @@ export const InventoryCreateForm = () => {
                     <Text size="small" weight="plus">
                       {loc.name}
                     </Text>
-                    {(loc as any).address && (
+                    {loc.address && (
                       <Text size="xsmall" className="text-ui-fg-subtle">
-                        {[(loc as any).address.city, (loc as any).address.country_code?.toUpperCase()]
+                        {[loc.address.city, loc.address.country_code?.toUpperCase()]
                           .filter(Boolean)
                           .join(", ")}
                       </Text>
