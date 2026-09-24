@@ -24,7 +24,7 @@ import {
   XMark,
 } from "@medusajs/icons"
 import { useQuery } from "@tanstack/react-query"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 interface Props {
   /** Called with the category ID and name once the seller selects a category */
@@ -86,17 +86,23 @@ export function TrustClawCategoryPicker({
 
   const safeSegments = Array.isArray(segments) ? segments : []
 
-  // 1. Resolve vendor's effective segment code
-  const effectiveVendorSegmentCode =
-    propSegmentCode ||
-    onboarding?.segment?.code ||
-    safeSegments.find(
-      (s) =>
-        s.id === onboarding?.segmentId ||
-        s.code === onboarding?.segmentId ||
-        (onboarding?.segment?.name &&
-          s.name?.toLowerCase() === onboarding.segment.name.toLowerCase())
-    )?.code
+  // 1. Resolve vendor's effective segment code — memoized so .find() doesn't
+  //    return a new reference on every render and trigger infinite useEffect loops.
+  const effectiveVendorSegmentCode = useMemo(() => {
+    return (
+      propSegmentCode ||
+      onboarding?.segment?.code ||
+      safeSegments.find(
+        (s) =>
+          s.id === onboarding?.segmentId ||
+          s.code === onboarding?.segmentId ||
+          (onboarding?.segment?.name &&
+            s.name?.toLowerCase() === onboarding.segment.name.toLowerCase())
+      )?.code ||
+      undefined
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propSegmentCode, onboarding?.segment?.code, onboarding?.segment?.name, onboarding?.segmentId, segments])
 
   const isVendorScoped = Boolean(effectiveVendorSegmentCode)
 
@@ -106,12 +112,15 @@ export function TrustClawCategoryPicker({
   )
   const [breadcrumb, setBreadcrumb] = useState<TrustClawCategory[]>([])
 
-  // Auto-synchronize locked segment once onboarding loads
+  // Auto-synchronize locked segment once onboarding resolves.
+  // NOTE: selectedSegmentCode is intentionally NOT in deps — adding it would
+  // cause an infinite loop (effect sets it → triggers itself again).
   useEffect(() => {
     if (effectiveVendorSegmentCode && selectedSegmentCode !== effectiveVendorSegmentCode) {
       setSelectedSegmentCode(effectiveVendorSegmentCode)
     }
-  }, [effectiveVendorSegmentCode, selectedSegmentCode])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveVendorSegmentCode])
 
   // ── Browse Drilldown Query ──
   const currentParentId =
