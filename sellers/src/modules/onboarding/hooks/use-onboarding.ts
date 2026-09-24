@@ -19,8 +19,8 @@ export const useVendorOnboardingStatus = () => {
   return useQuery({
     queryKey: [...ONBOARDING_QUERY_KEY, "status"],
     queryFn: async () => {
-      const res = await getVendorOnboardingStatus()
-      return res.onboarding
+      const res = await getVendorOnboardingStatus().catch(() => null)
+      return res?.onboarding ?? null
     },
     staleTime: 30 * 1000,
   })

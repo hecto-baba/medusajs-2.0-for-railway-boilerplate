@@ -15,7 +15,7 @@
 
 const BASE_URL =
   process.env.TRUSTCLAW_API_URL || "https://trustclaw-steel-phi.vercel.app"
-const API_KEY = process.env.TRUSTCLAW_API_KEY || ""
+const API_KEY = process.env.TRUSTCLAW_API_KEY || "dev_secret_key_123"
 
 export class TrustClawError extends Error {
   constructor(

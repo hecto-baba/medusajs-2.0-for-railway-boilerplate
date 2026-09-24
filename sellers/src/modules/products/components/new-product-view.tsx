@@ -18,7 +18,8 @@ export function NewProductView() {
     staleTime: 10 * 60 * 1000,
   })
 
-  const matchedSegment = segments.find(
+  const safeSegments = Array.isArray(segments) ? segments : []
+  const matchedSegment = safeSegments.find(
     (s) =>
       (onboarding?.segment?.code && s.code === onboarding.segment.code) ||
       (onboarding?.segmentId && s.id === onboarding.segmentId) ||
