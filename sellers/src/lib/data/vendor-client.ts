@@ -455,9 +455,9 @@ export type TrustClawCategory = {
  * Proxied through Medusa so the API key stays server-side.
  */
 export const getTrustClawSegments = () =>
-  request<{ segments: TrustClawSegment[] }>("taxonomy/segments", {}).then(
-    (r) => r.segments
-  )
+  request<{ segments: TrustClawSegment[] }>("taxonomy/segments", {})
+    .then((r) => (Array.isArray(r?.segments) ? r.segments : []))
+    .catch(() => [] as TrustClawSegment[])
 
 export type TrustClawCategoryQueryParams = {
   segmentCode?: string
@@ -507,7 +507,9 @@ export const getTrustClawCategories = (
   return request<{ categories: TrustClawCategory[] }>(
     "taxonomy/tc-categories",
     params
-  ).then((r) => r.categories)
+  )
+    .then((r) => (Array.isArray(r?.categories) ? r.categories : []))
+    .catch(() => [] as TrustClawCategory[])
 }
 
 export type TrustClawVendorType = {

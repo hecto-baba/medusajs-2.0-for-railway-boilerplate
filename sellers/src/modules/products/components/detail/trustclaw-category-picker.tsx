@@ -84,11 +84,13 @@ export function TrustClawCategoryPicker({
     staleTime: 10 * 60 * 1000,
   })
 
+  const safeSegments = Array.isArray(segments) ? segments : []
+
   // 1. Resolve vendor's effective segment code
   const effectiveVendorSegmentCode =
     propSegmentCode ||
     onboarding?.segment?.code ||
-    segments.find(
+    safeSegments.find(
       (s) =>
         s.id === onboarding?.segmentId ||
         s.code === onboarding?.segmentId ||
@@ -115,7 +117,7 @@ export function TrustClawCategoryPicker({
   const currentParentId =
     breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].id : undefined
 
-  const { data: categories = [], isLoading: categoriesLoading } = useQuery({
+  const { data: rawCategories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: [
       "tc-categories-browse",
       selectedSegmentCode,
@@ -130,8 +132,10 @@ export function TrustClawCategoryPicker({
     staleTime: 5 * 60 * 1000,
   })
 
+  const categories = Array.isArray(rawCategories) ? rawCategories : []
+
   const currentSegment =
-    segments.find((s) => s.code === selectedSegmentCode) ||
+    safeSegments.find((s) => s.code === selectedSegmentCode) ||
     (onboarding?.segment?.code === selectedSegmentCode ? onboarding.segment : null)
 
   // ── Handlers ──
@@ -301,11 +305,13 @@ export function TrustClawCategoryPicker({
                 </Select.Trigger>
                 <Select.Content>
                   <Select.Item value={NONE}>— Select segment —</Select.Item>
-                  {segments.map((seg) => (
-                    <Select.Item key={seg.id} value={seg.code}>
-                      {seg.name} ({seg.orderType || "BUY"})
-                    </Select.Item>
-                  ))}
+                  {safeSegments
+                    .filter((seg) => Boolean(seg?.code))
+                    .map((seg) => (
+                      <Select.Item key={seg.id} value={String(seg.code)}>
+                        {seg.name} ({seg.orderType || "BUY"})
+                      </Select.Item>
+                    ))}
                 </Select.Content>
               </Select>
             </div>

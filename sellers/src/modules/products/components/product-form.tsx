@@ -620,11 +620,13 @@ export const ProductForm = ({ product }: ProductFormProps) => {
               </Select.Trigger>
               <Select.Content>
                 <Select.Item value="none">None</Select.Item>
-                {productTypes.map((pt) => (
-                  <Select.Item key={pt.id} value={pt.id}>
-                    {pt.value}
-                  </Select.Item>
-                ))}
+                {productTypes
+                  .filter((pt) => Boolean(pt?.id))
+                  .map((pt) => (
+                    <Select.Item key={pt.id} value={String(pt.id)}>
+                      {pt.value}
+                    </Select.Item>
+                  ))}
               </Select.Content>
             </Select>
           </div>
@@ -643,11 +645,13 @@ export const ProductForm = ({ product }: ProductFormProps) => {
               </Select.Trigger>
               <Select.Content>
                 <Select.Item value="none">None</Select.Item>
-                {collections.map((c) => (
-                  <Select.Item key={c.id} value={c.id}>
-                    {c.title}
-                  </Select.Item>
-                ))}
+                {collections
+                  .filter((c) => Boolean(c?.id))
+                  .map((c) => (
+                    <Select.Item key={c.id} value={String(c.id)}>
+                      {c.title}
+                    </Select.Item>
+                  ))}
               </Select.Content>
             </Select>
           </div>
