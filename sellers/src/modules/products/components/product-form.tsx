@@ -184,31 +184,36 @@ export const ProductForm = ({ product }: ProductFormProps) => {
   const { data: typesData } = useQuery({
     queryKey: ["vendor-product-types"],
     queryFn: () => listVendorProductTypes({ limit: 100, offset: 0 }),
+    staleTime: 5 * 60 * 1000,
   })
   const { data: collectionsData } = useQuery({
     queryKey: ["vendor-collections"],
     queryFn: () => listVendorCollections({ limit: 100, offset: 0 }),
+    staleTime: 5 * 60 * 1000,
   })
   const { data: tagsData } = useQuery({
     queryKey: ["vendor-product-tags"],
     queryFn: () => listVendorProductTags({ limit: 100, offset: 0 }),
+    staleTime: 5 * 60 * 1000,
   })
   const { data: salesChannelsData } = useQuery({
     queryKey: ["vendor-sales-channels"],
     queryFn: () => listVendorSalesChannels({ limit: 100, offset: 0 }),
+    staleTime: 5 * 60 * 1000,
   })
 
-  const productTypes = typesData?.product_types ?? []
-  const collections = collectionsData?.collections ?? []
-  const existingTags = tagsData?.product_tags ?? []
-  const salesChannels = salesChannelsData?.sales_channels ?? []
+  const productTypes = useMemo(() => typesData?.product_types ?? [], [typesData?.product_types])
+  const collections = useMemo(() => collectionsData?.collections ?? [], [collectionsData?.collections])
+  const existingTags = useMemo(() => tagsData?.product_tags ?? [], [tagsData?.product_tags])
+  const salesChannels = useMemo(() => salesChannelsData?.sales_channels ?? [], [salesChannelsData?.sales_channels])
 
   // Initialize default sales channel if creating and channels loaded
   useEffect(() => {
     if (!isEdit && salesChannels.length > 0 && selectedSalesChannelIds.length === 0) {
       setSelectedSalesChannelIds(salesChannels.map((s) => s.id))
     }
-  }, [isEdit, salesChannels, selectedSalesChannelIds.length])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, salesChannels])
 
   // 3. Variants & Options Configuration
   const [variantMode, setVariantMode] = useState<"single" | "multi">("single")
