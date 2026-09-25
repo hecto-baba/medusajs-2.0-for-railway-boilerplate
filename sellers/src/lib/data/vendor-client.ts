@@ -2022,7 +2022,10 @@ export const listVendorDraftOrders = (params: {
   q?: string
   order?: string
   created_at_gte?: string
+  updated_at_gte?: string
   currency_code?: string
+  sales_channel_id?: string
+  region_id?: string
 }) =>
   request<ListResponse<{ draft_orders: VendorDraftOrder[] }>>(
     "draft-orders",

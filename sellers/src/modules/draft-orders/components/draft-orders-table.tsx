@@ -4,6 +4,8 @@ import {
   convertVendorDraftOrder,
   deleteVendorDraftOrder,
   listVendorDraftOrders,
+  listVendorRegions,
+  listVendorSalesChannels,
   type VendorDraftOrder,
 } from "@lib/data/vendor-client"
 import {
@@ -33,32 +35,6 @@ import { DraftOrderModal } from "./forms/draft-order-modal"
 const columnHelper = createDataTableColumnHelper<VendorDraftOrder>()
 const filterHelper = createDataTableFilterHelper<VendorDraftOrder>()
 
-const filters = [
-  filterHelper.custom({
-    id: "created_at_gte",
-    label: "Date Created",
-    type: "select",
-    options: [
-      { label: "Last 7 days", value: "7d" },
-      { label: "Last 30 days", value: "30d" },
-      { label: "Last 90 days", value: "90d" },
-    ],
-  }),
-  filterHelper.custom({
-    id: "currency_code",
-    label: "Currency",
-    type: "select",
-    options: [
-      { label: "USD ($)", value: "usd" },
-      { label: "EUR (€)", value: "eur" },
-      { label: "GBP (£)", value: "gbp" },
-      { label: "CAD ($)", value: "cad" },
-      { label: "AUD ($)", value: "aud" },
-      { label: "INR (₹)", value: "inr" },
-    ],
-  }),
-]
-
 const extractFilterVal = (val: any): string | undefined => {
   if (!val) return undefined
   if (typeof val === "string") return val
@@ -85,6 +61,85 @@ export const DraftOrdersTable = () => {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
 
+  // Fetch filter option data
+  const { data: salesChannelsData } = useQuery({
+    queryKey: ["vendor-sales-channels-for-draft-filter"],
+    queryFn: () => listVendorSalesChannels({ limit: 100, offset: 0 }),
+    staleTime: 5 * 60 * 1000,
+  })
+  const { data: regionsData } = useQuery({
+    queryKey: ["vendor-regions-for-draft-filter"],
+    queryFn: () => listVendorRegions(),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Dynamic filters matching Backend Production
+  const filters = useMemo(() => {
+    const list: any[] = [
+      filterHelper.custom({
+        id: "q_customer",
+        label: "Customer",
+        type: "select",
+        options: [
+          { label: "Guest checkout only", value: "guest" },
+          { label: "Has customer account", value: "has_customer" },
+        ],
+      }),
+    ]
+
+    const channels = salesChannelsData?.sales_channels ?? []
+    if (channels.length > 0) {
+      list.push(
+        filterHelper.custom({
+          id: "sales_channel_id",
+          label: "Sales Channel",
+          type: "select",
+          options: channels.map((sc) => ({ label: sc.name, value: sc.id })),
+        })
+      )
+    }
+
+    const regions = regionsData?.regions ?? []
+    if (regions.length > 0) {
+      list.push(
+        filterHelper.custom({
+          id: "region_id",
+          label: "Region",
+          type: "select",
+          options: regions.map((r) => ({ label: r.name, value: r.id })),
+        })
+      )
+    }
+
+    list.push(
+      filterHelper.custom({
+        id: "created_at_gte",
+        label: "Created At",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      })
+    )
+
+    list.push(
+      filterHelper.custom({
+        id: "updated_at_gte",
+        label: "Updated At",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      })
+    )
+
+    return list
+  }, [salesChannelsData, regionsData])
+
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
 
@@ -93,18 +148,26 @@ export const DraftOrdersTable = () => {
     : undefined
 
   const dateFilterVal = extractFilterVal(filtering.created_at_gte)
+  const updatedFilterVal = extractFilterVal(filtering.updated_at_gte)
+  const salesChannelId = extractFilterVal(filtering.sales_channel_id)
+  const regionId = extractFilterVal(filtering.region_id)
+
   const createdAtGte = useMemo(() => {
     if (!dateFilterVal) return undefined
     const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
     return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
   }, [dateFilterVal])
 
-  const currencyCode = extractFilterVal(filtering.currency_code)
+  const updatedAtGte = useMemo(() => {
+    if (!updatedFilterVal) return undefined
+    const days = updatedFilterVal === "7d" ? 7 : updatedFilterVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [updatedFilterVal])
 
   const { data, isLoading } = useQuery({
     queryKey: [
       "vendor-draft-orders",
-      { limit, offset, q: search, order, created_at_gte: createdAtGte, currency_code: currencyCode },
+      { limit, offset, q: search, order, created_at_gte: createdAtGte, updated_at_gte: updatedAtGte, sales_channel_id: salesChannelId, region_id: regionId },
     ],
     queryFn: () =>
       listVendorDraftOrders({
@@ -113,8 +176,11 @@ export const DraftOrdersTable = () => {
         q: search || undefined,
         order,
         created_at_gte: createdAtGte,
-        currency_code: currencyCode,
+        updated_at_gte: updatedAtGte,
+        sales_channel_id: salesChannelId,
+        region_id: regionId,
       }),
+    placeholderData: (previous) => previous,
   })
 
   const draftOrders = data?.draft_orders ?? []
@@ -175,6 +241,9 @@ export const DraftOrdersTable = () => {
       columnHelper.accessor("display_id", {
         header: "Order #",
         enableSorting: true,
+        sortLabel: "Display ID",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           const draft = row.original
           return (
@@ -189,6 +258,10 @@ export const DraftOrdersTable = () => {
       }),
       columnHelper.accessor("customer", {
         header: "Customer",
+        enableSorting: true,
+        sortLabel: "Customer",
+        sortAscLabel: "A-Z",
+        sortDescLabel: "Z-A",
         cell: ({ row }) => {
           const d = row.original
           const customer = d.customer
@@ -241,6 +314,9 @@ export const DraftOrdersTable = () => {
       columnHelper.accessor("created_at", {
         header: "Date",
         enableSorting: true,
+        sortLabel: "Date",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ getValue }) => {
           const date = getValue()
           if (!date) return <PlaceholderCell />
