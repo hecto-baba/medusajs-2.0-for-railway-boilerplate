@@ -11,7 +11,9 @@ export const GetVendorSalesChannelsSchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   q: z.string().optional(),
   order: z.string().optional(),
-  status: z.enum(["all", "enabled", "disabled"]).optional(),
+  status: z.string().optional(),
+  created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
 })
 
 export const CreateVendorSalesChannelSchema = z.object({
@@ -40,9 +42,8 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, order, status } = req.validatedQuery as unknown as z.infer<
-    typeof GetVendorSalesChannelsSchema
-  >
+  const { limit, offset, q, order, status, created_at_gte, updated_at_gte } =
+    req.validatedQuery as unknown as z.infer<typeof GetVendorSalesChannelsSchema>
 
   const {
     data: [vendorAdmin],
@@ -74,16 +75,23 @@ export const GET = async (
       { description: { $ilike: `%${q}%` } },
     ]
   }
-  if (status === "enabled") {
+  if (status === "enabled" || status === "false") {
     filters.is_disabled = false
-  } else if (status === "disabled") {
+  } else if (status === "disabled" || status === "true") {
     filters.is_disabled = true
+  }
+  if (created_at_gte) {
+    filters.created_at = { $gte: new Date(created_at_gte) }
+  }
+  if (updated_at_gte) {
+    filters.updated_at = { $gte: new Date(updated_at_gte) }
   }
 
   let orderConfig: Record<string, "ASC" | "DESC"> = { created_at: "ASC" }
   if (order) {
     const isDesc = order.startsWith("-")
-    const field = isDesc ? order.slice(1) : order
+    const rawField = isDesc ? order.slice(1) : order
+    const field = rawField === "status" ? "is_disabled" : rawField
     orderConfig = { [field]: isDesc ? "DESC" : "ASC" }
   }
 

@@ -2276,6 +2276,76 @@ export const deleteVendorShippingProfile = (id: string) =>
     "DELETE"
   )
 
+/* ---------------------------------------------------- shipping option types */
+
+export type VendorShippingOptionType = {
+  id: string
+  label: string
+  code: string
+  description?: string | null
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorShippingOptionTypes = (params?: {
+  limit?: number
+  offset?: number
+  q?: string
+  label?: string
+  code?: string
+  created_at_gte?: string
+  updated_at_gte?: string
+  order?: string
+}) =>
+  request<{ shipping_option_types: VendorShippingOptionType[]; count?: number }>(
+    "shipping-option-types",
+    (params || {}) as Record<string, string | number | undefined>
+  )
+
+export const getVendorShippingOptionType = async (id: string) => {
+  const res = await fetch(`/api/vendors/shipping-option-types/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { shipping_option_type: VendorShippingOptionType }
+}
+
+export const createVendorShippingOptionType = (body: {
+  label: string
+  code: string
+  description?: string
+}) =>
+  mutate<{ shipping_option_type: VendorShippingOptionType }>(
+    "shipping-option-types",
+    "POST",
+    body
+  )
+
+export const updateVendorShippingOptionType = (
+  id: string,
+  body: {
+    label?: string
+    code?: string
+    description?: string
+  }
+) =>
+  mutate<{ shipping_option_type: VendorShippingOptionType }>(
+    `shipping-option-types/${id}`,
+    "POST",
+    body
+  )
+
+export const deleteVendorShippingOptionType = (id: string) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(
+    `shipping-option-types/${id}`,
+    "DELETE"
+  )
+
 /* --------------------------------------------------------- sales channels */
 
 export type VendorSalesChannel = {
@@ -2296,7 +2366,9 @@ export const listVendorSalesChannels = (params: {
   offset: number
   q?: string
   order?: string
-  status?: "all" | "enabled" | "disabled"
+  status?: string
+  created_at_gte?: string
+  updated_at_gte?: string
 }) =>
   request<ListResponse<{ sales_channels: VendorSalesChannel[] }>>(
     "sales-channels",
@@ -2377,7 +2449,9 @@ export const listVendorProductTypes = (params: {
   offset: number
   q?: string
   order?: string
+  status?: string
   created_at_gte?: string
+  updated_at_gte?: string
 }) =>
   request<ListResponse<{ product_types: VendorProductTypeItem[] }>>(
     "product-types",

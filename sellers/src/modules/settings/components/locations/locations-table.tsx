@@ -24,6 +24,7 @@ import { useState } from "react"
 import { LocationCreateModal } from "./location-create-modal"
 import { LocationEditDrawer } from "./location-edit-drawer"
 import { ShippingProfilesCard } from "./shipping-profiles-card"
+import { ShippingOptionTypesCard } from "./shipping-option-types-card"
 
 const columnHelper = createDataTableColumnHelper<VendorStockLocation>()
 
@@ -36,6 +37,7 @@ export const LocationsTable = () => {
     pageIndex: 0,
     pageSize: 20,
   })
+  const [search, setSearch] = useState("")
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState<VendorStockLocation | null>(null)
@@ -44,8 +46,13 @@ export const LocationsTable = () => {
   const offset = pagination.pageIndex * limit
 
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-stock-locations", limit, offset],
-    queryFn: () => listVendorStockLocations({ limit, offset }),
+    queryKey: ["vendor-stock-locations", limit, offset, search],
+    queryFn: () =>
+      listVendorStockLocations({
+        limit,
+        offset,
+        q: search || undefined,
+      }),
     placeholderData: (previous) => previous,
   })
 
@@ -166,6 +173,7 @@ export const LocationsTable = () => {
     getRowId: (row) => row.id,
     isLoading,
     pagination: { state: pagination, onPaginationChange: setPagination },
+    search: { state: search, onSearchChange: setSearch },
   })
 
   return (
@@ -179,14 +187,17 @@ export const LocationsTable = () => {
                 Manage your store stock locations, warehouses, and fulfillment origins.
               </Text>
             </div>
-            <Button
-              size="small"
-              variant="secondary"
-              onClick={() => setCreateOpen(true)}
-            >
-              <PlusMini />
-              Add Location
-            </Button>
+            <div className="flex items-center gap-x-2">
+              <DataTable.Search placeholder="Search locations..." />
+              <Button
+                size="small"
+                variant="secondary"
+                onClick={() => setCreateOpen(true)}
+              >
+                <PlusMini />
+                Add Location
+              </Button>
+            </div>
           </DataTable.Toolbar>
           <DataTable.Table />
           <DataTable.Pagination />
@@ -194,6 +205,8 @@ export const LocationsTable = () => {
       </Container>
 
       <ShippingProfilesCard />
+
+      <ShippingOptionTypesCard />
 
       <LocationCreateModal
         open={createOpen}
