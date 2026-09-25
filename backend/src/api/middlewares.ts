@@ -115,7 +115,11 @@ import {
   CreateVendorStockLocationSchema,
 } from "./vendors/stock-locations/route";
 import { UpdateVendorStockLocationSchema } from "./vendors/stock-locations/[id]/route";
-import { CreateVendorShippingProfileSchema } from "./vendors/shipping-profiles/route";
+import {
+  CreateVendorShippingProfileSchema,
+  GetVendorShippingProfilesSchema,
+} from "./vendors/shipping-profiles/route";
+import { UpdateVendorShippingProfileSchema } from "./vendors/shipping-profiles/[id]/route";
 import {
   GetVendorSalesChannelsSchema,
   CreateVendorSalesChannelSchema,
@@ -1299,9 +1303,23 @@ export default defineMiddlewares({
     },
     {
       matcher: "/vendors/shipping-profiles",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorShippingProfilesSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/shipping-profiles",
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(CreateVendorShippingProfileSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/shipping-profiles/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorShippingProfileSchema)
       ]
     },
     {

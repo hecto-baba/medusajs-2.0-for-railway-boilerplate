@@ -86,9 +86,10 @@ const filters = [
 
 type ApiKeysTableProps = {
   defaultTab?: "all" | "publishable" | "secret"
+  fixedType?: "publishable" | "secret"
 }
 
-export const ApiKeysTable = ({ defaultTab }: ApiKeysTableProps) => {
+export const ApiKeysTable = ({ defaultTab, fixedType }: ApiKeysTableProps) => {
   const queryClient = useQueryClient()
   const prompt = usePrompt()
   const router = useRouter()
@@ -102,6 +103,7 @@ export const ApiKeysTable = ({ defaultTab }: ApiKeysTableProps) => {
     | null
 
   const initialTab =
+    fixedType ||
     defaultTab ||
     (tabFromQuery === "publishable" || tabFromQuery === "secret"
       ? tabFromQuery
@@ -119,14 +121,19 @@ export const ApiKeysTable = ({ defaultTab }: ApiKeysTableProps) => {
     pageSize: 20,
   })
 
-  // Sync tab with URL if tabFromQuery changes
+  // Sync tab with URL if tabFromQuery changes (only when not fixedType)
   useEffect(() => {
+    if (fixedType) {
+      setActiveTab(fixedType)
+      return
+    }
     if (tabFromQuery && (tabFromQuery === "all" || tabFromQuery === "publishable" || tabFromQuery === "secret")) {
       setActiveTab(tabFromQuery)
     }
-  }, [tabFromQuery])
+  }, [tabFromQuery, fixedType])
 
   const handleTabChange = (tab: "all" | "publishable" | "secret") => {
+    if (fixedType) return
     setActiveTab(tab)
     setPagination((prev) => ({ ...prev, pageIndex: 0 }))
     if (pathname.includes("/settings/api-keys")) {
@@ -262,146 +269,158 @@ export const ApiKeysTable = ({ defaultTab }: ApiKeysTableProps) => {
   }
 
   const columns = useMemo(
-    () => [
-      columnHelper.accessor("title", {
-        id: "title",
-        header: "Key",
-        enableSorting: true,
-        sortLabel: "Title",
-        sortAscLabel: "Ascending",
-        sortDescLabel: "Descending",
-        cell: ({ row }) => (
-          <div className="flex items-center gap-x-2.5">
-            <Key className="text-ui-fg-subtle h-4 w-4 shrink-0" />
-            <div className="flex flex-col">
-              <Text size="small" weight="plus" className="text-ui-fg-base">
-                {row.original.title}
-              </Text>
-              <div className="flex items-center gap-x-1 mt-0.5">
-                <span className="font-mono text-xs text-ui-fg-subtle">
-                  {row.original.redacted ||
-                    (row.original.token
-                      ? row.original.token.slice(0, 16) + "..."
-                      : "")}
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleCopy(row.original.token || row.original.redacted)
-                  }
-                  className="text-ui-fg-subtle hover:text-ui-fg-base transition-colors p-0.5"
-                  title="Copy token"
-                >
-                  <SquareTwoStack className="h-3 w-3" />
-                </button>
+    () => {
+      const cols: any[] = [
+        columnHelper.accessor("title", {
+          id: "title",
+          header: "Key",
+          enableSorting: true,
+          sortLabel: "Title",
+          sortAscLabel: "Ascending",
+          sortDescLabel: "Descending",
+          cell: ({ row }) => (
+            <div className="flex items-center gap-x-2.5">
+              <Key className="text-ui-fg-subtle h-4 w-4 shrink-0" />
+              <div className="flex flex-col">
+                <Text size="small" weight="plus" className="text-ui-fg-base">
+                  {row.original.title}
+                </Text>
+                <div className="flex items-center gap-x-1 mt-0.5">
+                  <span className="font-mono text-xs text-ui-fg-subtle">
+                    {row.original.redacted ||
+                      (row.original.token
+                        ? row.original.token.slice(0, 16) + "..."
+                        : "")}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleCopy(row.original.token || row.original.redacted)
+                    }
+                    className="text-ui-fg-subtle hover:text-ui-fg-base transition-colors p-0.5"
+                    title="Copy token"
+                  >
+                    <SquareTwoStack className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ),
-      }),
-      columnHelper.accessor("type", {
-        id: "type",
-        header: "Type",
-        cell: ({ row }) => (
-          <Badge
-            size="small"
-            color={row.original.type === "secret" ? "purple" : "blue"}
-          >
-            {row.original.type === "secret" ? "Secret" : "Publishable"}
-          </Badge>
-        ),
-      }),
-      columnHelper.accessor("created_at", {
-        id: "created_at",
-        header: "Created",
-        enableSorting: true,
-        sortLabel: "Created",
-        sortAscLabel: "Ascending",
-        sortDescLabel: "Descending",
-        cell: ({ row }) => {
-          const date = row.original.created_at
-            ? new Date(row.original.created_at).toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })
-            : "-"
-          return (
-            <Text size="small" className="text-ui-fg-subtle">
-              {date}
-            </Text>
-          )
-        },
-      }),
-      columnHelper.accessor("updated_at", {
-        id: "updated_at",
-        header: "Updated",
-        enableSorting: true,
-        sortLabel: "Updated",
-        sortAscLabel: "Ascending",
-        sortDescLabel: "Descending",
-        cell: ({ row }) => {
-          const date = row.original.updated_at
-            ? new Date(row.original.updated_at).toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })
-            : "-"
-          return (
-            <Text size="small" className="text-ui-fg-subtle">
-              {date}
-            </Text>
-          )
-        },
-      }),
-      columnHelper.accessor("revoked_at", {
-        id: "revoked_at",
-        header: "Status",
-        enableSorting: true,
-        sortLabel: "Revoked At",
-        sortAscLabel: "Ascending",
-        sortDescLabel: "Descending",
-        cell: ({ row }) => {
-          const isRevoked = !!row.original.revoked_at
-          return (
-            <StatusBadge color={isRevoked ? "red" : "green"}>
-              {isRevoked ? "Revoked" : "Active"}
-            </StatusBadge>
-          )
-        },
-      }),
-      columnHelper.action({
-        actions: (ctx) => {
-          const isRevoked = !!ctx.row.original.revoked_at
-          const actionsList: any[] = [
-            {
-              label: "Copy Token",
-              icon: <SquareTwoStack />,
-              onClick: () =>
-                handleCopy(ctx.row.original.token || ctx.row.original.redacted),
-            },
-          ]
+          ),
+        }),
+      ]
 
-          if (!isRevoked) {
-            actionsList.push({
-              label: "Revoke Key",
-              icon: <XCircle />,
-              onClick: () => handleRevoke(ctx.row.original),
-            })
-          }
-
-          actionsList.push({
-            label: "Delete",
-            icon: <Trash />,
-            onClick: () => handleDelete(ctx.row.original),
+      if (!fixedType) {
+        cols.push(
+          columnHelper.accessor("type", {
+            id: "type",
+            header: "Type",
+            cell: ({ row }) => (
+              <Badge
+                size="small"
+                color={row.original.type === "secret" ? "purple" : "blue"}
+              >
+                {row.original.type === "secret" ? "Secret" : "Publishable"}
+              </Badge>
+            ),
           })
+        )
+      }
 
-          return actionsList
-        },
-      }),
-    ],
-    [handleRevoke, handleDelete]
+      cols.push(
+        columnHelper.accessor("created_at", {
+          id: "created_at",
+          header: "Created",
+          enableSorting: true,
+          sortLabel: "Created",
+          sortAscLabel: "Ascending",
+          sortDescLabel: "Descending",
+          cell: ({ row }) => {
+            const date = row.original.created_at
+              ? new Date(row.original.created_at).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })
+              : "-"
+            return (
+              <Text size="small" className="text-ui-fg-subtle">
+                {date}
+              </Text>
+            )
+          },
+        }),
+        columnHelper.accessor("updated_at", {
+          id: "updated_at",
+          header: "Updated",
+          enableSorting: true,
+          sortLabel: "Updated",
+          sortAscLabel: "Ascending",
+          sortDescLabel: "Descending",
+          cell: ({ row }) => {
+            const date = row.original.updated_at
+              ? new Date(row.original.updated_at).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })
+              : "-"
+            return (
+              <Text size="small" className="text-ui-fg-subtle">
+                {date}
+              </Text>
+            )
+          },
+        }),
+        columnHelper.accessor("revoked_at", {
+          id: "revoked_at",
+          header: "Status",
+          enableSorting: true,
+          sortLabel: "Revoked At",
+          sortAscLabel: "Ascending",
+          sortDescLabel: "Descending",
+          cell: ({ row }) => {
+            const isRevoked = !!row.original.revoked_at
+            return (
+              <StatusBadge color={isRevoked ? "red" : "green"}>
+                {isRevoked ? "Revoked" : "Active"}
+              </StatusBadge>
+            )
+          },
+        }),
+        columnHelper.action({
+          actions: (ctx) => {
+            const isRevoked = !!ctx.row.original.revoked_at
+            const actionsList: any[] = [
+              {
+                label: "Copy Token",
+                icon: <SquareTwoStack />,
+                onClick: () =>
+                  handleCopy(ctx.row.original.token || ctx.row.original.redacted),
+              },
+            ]
+
+            if (!isRevoked) {
+              actionsList.push({
+                label: "Revoke Key",
+                icon: <XCircle />,
+                onClick: () => handleRevoke(ctx.row.original),
+              })
+            }
+
+            actionsList.push({
+              label: "Delete",
+              icon: <Trash />,
+              onClick: () => handleDelete(ctx.row.original),
+            })
+
+            return actionsList
+          },
+        })
+      )
+
+      return cols
+    },
+    [fixedType, handleRevoke, handleDelete]
   )
 
   const table = useDataTable({
@@ -448,48 +467,56 @@ export const ApiKeysTable = ({ defaultTab }: ApiKeysTableProps) => {
             </Button>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
-            <div className="flex items-center gap-x-2">
-              <button
-                type="button"
-                className={`pb-1 px-1 text-sm font-medium transition-colors border-b-2 ${
-                  activeTab === "all"
-                    ? "border-ui-fg-base text-ui-fg-base"
-                    : "border-transparent text-ui-fg-subtle hover:text-ui-fg-base"
-                }`}
-                onClick={() => handleTabChange("all")}
-              >
-                All Keys
-              </button>
-              <button
-                type="button"
-                className={`pb-1 px-1 text-sm font-medium transition-colors border-b-2 ${
-                  activeTab === "publishable"
-                    ? "border-ui-fg-base text-ui-fg-base"
-                    : "border-transparent text-ui-fg-subtle hover:text-ui-fg-base"
-                }`}
-                onClick={() => handleTabChange("publishable")}
-              >
-                Publishable Keys
-              </button>
-              <button
-                type="button"
-                className={`pb-1 px-1 text-sm font-medium transition-colors border-b-2 ${
-                  activeTab === "secret"
-                    ? "border-ui-fg-base text-ui-fg-base"
-                    : "border-transparent text-ui-fg-subtle hover:text-ui-fg-base"
-                }`}
-                onClick={() => handleTabChange("secret")}
-              >
-                Secret Keys
-              </button>
-            </div>
-            <div className="flex items-center gap-x-2">
+          {fixedType ? (
+            <div className="flex items-center justify-end gap-x-2 border-b pb-3">
               <DataTable.Search placeholder="Search..." />
               <DataTable.FilterMenu tooltip="Filter" />
               <DataTable.SortingMenu tooltip="Sort" />
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
+              <div className="flex items-center gap-x-2">
+                <button
+                  type="button"
+                  className={`pb-1 px-1 text-sm font-medium transition-colors border-b-2 ${
+                    activeTab === "all"
+                      ? "border-ui-fg-base text-ui-fg-base"
+                      : "border-transparent text-ui-fg-subtle hover:text-ui-fg-base"
+                  }`}
+                  onClick={() => handleTabChange("all")}
+                >
+                  All Keys
+                </button>
+                <button
+                  type="button"
+                  className={`pb-1 px-1 text-sm font-medium transition-colors border-b-2 ${
+                    activeTab === "publishable"
+                      ? "border-ui-fg-base text-ui-fg-base"
+                      : "border-transparent text-ui-fg-subtle hover:text-ui-fg-base"
+                  }`}
+                  onClick={() => handleTabChange("publishable")}
+                >
+                  Publishable Keys
+                </button>
+                <button
+                  type="button"
+                  className={`pb-1 px-1 text-sm font-medium transition-colors border-b-2 ${
+                    activeTab === "secret"
+                      ? "border-ui-fg-base text-ui-fg-base"
+                      : "border-transparent text-ui-fg-subtle hover:text-ui-fg-base"
+                  }`}
+                  onClick={() => handleTabChange("secret")}
+                >
+                  Secret Keys
+                </button>
+              </div>
+              <div className="flex items-center gap-x-2">
+                <DataTable.Search placeholder="Search..." />
+                <DataTable.FilterMenu tooltip="Filter" />
+                <DataTable.SortingMenu tooltip="Sort" />
+              </div>
+            </div>
+          )}
         </DataTable.Toolbar>
         <DataTable.FilterBar />
         <DataTable.Table
@@ -510,6 +537,8 @@ export const ApiKeysTable = ({ defaultTab }: ApiKeysTableProps) => {
       <ApiKeyCreateModal
         open={createOpen}
         onOpenChange={setCreateOpen}
+        defaultType={fixedType || (activeTab === "all" ? "publishable" : activeTab)}
+        lockType={!!fixedType}
       />
     </Container>
   )

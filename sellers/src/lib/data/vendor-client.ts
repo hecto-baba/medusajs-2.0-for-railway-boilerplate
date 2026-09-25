@@ -2244,10 +2244,19 @@ export type VendorShippingProfile = {
   updated_at?: string
 }
 
-export const listVendorShippingProfiles = () =>
-  request<{ shipping_profiles: VendorShippingProfile[] }>(
+export const listVendorShippingProfiles = (params?: {
+  limit?: number
+  offset?: number
+  q?: string
+  name?: string
+  type?: string
+  created_at_gte?: string
+  updated_at_gte?: string
+  order?: string
+}) =>
+  request<{ shipping_profiles: VendorShippingProfile[]; count?: number }>(
     "shipping-profiles",
-    {}
+    params || {}
   )
 
 export const createVendorShippingProfile = (body: {
@@ -2259,6 +2268,12 @@ export const createVendorShippingProfile = (body: {
     "shipping-profiles",
     "POST",
     body
+  )
+
+export const deleteVendorShippingProfile = (id: string) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(
+    `shipping-profiles/${id}`,
+    "DELETE"
   )
 
 /* --------------------------------------------------------- sales channels */

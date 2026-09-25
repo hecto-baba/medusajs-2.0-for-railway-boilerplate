@@ -23,24 +23,28 @@ type ApiKeyCreateModalProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess?: () => void
+  defaultType?: "publishable" | "secret"
+  lockType?: boolean
 }
 
 export const ApiKeyCreateModal = ({
   open,
   onOpenChange,
   onSuccess,
+  defaultType = "publishable",
+  lockType = false,
 }: ApiKeyCreateModalProps) => {
   const queryClient = useQueryClient()
 
   const [title, setTitle] = useState("")
-  const [type, setType] = useState<"publishable" | "secret">("publishable")
+  const [type, setType] = useState<"publishable" | "secret">(defaultType)
   const [createdKey, setCreatedKey] = useState<VendorApiKey | null>(null)
   const [copied, setCopied] = useState(false)
 
   const handleClose = () => {
     onOpenChange(false)
     setTitle("")
-    setType("publishable")
+    setType(defaultType)
     setCreatedKey(null)
     setCopied(false)
   }
@@ -183,60 +187,73 @@ export const ApiKeyCreateModal = ({
                 />
               </div>
 
-              <div className="flex flex-col gap-y-3">
-                <Label size="small" weight="plus">
-                  Key Type
-                </Label>
-                <RadioGroup
-                  value={type}
-                  onValueChange={(val) => setType(val as "publishable" | "secret")}
-                  className="flex flex-col gap-y-3"
-                >
-                  <label
-                    htmlFor="type-publishable"
-                    className="flex items-start gap-x-3 rounded-lg border p-4 cursor-pointer hover:bg-ui-bg-subtle transition-colors"
+              {!lockType ? (
+                <div className="flex flex-col gap-y-3">
+                  <Label size="small" weight="plus">
+                    Key Type
+                  </Label>
+                  <RadioGroup
+                    value={type}
+                    onValueChange={(val) => setType(val as "publishable" | "secret")}
+                    className="flex flex-col gap-y-3"
                   >
-                    <RadioGroup.Item
-                      value="publishable"
-                      id="type-publishable"
-                      className="mt-0.5"
-                    />
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-x-2">
-                        <Text size="small" weight="plus">
-                          Publishable Key
+                    <label
+                      htmlFor="type-publishable"
+                      className="flex items-start gap-x-3 rounded-lg border p-4 cursor-pointer hover:bg-ui-bg-subtle transition-colors"
+                    >
+                      <RadioGroup.Item
+                        value="publishable"
+                        id="type-publishable"
+                        className="mt-0.5"
+                      />
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-x-2">
+                          <Text size="small" weight="plus">
+                            Publishable Key
+                          </Text>
+                          <Badge size="small" color="blue">Client-side</Badge>
+                        </div>
+                        <Text size="xsmall" className="text-ui-fg-subtle mt-0.5">
+                          Used in public client-side applications and storefronts with scoped permissions.
                         </Text>
-                        <Badge size="small" color="blue">Client-side</Badge>
                       </div>
-                      <Text size="xsmall" className="text-ui-fg-subtle mt-0.5">
-                        Used in public client-side applications and storefronts with scoped permissions.
-                      </Text>
-                    </div>
-                  </label>
+                    </label>
 
-                  <label
-                    htmlFor="type-secret"
-                    className="flex items-start gap-x-3 rounded-lg border p-4 cursor-pointer hover:bg-ui-bg-subtle transition-colors"
-                  >
-                    <RadioGroup.Item
-                      value="secret"
-                      id="type-secret"
-                      className="mt-0.5"
-                    />
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-x-2">
-                        <Text size="small" weight="plus">
-                          Secret Key
+                    <label
+                      htmlFor="type-secret"
+                      className="flex items-start gap-x-3 rounded-lg border p-4 cursor-pointer hover:bg-ui-bg-subtle transition-colors"
+                    >
+                      <RadioGroup.Item
+                        value="secret"
+                        id="type-secret"
+                        className="mt-0.5"
+                      />
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-x-2">
+                          <Text size="small" weight="plus">
+                            Secret Key
+                          </Text>
+                          <Badge size="small" color="purple">Backend / CLI</Badge>
+                        </div>
+                        <Text size="xsmall" className="text-ui-fg-subtle mt-0.5">
+                          Used for secure server-to-server operations and automated scripts with full vendor privileges.
                         </Text>
-                        <Badge size="small" color="purple">Backend / CLI</Badge>
                       </div>
-                      <Text size="xsmall" className="text-ui-fg-subtle mt-0.5">
-                        Used for secure server-to-server operations and automated scripts with full vendor privileges.
-                      </Text>
-                    </div>
-                  </label>
-                </RadioGroup>
-              </div>
+                    </label>
+                  </RadioGroup>
+                </div>
+              ) : (
+                <div className="flex items-center gap-x-2 rounded-md border border-ui-border-base bg-ui-bg-subtle p-3">
+                  <Badge size="small" color={type === "secret" ? "purple" : "blue"}>
+                    {type === "secret" ? "Secret Key" : "Publishable Key"}
+                  </Badge>
+                  <Text size="xsmall" className="text-ui-fg-subtle">
+                    {type === "secret"
+                      ? "Creating a secret API key for backend integrations."
+                      : "Creating a publishable API key for client-side storefronts."}
+                  </Text>
+                </div>
+              )}
             </form>
           )}
         </FocusModal.Body>
