@@ -1,6 +1,6 @@
 "use client"
 
-import { listVendorOrders, type VendorOrder } from "@lib/data/vendor-client"
+import { listVendorOrders, listVendorRegions, listVendorSalesChannels, type VendorOrder } from "@lib/data/vendor-client"
 import {
   createDataTableColumnHelper,
   createDataTableFilterHelper,
@@ -13,50 +13,22 @@ import {
   useDataTable,
 } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { OrderExportButton } from "./order-export-button"
 
 const columnHelper = createDataTableColumnHelper<VendorOrder>()
 const filterHelper = createDataTableFilterHelper<VendorOrder>()
 
-const filters = [
-  filterHelper.accessor("status", {
-    label: "Status",
-    type: "select",
-    options: [
-      { label: "Pending", value: "pending" },
-      { label: "Completed", value: "completed" },
-      { label: "Canceled", value: "canceled" },
-      { label: "Requires Action", value: "requires_action" },
-    ],
-  }),
-  filterHelper.custom({
-    id: "payment_status",
-    label: "Payment Status",
-    type: "select",
-    options: [
-      { label: "Captured", value: "captured" },
-      { label: "Completed", value: "completed" },
-      { label: "Authorized", value: "authorized" },
-      { label: "Not Paid", value: "not_paid" },
-      { label: "Partially Refunded", value: "partially_refunded" },
-      { label: "Refunded", value: "refunded" },
-    ],
-  }),
-  filterHelper.custom({
-    id: "fulfillment_status",
-    label: "Fulfillment Status",
-    type: "select",
-    options: [
-      { label: "Not Fulfilled", value: "not_fulfilled" },
-      { label: "Partially Fulfilled", value: "partially_fulfilled" },
-      { label: "Fulfilled", value: "fulfilled" },
-      { label: "Shipped", value: "shipped" },
-      { label: "Delivered", value: "delivered" },
-      { label: "Canceled", value: "canceled" },
-    ],
-  }),
-]
+const extractFilterValue = (val: any): string | undefined => {
+  if (!val) return undefined
+  if (typeof val === "string") return val
+  if (Array.isArray(val)) return val[0]
+  if (typeof val === "object") {
+    const flat = Object.values(val).flat()
+    return (flat[0] as string) || undefined
+  }
+  return undefined
+}
 
 /**
  * Amounts arrive as major units already (450 means €450.00), so this only
@@ -108,7 +80,7 @@ const columns = [
     id: "display_id",
     header: "Order",
     enableSorting: true,
-    sortLabel: "Order #",
+    sortLabel: "Display ID",
     sortAscLabel: "Ascending",
     sortDescLabel: "Descending",
     cell: ({ getValue }) => `#${getValue()}`,
@@ -117,15 +89,32 @@ const columns = [
     id: "created_at",
     header: "Date",
     enableSorting: true,
-    sortLabel: "Date",
-    sortAscLabel: "Oldest first",
-    sortDescLabel: "Newest first",
+    sortLabel: "Created",
+    sortAscLabel: "Ascending",
+    sortDescLabel: "Descending",
     cell: ({ getValue }) =>
       new Date(getValue()).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
         year: "numeric",
       }),
+  }),
+  columnHelper.accessor("updated_at", {
+    id: "updated_at",
+    header: "Updated",
+    enableSorting: true,
+    sortLabel: "Updated",
+    sortAscLabel: "Ascending",
+    sortDescLabel: "Descending",
+    cell: ({ getValue }) => {
+      const val = getValue()
+      if (!val) return "—"
+      return new Date(val).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    },
   }),
   columnHelper.display({
     id: "customer",
@@ -150,25 +139,10 @@ const columns = [
   columnHelper.accessor("total", {
     id: "total",
     header: "Order Total",
-    enableSorting: true,
-    sortLabel: "Total",
-    sortAscLabel: "Lowest first",
-    sortDescLabel: "Highest first",
     cell: ({ row }) =>
       formatAmount(row.original.total, row.original.currency_code),
   }),
 ]
-
-const extractFilterValue = (val: any): string | undefined => {
-  if (!val) return undefined
-  if (typeof val === "string") return val
-  if (Array.isArray(val)) return val[0]
-  if (typeof val === "object") {
-    const flat = Object.values(val).flat()
-    return (flat[0] as string) || undefined
-  }
-  return undefined
-}
 
 export const OrdersTable = () => {
   const [search, setSearch] = useState("")
@@ -179,6 +153,71 @@ export const OrdersTable = () => {
     pageSize: 20,
   })
 
+  // Fetch filter option data
+  const { data: regionsData } = useQuery({
+    queryKey: ["vendor-regions-for-orders-filter"],
+    queryFn: () => listVendorRegions(),
+    staleTime: 5 * 60 * 1000,
+  })
+  const { data: salesChannelsData } = useQuery({
+    queryKey: ["vendor-sales-channels-for-orders-filter"],
+    queryFn: () => listVendorSalesChannels({ limit: 100, offset: 0 }),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Dynamic filters matching Backend Production
+  const filters = useMemo(() => {
+    const list: any[] = []
+
+    const regions = regionsData?.regions ?? []
+    list.push(
+      filterHelper.custom({
+        id: "region_id",
+        label: "Region",
+        type: "select",
+        options: regions.map((r) => ({ label: r.name, value: r.id })),
+      })
+    )
+
+    const channels = salesChannelsData?.sales_channels ?? []
+    list.push(
+      filterHelper.custom({
+        id: "sales_channel_id",
+        label: "Sales Channel",
+        type: "select",
+        options: channels.map((sc) => ({ label: sc.name, value: sc.id })),
+      })
+    )
+
+    list.push(
+      filterHelper.custom({
+        id: "created_at_gte",
+        label: "Created",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      })
+    )
+
+    list.push(
+      filterHelper.custom({
+        id: "updated_at_gte",
+        label: "Updated",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      })
+    )
+
+    return list
+  }, [regionsData, salesChannelsData])
+
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
 
@@ -186,9 +225,22 @@ export const OrdersTable = () => {
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
-  const status = extractFilterValue(filtering.status)
-  const paymentStatus = extractFilterValue(filtering.payment_status)
-  const fulfillmentStatus = extractFilterValue(filtering.fulfillment_status)
+  const regionId = extractFilterValue(filtering.region_id)
+  const salesChannelId = extractFilterValue(filtering.sales_channel_id)
+  const dateCreatedVal = extractFilterValue(filtering.created_at_gte)
+  const dateUpdatedVal = extractFilterValue(filtering.updated_at_gte)
+
+  const createdAtGte = useMemo(() => {
+    if (!dateCreatedVal) return undefined
+    const days = dateCreatedVal === "7d" ? 7 : dateCreatedVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [dateCreatedVal])
+
+  const updatedAtGte = useMemo(() => {
+    if (!dateUpdatedVal) return undefined
+    const days = dateUpdatedVal === "7d" ? 7 : dateUpdatedVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [dateUpdatedVal])
 
   const { data, isLoading } = useQuery({
     queryKey: [
@@ -197,9 +249,10 @@ export const OrdersTable = () => {
       offset,
       search,
       order,
-      status,
-      paymentStatus,
-      fulfillmentStatus,
+      regionId,
+      salesChannelId,
+      createdAtGte,
+      updatedAtGte,
     ],
     queryFn: () =>
       listVendorOrders({
@@ -207,9 +260,10 @@ export const OrdersTable = () => {
         offset,
         q: search || undefined,
         order,
-        status,
-        payment_status: paymentStatus,
-        fulfillment_status: fulfillmentStatus,
+        region_id: regionId,
+        sales_channel_id: salesChannelId,
+        created_at_gte: createdAtGte,
+        updated_at_gte: updatedAtGte,
       }),
     // Without this the table empties on every page change and the row area
     // collapses, which reads as a flash of "no results" mid-navigation.
@@ -257,10 +311,12 @@ export const OrdersTable = () => {
           <DataTable.SortingMenu tooltip="Sort" />
           <OrderExportButton
             search={search}
-            status={status}
-            paymentStatus={paymentStatus}
-            fulfillmentStatus={fulfillmentStatus}
             order={order}
+            regionId={regionId}
+            salesChannelId={salesChannelId}
+            createdAtGte={createdAtGte}
+            updatedAtGte={updatedAtGte}
+            currentOrders={data?.orders}
           />
         </div>
       </DataTable.Toolbar>

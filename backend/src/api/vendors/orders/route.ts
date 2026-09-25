@@ -14,6 +14,10 @@ export const GetVendorOrdersSchema = z.object({
   status: z.string().optional(),
   payment_status: z.string().optional(),
   fulfillment_status: z.string().optional(),
+  region_id: z.string().optional(),
+  sales_channel_id: z.string().optional(),
+  created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
 })
 
 /**
@@ -37,6 +41,10 @@ export const GET = async (
     status,
     payment_status,
     fulfillment_status,
+    region_id,
+    sales_channel_id,
+    created_at_gte,
+    updated_at_gte,
   } = req.validatedQuery as unknown as z.infer<typeof GetVendorOrdersSchema>
 
   const {
@@ -77,6 +85,7 @@ export const GET = async (
         "display_id",
         "status",
         "created_at",
+        "updated_at",
         "currency_code",
         "total",
         "subtotal",
@@ -84,6 +93,7 @@ export const GET = async (
         "tax_total",
         "customer.*",
         "sales_channel.*",
+        "region_id",
         "items.*",
         "items.tax_lines",
         "items.adjustments",
@@ -180,6 +190,34 @@ export const GET = async (
     })
   }
 
+  // Filter by region
+  if (region_id) {
+    filtered = filtered.filter((o: any) => o.region_id === region_id)
+  }
+
+  // Filter by sales channel
+  if (sales_channel_id) {
+    filtered = filtered.filter(
+      (o: any) => o.sales_channel?.id === sales_channel_id || o.sales_channel_id === sales_channel_id
+    )
+  }
+
+  // Filter by created_at_gte
+  if (created_at_gte) {
+    const gteTime = new Date(created_at_gte).getTime()
+    filtered = filtered.filter(
+      (o: any) => new Date(o.created_at).getTime() >= gteTime
+    )
+  }
+
+  // Filter by updated_at_gte
+  if (updated_at_gte) {
+    const gteTime = new Date(updated_at_gte).getTime()
+    filtered = filtered.filter(
+      (o: any) => new Date(o.updated_at || o.created_at).getTime() >= gteTime
+    )
+  }
+
   // Sort orders
   const sortField = order ? (order.startsWith("-") ? order.slice(1) : order) : "created_at"
   const isDesc = order ? order.startsWith("-") : true // default created_at DESC
@@ -188,7 +226,7 @@ export const GET = async (
     let valA = a[sortField]
     let valB = b[sortField]
 
-    if (sortField === "created_at") {
+    if (sortField === "created_at" || sortField === "updated_at") {
       valA = new Date(valA || 0).getTime()
       valB = new Date(valB || 0).getTime()
     } else if (sortField === "display_id" || sortField === "total") {

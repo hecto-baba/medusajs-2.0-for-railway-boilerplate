@@ -89,6 +89,7 @@ export type VendorOrder = {
   display_id: number
   status: string
   created_at: string
+  updated_at?: string
   email: string | null
   currency_code: string
   total: number
@@ -219,6 +220,10 @@ export const listVendorOrders = (params: {
   status?: string
   payment_status?: string
   fulfillment_status?: string
+  region_id?: string
+  sales_channel_id?: string
+  created_at_gte?: string
+  updated_at_gte?: string
 }) =>
   request<ListResponse<{ orders: VendorOrder[] }>>(
     "orders",
