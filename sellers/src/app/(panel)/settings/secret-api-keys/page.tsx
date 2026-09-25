@@ -1,5 +1,12 @@
-import { redirect } from "next/navigation"
+import { ApiKeysTable } from "@modules/settings"
+import { Metadata } from "next"
 
-export default function SecretApiKeysRedirectPage() {
-  redirect("/settings/api-keys?tab=secret")
+export const metadata: Metadata = { title: "Secret API Keys" }
+
+export default function SecretApiKeysPage() {
+  return (
+    <div className="flex flex-col gap-y-3 p-6">
+      <ApiKeysTable defaultTab="secret" />
+    </div>
+  )
 }

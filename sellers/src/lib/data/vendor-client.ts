@@ -2461,6 +2461,10 @@ export const listVendorApiKeys = (params: {
   offset: number
   type?: "publishable" | "secret"
   q?: string
+  order?: string
+  created_at_gte?: string
+  updated_at_gte?: string
+  revoked_at?: string
 }) =>
   request<ListResponse<{ api_keys: VendorApiKey[] }>>(
     "api-keys",

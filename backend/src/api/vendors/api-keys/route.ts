@@ -11,6 +11,10 @@ export const GetVendorApiKeysSchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   type: z.enum(["publishable", "secret"]).optional(),
   q: z.string().optional(),
+  order: z.string().optional(),
+  created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
+  revoked_at: z.string().optional(),
 })
 
 export const CreateVendorApiKeySchema = z.object({
@@ -43,9 +47,16 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, type, q } = req.validatedQuery as unknown as z.infer<
-    typeof GetVendorApiKeysSchema
-  >
+  const {
+    limit,
+    offset,
+    type,
+    q,
+    order,
+    created_at_gte,
+    updated_at_gte,
+    revoked_at,
+  } = req.validatedQuery as unknown as z.infer<typeof GetVendorApiKeysSchema>
 
   const {
     data: [vendorAdmin],
@@ -64,7 +75,7 @@ export const GET = async (
     return
   }
 
-  const { data: apiKeys, metadata } = await query.graph({
+  const { data: rawApiKeys } = await query.graph({
     entity: "api_key",
     fields: [
       "id",
@@ -79,18 +90,95 @@ export const GET = async (
     filters: {
       id: vendorKeyIds,
       ...(type ? { type } : {}),
-      ...(q ? { title: { $ilike: `%${q}%` } } : {}),
     },
     pagination: {
-      skip: offset,
-      take: limit,
-      order: { created_at: "DESC" },
+      skip: 0,
+      take: 1000,
     },
   })
 
+  let filtered = (rawApiKeys || []) as any[]
+
+  // Filter by search query (q)
+  if (q) {
+    const lower = q.toLowerCase()
+    filtered = filtered.filter(
+      (k: any) =>
+        k.title?.toLowerCase().includes(lower) ||
+        k.redacted?.toLowerCase().includes(lower) ||
+        k.token?.toLowerCase().includes(lower)
+    )
+  }
+
+  // Filter by created_at_gte
+  if (created_at_gte) {
+    const gteTime = new Date(created_at_gte).getTime()
+    filtered = filtered.filter(
+      (k: any) => new Date(k.created_at).getTime() >= gteTime
+    )
+  }
+
+  // Filter by updated_at_gte
+  if (updated_at_gte) {
+    const gteTime = new Date(updated_at_gte).getTime()
+    filtered = filtered.filter(
+      (k: any) => new Date(k.updated_at || k.created_at).getTime() >= gteTime
+    )
+  }
+
+  // Filter by revoked_at
+  if (revoked_at) {
+    if (revoked_at === "revoked" || revoked_at === "true") {
+      filtered = filtered.filter((k: any) => !!k.revoked_at)
+    } else if (revoked_at === "active" || revoked_at === "false") {
+      filtered = filtered.filter((k: any) => !k.revoked_at)
+    } else {
+      const gteTime = new Date(revoked_at).getTime()
+      if (!isNaN(gteTime)) {
+        filtered = filtered.filter(
+          (k: any) => k.revoked_at && new Date(k.revoked_at).getTime() >= gteTime
+        )
+      }
+    }
+  }
+
+  // Sort api keys
+  // Sort options: Title, Created, Updated, Revoked At, Ascending, Descending
+  const sortField = order
+    ? order.startsWith("-")
+      ? order.slice(1)
+      : order
+    : "created_at"
+  const isDesc = order ? order.startsWith("-") : true
+
+  filtered.sort((a: any, b: any) => {
+    let valA = a[sortField]
+    let valB = b[sortField]
+
+    if (
+      sortField === "created_at" ||
+      sortField === "updated_at" ||
+      sortField === "revoked_at"
+    ) {
+      valA = new Date(valA || 0).getTime()
+      valB = new Date(valB || 0).getTime()
+    } else if (sortField === "title") {
+      valA = (valA || "").toLowerCase()
+      valB = (valB || "").toLowerCase()
+      return isDesc ? valB.localeCompare(valA) : valA.localeCompare(valB)
+    }
+
+    if (valA < valB) return isDesc ? 1 : -1
+    if (valA > valB) return isDesc ? -1 : 1
+    return 0
+  })
+
+  const count = filtered.length
+  const paginated = filtered.slice(offset, offset + limit)
+
   res.json({
-    api_keys: apiKeys,
-    count: metadata?.count ?? apiKeys.length,
+    api_keys: paginated,
+    count,
     limit,
     offset,
   })
