@@ -232,7 +232,7 @@ export const listVendorOrders = (params: {
 
 const mutate = async <T>(
   path: string,
-  method: "POST" | "DELETE",
+  method: "POST" | "PATCH" | "DELETE",
   body?: unknown
 ) => {
   const res = await fetch(`/api/vendors/${path}`, {
@@ -693,6 +693,7 @@ export type VendorMe = {
     name: string
     handle: string
     logo: string | null
+    metadata?: Record<string, any> | null
   }
 }
 
@@ -710,6 +711,7 @@ export const updateVendorMe = async (body: {
   last_name?: string | null
   name?: string
   logo?: string | null
+  metadata?: Record<string, any> | null
 }) => {
   const res = await fetch("/api/vendors/me", {
     method: "PATCH",
@@ -2882,5 +2884,38 @@ export const getVendorWorkflowExecution = (id: string) =>
   request<{ workflow_execution: VendorWorkflowExecution }>(
     `workflow-executions/${id}`,
     {}
+  )
+
+/* ---------------------------------------------------------------- currencies */
+
+export type VendorCurrency = {
+  code: string
+  name: string
+  symbol: string
+  is_default: boolean
+  is_tax_inclusive: boolean
+}
+
+export const listVendorCurrencies = () =>
+  request<{ currencies: VendorCurrency[] }>("currencies", {})
+
+export const addVendorCurrency = (body: {
+  code: string
+  is_default?: boolean
+  is_tax_inclusive?: boolean
+}) => mutate<{ currency: VendorCurrency }>("currencies", "POST", body)
+
+export const updateVendorCurrency = (
+  code: string,
+  body: {
+    is_default?: boolean
+    is_tax_inclusive?: boolean
+  }
+) => mutate<{ currency: VendorCurrency }>(`currencies/${code}`, "PATCH", body)
+
+export const deleteVendorCurrency = (code: string) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(
+    `currencies/${code}`,
+    "DELETE"
   )
 

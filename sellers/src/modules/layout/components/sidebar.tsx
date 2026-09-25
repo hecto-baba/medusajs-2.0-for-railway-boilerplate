@@ -18,6 +18,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { UserMenu } from "./user-menu"
+import { StoreHeaderDropdown } from "./store-header-dropdown"
 import {
   LayoutComposer,
   CUSTOMIZE_IDS,
@@ -153,21 +154,11 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
   return (
     <aside className="bg-ui-bg-subtle border-ui-border-base flex h-screen w-[220px] shrink-0 flex-col justify-between border-r">
       <div className="flex flex-col gap-y-4 p-3 overflow-y-auto">
-        <div className="flex flex-col gap-y-1 px-2 py-1">
-          <div className="flex items-center gap-x-2">
-            <Avatar fallback={storeName.charAt(0).toUpperCase()} size="small" />
-            <Text size="small" weight="plus" className="text-ui-fg-base truncate">
-              {storeName}
-            </Text>
-          </div>
-          {verticalLabel && (
-            <div className="flex items-center gap-x-1 pl-7">
-              <Badge size="xsmall" color="blue" className="text-[9px] py-0 px-1 truncate">
-                {verticalLabel} {vendorTypeLabel ? `• ${vendorTypeLabel}` : ""}
-              </Badge>
-            </div>
-          )}
-        </div>
+        <StoreHeaderDropdown
+          storeName={storeName}
+          verticalLabel={verticalLabel}
+          vendorTypeLabel={vendorTypeLabel}
+        />
 
         <nav className="flex flex-col">
           <LayoutComposer

@@ -105,6 +105,26 @@ Keeping separate customized dropdowns; rejected because Backend Production uses 
 
 **Core concept to remember:** 
 In Medusa 2.0 `@medusajs/ui`, table filter menus and sorting menus dynamically reflect the table definition. Filtering is configured using `createDataTableFilterHelper<T>()`, and sorting menus automatically discover any column with `enableSorting: true`, displaying `sortLabel` alongside `sortAscLabel: "Ascending"` and `sortDescLabel: "Descending"`. For backend routes, always extend query schemas with `z.coerce` or date string validators (`created_at_gte`, `updated_at_gte`) and map frontend column IDs (e.g. `status` to `is_disabled`) so graph queries order and filter accurately.
+### Store Currencies Full Parity, Store General Settings Parity, and Top-Left Store Header Dropdown — 2026-09-25
 
+**What was used:**
+1. **Currencies Management Parity**:
+   - Implemented dedicated backend endpoints (`/vendors/currencies` and `/vendors/currencies/:code`) with full `GET`, `POST`, `PATCH`, and `DELETE` methods, backed by standard ISO currency datasets and vendor metadata persistence.
+   - Built `StoreCurrencySection` equipped with a search bar, sorting dropdown (by `Name` or `Code`, in `Ascending` or `Descending` order), header action buttons and three-dot dropdown with `Add` option, and per-row action menus featuring `Edit` and `Remove` (with confirmation modal and default currency deletion safeguard).
+   - Created `AddCurrencyModal` (with search and multi-currency selection) and `EditCurrencyModal` (toggling default currency and tax-inclusive pricing).
+2. **Store General Settings Parity**:
+   - Expanded `StoreGeneralSection` to display `Default Currency`, `Default Region`, `Default Sales Channel`, and `Default Location` badges linking directly to their respective settings pages (`/settings/currencies`, `/settings/regions`, `/settings/sales-channels`, `/settings/locations`), alongside `Name`, `Handle`, and `Logo`.
+   - Extended `EditStoreForm` with selection controls for Default Currency, Default Region, Default Sales Channel, and Default Location.
+3. **Top-Left Store Header Dropdown**:
+   - Replaced static sidebar store banner with `@medusajs/ui` `DropdownMenu` (`StoreHeaderDropdown`).
+   - Clicking the store badge in the top-left corner reveals `Store Name`, `Store Settings` (linking to `/settings`), and `Logout` (calling `vendorLogout()`).
 
+**Why this over alternatives:**
+In Medusa Admin Backend Production, currencies are fully manageable with search, sorting, addition, edition, and deletion. Leaving the Seller Panel with a static, read-only list caused friction and discrepancies. Displaying default region, sales channel, and location in Store Settings gives sellers immediate insight into their operational topology. Finally, placing Store Settings and Logout in the top-left store header dropdown matches Medusa Admin's header ergonomics and provides intuitive navigation.
+
+**Alternatives considered:**
+Leaving currency management read-only in the Seller Panel; rejected because sellers must configure their active currencies and tax-inclusive pricing. Hardcoding store defaults as plain text without navigation links; rejected because direct links to settings subpages reduce configuration latency.
+
+**Core concept to remember:**
+In multi-tenant or multi-vendor platforms, vendor-specific store preferences (default currency, tax-inclusive flags, linked regions, channels, and locations) should gracefully fall back to platform defaults when unset, while allowing vendor overrides via structured metadata. In UI architecture, pairing table search and sort states with memoized filtering provides instantaneous feedback without redundant network waterfalls.
 

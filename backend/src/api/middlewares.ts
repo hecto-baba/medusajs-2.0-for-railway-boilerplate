@@ -150,6 +150,8 @@ import {
 } from "./vendors/tax-regions/route";
 import { UpdateVendorTaxRateSchema } from "./vendors/tax-regions/[id]/route";
 import { UpdateVendorProductTagSchema } from "./vendors/product-tags/[id]/route";
+import { PostVendorCurrencySchema } from "./vendors/currencies/route";
+import { PatchVendorCurrencySchema } from "./vendors/currencies/[code]/route";
 import {
   GetVendorApiKeysSchema,
   CreateVendorApiKeySchema,
@@ -1503,6 +1505,26 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(UpdateVendorTaxRateSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/currencies*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/currencies",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorCurrencySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/currencies/:code",
+      methods: ["PATCH"],
+      middlewares: [
+        validateAndTransformBody(PatchVendorCurrencySchema)
       ]
     },
     {

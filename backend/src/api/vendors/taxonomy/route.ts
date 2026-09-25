@@ -34,7 +34,7 @@ export const GET = async (
     data: [vendorAdmin],
   } = await query.graph({
     entity: "vendor_admin",
-    fields: ["vendor.id", "vendor.stock_locations.id"],
+    fields: ["vendor.id", "vendor.stock_locations.id", "vendor.metadata"],
     filters: { id: [req.auth_context.actor_id] },
   }).catch(() => ({ data: [] }))
 
@@ -110,12 +110,21 @@ export const GET = async (
     types: types.data,
     sales_channels: salesChannels.data,
     shipping_profiles: shippingProfiles.data,
-    currencies: (stores.data[0]?.supported_currencies ?? []).map(
-      (currency: any) => ({
-        code: currency.currency_code,
-        is_default: Boolean(currency.is_default),
-      })
-    ),
+    currencies: (() => {
+      const vendorMetaCurrencies = vendorAdmin?.vendor?.metadata?.currencies as any[]
+      if (vendorMetaCurrencies && Array.isArray(vendorMetaCurrencies) && vendorMetaCurrencies.length > 0) {
+        return vendorMetaCurrencies.map((c) => ({
+          code: (c.code || "").toLowerCase(),
+          is_default: Boolean(c.is_default),
+        }))
+      }
+      return (stores.data[0]?.supported_currencies ?? []).map(
+        (currency: any) => ({
+          code: currency.currency_code,
+          is_default: Boolean(currency.is_default),
+        })
+      )
+    })(),
     stock_locations: stockLocations.data,
   })
 }
