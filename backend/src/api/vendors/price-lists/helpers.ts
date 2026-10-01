@@ -1,6 +1,7 @@
 import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import { getVendorId } from "../shared/vendor-scope"
+import { getVendorCustomerGroupIds } from "../customers/helpers"
 
 // Single source of truth lives in shared/vendor-scope.ts; re-exported so
 // existing imports from this file keep working.
@@ -207,4 +208,58 @@ export const refetchVendorPriceList = async (
   }
 
   return transformVendorPriceList(priceList)
+}
+
+/**
+ * Every price id named in a batch body must belong to THIS price list. The list
+ * itself is checked, but the ids in update and delete come from the body, so
+ * without this a seller could name another seller's price id on their own list
+ * and change or delete it.
+ */
+export const assertPricesBelongToPriceList = async (
+  req: AuthenticatedMedusaRequest,
+  priceListId: string,
+  priceIds: string[]
+): Promise<void> => {
+  const ids = Array.from(new Set(priceIds.filter(Boolean)))
+
+  if (!ids.length) {
+    return
+  }
+
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const {
+    data: [priceList],
+  } = await query.graph({
+    entity: "price_list",
+    fields: ["id", "prices.id"],
+    filters: { id: [priceListId] },
+  })
+
+  const own = new Set(((priceList as any)?.prices ?? []).map((price: any) => price?.id))
+
+  if (ids.some((id) => !own.has(id))) {
+    throw new MedusaError(MedusaError.Types.NOT_FOUND, "Price not found.")
+  }
+}
+
+/**
+ * A price list may only target the seller's own customer groups. Group ids come
+ * in the body's rules, so another seller's group answers 404.
+ */
+export const assertPriceListRulesBelongToVendor = async (
+  req: AuthenticatedMedusaRequest,
+  rules?: Record<string, string[]> | null
+): Promise<void> => {
+  const groupIds = (rules?.customer_group_id ?? []).filter(Boolean)
+
+  if (!groupIds.length) {
+    return
+  }
+
+  const owned = new Set(await getVendorCustomerGroupIds(req))
+
+  if (groupIds.some((id) => !owned.has(id))) {
+    throw new MedusaError(MedusaError.Types.NOT_FOUND, "Customer group not found.")
+  }
 }

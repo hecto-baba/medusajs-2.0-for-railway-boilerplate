@@ -9,6 +9,7 @@ import {
   updateCampaignsWorkflow,
 } from "@medusajs/medusa/core-flows"
 import { assertOwnership, VENDOR_CAMPAIGN_FIELDS } from "../helpers"
+import { assertPromotionsBelongToVendor } from "../../promotions/helpers"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
@@ -36,6 +37,7 @@ export const POST = async (
 ) => {
   const { id } = req.params
   await assertOwnership(req, id)
+  await assertPromotionsBelongToVendor(req, (req.validatedBody as any)?.promotions)
 
   const { result } = await updateCampaignsWorkflow(req.scope).run({
     input: {

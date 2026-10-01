@@ -15,6 +15,7 @@ import {
 } from "@medusajs/medusa/core-flows"
 import { MARKETPLACE_MODULE } from "../../../../modules/marketplace"
 import {
+  assertPriceListRulesBelongToVendor,
   assertVendorOwnsPriceList,
   getVendorId,
   refetchVendorPriceList,
@@ -62,6 +63,9 @@ export const POST = async (
   await assertVendorOwnsPriceList(req, id)
 
   const updateData = req.validatedBody
+
+  // The groups a list targets must be the seller's own.
+  await assertPriceListRulesBelongToVendor(req, (updateData as any).rules)
 
   await updatePriceListsWorkflow(req.scope).run({
     input: {

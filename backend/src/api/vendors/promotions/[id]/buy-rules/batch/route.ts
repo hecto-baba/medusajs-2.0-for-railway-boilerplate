@@ -5,6 +5,7 @@ import type {
 import { RuleType } from "@medusajs/framework/utils"
 import { batchPromotionRulesWorkflow } from "@medusajs/medusa/core-flows"
 import {
+  assertRuleIdsBelongToPromotion,
   assertOnlyProductRules,
   assertOwnership,
   assertProductIdsBelongToVendor,
@@ -31,6 +32,10 @@ export const POST = async (
   assertOnlyProductRules(body.update)
   await assertProductIdsBelongToVendor(req, body.create)
   await assertProductIdsBelongToVendor(req, body.update)
+  await assertRuleIdsBelongToPromotion(req, id, "buy_rules", [
+    ...(body.update ?? []).map((rule) => rule.id),
+    ...(body.delete ?? []),
+  ])
 
   const { result } = await batchPromotionRulesWorkflow(req.scope).run({
     input: {

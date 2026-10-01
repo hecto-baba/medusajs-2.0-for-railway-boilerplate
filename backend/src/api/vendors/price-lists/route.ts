@@ -9,6 +9,7 @@ import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import {
   assertVendorOwnsVariants,
   getVendorId,
+  assertPriceListRulesBelongToVendor,
   getVendorPriceListIds,
   refetchVendorPriceList,
   transformVendorPriceList,
@@ -125,6 +126,9 @@ export const POST = async (
   const vendorId = await getVendorId(req)
   const payload = req.validatedBody
 
+  // The groups a list targets must be the seller's own.
+  await assertPriceListRulesBelongToVendor(req, payload.rules)
+
   // Validate variant ownership for any provided prices
   if (payload.prices && payload.prices.length) {
     const variantIds = payload.prices.map((p) => p.variant_id)
@@ -138,7 +142,7 @@ export const POST = async (
         ...payload,
         starts_at: payload.starts_at || null,
         ends_at: payload.ends_at || null,
-        description: payload.description || undefined,
+        description: payload.description || "",
         rules: payload.rules || undefined,
         prices: payload.prices || undefined,
         metadata: payload.metadata || undefined,

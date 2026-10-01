@@ -5,6 +5,7 @@ import type {
 import { z } from "@medusajs/framework/zod"
 import { batchPriceListPricesWorkflow } from "@medusajs/medusa/core-flows"
 import {
+  assertPricesBelongToPriceList,
   assertVendorOwnsPriceList,
   assertVendorOwnsVariants,
   refetchVendorPriceList,
@@ -52,6 +53,9 @@ export const POST = async (
   await assertVendorOwnsPriceList(req, id)
 
   const { create = [], update = [], delete: deleteIds = [] } = req.validatedBody
+
+  // Every price named in update or delete must belong to THIS list.
+  await assertPricesBelongToPriceList(req, id, [...update.map((p) => p.id), ...deleteIds])
 
   // Validate variant ownership for created and updated prices
   const variantIds = [

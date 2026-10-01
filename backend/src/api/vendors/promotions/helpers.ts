@@ -259,3 +259,80 @@ export const VENDOR_PROMOTION_FIELDS = [
   "rules.*",
   "rules.values.*",
 ]
+
+export type PromotionRuleKind = "rules" | "target_rules" | "buy_rules"
+
+/**
+ * Every rule id named in update or delete must belong to THIS promotion, under
+ * the same kind of rule (eligibility, target or buy). The promotion is
+ * ownership-checked, but the rule ids come from the body, so without this a
+ * seller could name another seller's rule id on their own promotion.
+ */
+export const assertRuleIdsBelongToPromotion = async (
+  req: AuthenticatedMedusaRequest,
+  promotionId: string,
+  kind: PromotionRuleKind,
+  ruleIds: Array<string | undefined | null>
+): Promise<void> => {
+  const ids = Array.from(new Set(ruleIds.filter((id): id is string => !!id)))
+
+  if (!ids.length) {
+    return
+  }
+
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const {
+    data: [promotion],
+  } = await query.graph({
+    entity: "promotion",
+    fields: ["id", "rules.id", "application_method.target_rules.id", "application_method.buy_rules.id"],
+    filters: { id: [promotionId] },
+  })
+
+  const source: any = promotion as any
+  const rows: any[] =
+    kind === "rules"
+      ? source?.rules ?? []
+      : kind === "target_rules"
+      ? source?.application_method?.target_rules ?? []
+      : source?.application_method?.buy_rules ?? []
+
+  const own = new Set(rows.map((row) => row?.id))
+
+  if (ids.some((id) => !own.has(id))) {
+    throw new MedusaError(MedusaError.Types.NOT_FOUND, "Promotion rule not found.")
+  }
+}
+
+/**
+ * A campaign may only collect the seller's own promotions. Promotion ids come in
+ * the body, so another seller's promotion answers 404 and is never pulled into
+ * this seller's campaign (which would change its budget and limits).
+ */
+export const assertPromotionsBelongToVendor = async (
+  req: AuthenticatedMedusaRequest,
+  promotions?: Array<{ id?: string } | string> | null
+): Promise<void> => {
+  const ids = (promotions ?? [])
+    .map((promotion) => (typeof promotion === "string" ? promotion : promotion?.id))
+    .filter((id): id is string => !!id)
+
+  if (!ids.length) {
+    return
+  }
+
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const {
+    data: [vendorAdmin],
+  } = await query.graph({
+    entity: "vendor_admin",
+    fields: ["vendor.promotions.id"],
+    filters: { id: [req.auth_context.actor_id] },
+  })
+
+  const own = new Set(((vendorAdmin?.vendor as any)?.promotions ?? []).map((promotion: any) => promotion?.id))
+
+  if (ids.some((id) => !own.has(id))) {
+    throw new MedusaError(MedusaError.Types.NOT_FOUND, "Promotion not found.")
+  }
+}
