@@ -479,7 +479,7 @@ Code for steps 1 to 6 is written and committed. These items remain before Phase 
 | 1 | Decide payouts (D2) | Done: platform ledger |
 | 2 | Design note | Done (12.1) |
 | 3 | Split at checkout | Done: `lib/split-order.ts`, run by the `order.placed` subscriber; replaces the old link-vendor-order logic, which tried to link several sellers to one order and could not |
-| 4 | One completion path | Done in code: `complete-cart-marketplace` workflow and `POST /store/carts/:id/complete-all` run core completion once, then tickets, rentals, appointments, expressions of interest and digital products for whatever the cart holds. The storefront now calls only this. Old routes remain. **Tested end to end for the standard path only**, see 12.3 |
+| 4 | One completion path | Done and tested: `complete-cart-marketplace` workflow and `POST /store/carts/:id/complete-all` run core completion once, then tickets, rentals, appointments, expressions of interest and digital products for whatever the cart holds. The storefront now calls only this. Old routes remain. See 12.3 |
 | 5 | Payment and payouts | Done: ledger table, `GET /vendors/payouts` (own entries and totals), `GET /admin/vendor-payouts`, `POST /admin/vendor-payouts/:id` (mark paid or void). No admin screen yet |
 | 6 | Everything that assumed one order per cart | Done as listed in 12.4 |
 | 7 | Storefront | Done: `GET /store/orders/:id/seller-orders`; a "Shipped by" block on the confirmation page and the account order page |
@@ -497,7 +497,15 @@ Tested in `integration-tests/http/phase3/order-split.spec.ts` (a real two-seller
 - seller ledger scoping and totals; admin settlement; settled entries are final
 - cancelling the parent cancels the children and voids the ledger
 
-**Not tested in integration:** the ticket, rental, appointment, expressions-of-interest and digital blocks of `complete-cart-marketplace` (they reuse the existing steps unchanged; only the standard path is exercised), rental activation from a seller shipment, quote acceptance announcing the order, the storefront pages (typechecked only), the seller order list rewrite beyond the default page.
+Also tested (`complete-all-features.spec.ts`, `complete-all-bookings.spec.ts`, `quote-accept.spec.ts`):
+- one cart with a standard item, a rental, an expression of interest and a digital product completes through `complete-all`; the rental, EOI and digital order are recorded once, and completing again books nothing twice
+- a one-seller order with a rental is not split: the security deposit (a line with no product) stays with the seller. **Found while writing this test:** the splitter first treated the deposit as a platform item and would have split every one-seller rental order; deposits now follow the seller of their rental group
+- a mixed cart splits, the seller's order holds the rental AND its deposit, the other seller's holds neither
+- the seller finds the rental from their child order (404 for the other seller); shipping the child order activates the rental booked on the parent; cancelling the child cancels the rental and voids the ledger entry
+- a cart with a ticket and an appointment next to another seller's product: the ticket purchase and the appointment attendee are recorded on the order, and the split gives the seller both items
+- accepting a quote announces `order.placed` and each seller gets their own order (before acceptance, none)
+
+**Not tested in integration:** the storefront pages (typechecked only), the order list's in-memory path with free-text search plus payment status filters on split orders, and the digital order email (no email provider in the test setup).
 
 ### 12.4 Step 6 in detail
 
@@ -518,11 +526,15 @@ Tested in `integration-tests/http/phase3/order-split.spec.ts` (a real two-seller
 
 ### 12.5 Deploy notes
 
-- `medusa db:migrate` creates the `vendor_order_split` table (migration 20261001140000).
+- `medusa db:migrate` creates the `vendor_order_split` table (migration 20261001140000) and adds the missing `quote.metadata` column (20261001150000, idempotent).
 - Orders placed BEFORE this release are not split; they keep the Phase 1 handling.
 - The storefront must be deployed together with the backend: it now calls `/store/carts/:id/complete-all`.
 
-### 12.6 Known gaps carried forward
+### 12.6 Found and fixed on the way
+
+- The `quote` table had no `metadata` column on a freshly migrated database (the model has one, no migration created it; it existed only where a hand-run script had added it), so every quote insert failed on any new environment. Migration 20261001150000 adds it (idempotent).
+
+### 12.7 Known gaps carried forward
 
 - No admin screen for the payout ledger (API only); no seller screen for earnings (API only).
 - Refunds and returns against a child order, and seller fulfilment, are Phase 4.

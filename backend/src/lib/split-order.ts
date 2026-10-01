@@ -141,7 +141,19 @@ export const splitOrderBySeller = async (
   // The seller of each item; platform items have none.
   const productIds = items.map((item) => item.product_id).filter((id): id is string => !!id)
   const productSellers = await loadProductSellers(container, productIds)
-  const sellerOf = (item: any): string | null => productSellers.get(item.product_id)?.id ?? null
+  // A rental adds a separate "Security Deposit" line with no product. It belongs to
+  // the seller of the rental item in the same rental group, not to the platform.
+  const groupSeller = new Map<string, string>()
+  for (const item of items) {
+    const groupId = item.metadata?.rental_group_id
+    const seller = productSellers.get(item.product_id)?.id
+    if (groupId && seller) {
+      groupSeller.set(groupId, seller)
+    }
+  }
+  const sellerOf = (item: any): string | null =>
+    productSellers.get(item.product_id)?.id ??
+    (item.metadata?.rental_group_id ? groupSeller.get(item.metadata.rental_group_id) ?? null : null)
 
   const sellerIds = [...new Set(items.map(sellerOf).filter((id): id is string => !!id))]
   if (!sellerIds.length) {
