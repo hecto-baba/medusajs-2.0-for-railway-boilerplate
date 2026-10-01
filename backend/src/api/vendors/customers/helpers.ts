@@ -66,6 +66,81 @@ export const assertVendorOwnsCustomer = async (
   }
 }
 
+/** Ids of the customers the seller created (linked directly), not those who only ordered. */
+export const getVendorDirectCustomerIds = async (
+  req: AuthenticatedMedusaRequest
+): Promise<string[]> => {
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+
+  const {
+    data: [vendorAdmin],
+  } = await query.graph({
+    entity: "vendor_admin",
+    fields: ["vendor.id", "vendor.customers.id"],
+    filters: { id: [req.auth_context.actor_id] },
+  })
+
+  return (
+    ((vendorAdmin?.vendor as any)?.customers as { id?: string }[] | undefined) ?? []
+  )
+    .map((customer) => customer?.id)
+    .filter((id): id is string => !!id)
+}
+
+/**
+ * A seller READS the customers they created and those who ordered from them,
+ * but WRITES only to customers they created. Answers 404 for a customer they
+ * cannot see at all, and a clear "not allowed" for one they can see but did not
+ * create (so the message is not misleading, and reveals nothing new).
+ */
+export const assertVendorManagesCustomer = async (
+  req: AuthenticatedMedusaRequest,
+  customerId: string
+): Promise<void> => {
+  await assertVendorOwnsCustomer(req, customerId)
+
+  const directIds = await getVendorDirectCustomerIds(req)
+
+  if (!directIds.includes(customerId)) {
+    throw new MedusaError(
+      MedusaError.Types.NOT_ALLOWED,
+      "You can only change customers you created."
+    )
+  }
+}
+
+type CustomerView = {
+  id: string
+  groups?: { id: string }[] | null
+  addresses?: unknown[] | null
+  metadata?: unknown
+  [key: string]: unknown
+}
+
+/**
+ * Shapes a customer for the calling seller:
+ *   - only the seller's OWN groups are listed (group names are another
+ *     seller's business);
+ *   - a customer who only ordered is shown without addresses or metadata.
+ */
+export const shapeCustomerForVendor = <T extends CustomerView>(
+  customer: T,
+  directIds: Set<string>,
+  ownedGroupIds: Set<string>
+): T => {
+  const shaped: CustomerView = {
+    ...customer,
+    groups: (customer.groups ?? []).filter((group) => ownedGroupIds.has(group.id)),
+  }
+
+  if (!directIds.has(customer.id)) {
+    shaped.addresses = []
+    shaped.metadata = null
+  }
+
+  return shaped as T
+}
+
 /** Fields returned for customer list/detail view in vendor panel. */
 export const VENDOR_CUSTOMER_FIELDS = [
   "id",
@@ -115,8 +190,11 @@ export const refetchVendorCustomer = async (
     },
   }).catch(() => ({ data: [] }))
 
+  const directIds = new Set(await getVendorDirectCustomerIds(req))
+  const ownedGroupIds = new Set(await getVendorCustomerGroupIds(req))
+
   return {
-    ...customer,
+    ...shapeCustomerForVendor(customer as any, directIds, ownedGroupIds),
     orders_count: vendorOrders.length,
     orders: vendorOrders,
   }

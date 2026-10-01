@@ -9,7 +9,7 @@ import {
   updateCustomerAddressesWorkflow,
 } from "@medusajs/medusa/core-flows"
 import {
-  assertVendorOwnsCustomer,
+  assertVendorManagesCustomer,
   refetchVendorCustomer,
 } from "../../../helpers"
 
@@ -35,7 +35,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const { id: customerId, address_id: addressId } = req.params
-  await assertVendorOwnsCustomer(req, customerId)
+  await assertVendorManagesCustomer(req, customerId)
 
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const {
@@ -66,7 +66,7 @@ export const POST = async (
   res: MedusaResponse
 ) => {
   const { id: customerId, address_id: addressId } = req.params
-  await assertVendorOwnsCustomer(req, customerId)
+  await assertVendorManagesCustomer(req, customerId)
 
   const addressData = req.validatedBody
   const updatePayload = {
@@ -94,7 +94,25 @@ export const DELETE = async (
   res: MedusaResponse
 ) => {
   const { id: customerId, address_id: addressId } = req.params
-  await assertVendorOwnsCustomer(req, customerId)
+  await assertVendorManagesCustomer(req, customerId)
+
+  // The address must belong to THIS customer. Checking only the customer let a
+  // seller delete any address in the store by naming one of their own customers.
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const {
+    data: [address],
+  } = await query.graph({
+    entity: "customer_address",
+    fields: ["id"],
+    filters: { id: [addressId], customer_id: [customerId] },
+  })
+
+  if (!address) {
+    throw new MedusaError(
+      MedusaError.Types.NOT_FOUND,
+      `Address with id: ${addressId} not found`
+    )
+  }
 
   const deleteAddress = deleteCustomerAddressesWorkflow(req.scope)
   await deleteAddress.run({

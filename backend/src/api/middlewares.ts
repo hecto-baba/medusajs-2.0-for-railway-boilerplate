@@ -92,6 +92,7 @@ import {
 } from "./vendors/customer-groups/route";
 import { PostVendorUpdateCustomerGroupSchema } from "./vendors/customer-groups/[id]/route";
 import { PostVendorCustomerGroupCustomersSchema } from "./vendors/customer-groups/[id]/customers/route";
+import { PostVendorBatchCustomerGroupsSchema } from "./vendors/customers/[id]/customer-groups/route";
 import {
   GetVendorPriceListsSchema,
   PostVendorCreatePriceListSchema,
@@ -1182,6 +1183,14 @@ export default defineMiddlewares({
       matcher: "/vendors/customers/:id/*",
       middlewares: [
         authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      // Without this entry req.validatedBody is undefined and the route answers 500.
+      matcher: "/vendors/customers/:id/customer-groups",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorBatchCustomerGroupsSchema)
       ]
     },
     {

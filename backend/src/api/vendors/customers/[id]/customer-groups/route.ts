@@ -2,6 +2,7 @@ import type {
   AuthenticatedMedusaRequest,
   MedusaResponse,
 } from "@medusajs/framework/http"
+import { MedusaError } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { linkCustomerGroupsToCustomerWorkflow } from "@medusajs/medusa/core-flows"
 import {
@@ -27,15 +28,13 @@ export const POST = async (
   // Ensure vendor owns the customer
   await assertVendorOwnsCustomer(req, id)
 
-  // If adding groups, ensure vendor owns those customer groups
-  if (add && add.length) {
+  // Every group named, whether added or removed, must be one of the seller's own.
+  // Another seller's group answers 404 (never 403, never echoing ids).
+  const namedGroupIds = [...(add ?? []), ...(remove ?? [])]
+  if (namedGroupIds.length) {
     const ownedGroupIds = await getVendorCustomerGroupIds(req)
-    const unauthorized = add.filter((gid) => !ownedGroupIds.includes(gid))
-    if (unauthorized.length) {
-      res.status(403).json({
-        message: `Cannot add customer groups outside vendor scope: ${unauthorized.join(", ")}`,
-      })
-      return
+    if (namedGroupIds.some((gid) => !ownedGroupIds.includes(gid))) {
+      throw new MedusaError(MedusaError.Types.NOT_FOUND, "Customer group not found.")
     }
   }
 
