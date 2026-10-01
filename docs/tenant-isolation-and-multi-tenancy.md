@@ -355,6 +355,11 @@ The route guard ratchet backlog went from 24 unguarded by-id routes to 1 (an ine
 - The admin API, store routes and the restaurant/driver logins were not audited.
 - Mixed orders stay mixed until Phase 3; the redaction in step 17 is interim.
 - No Postgres row-level security: isolation is enforced in code and by the tests above.
+- **Not deployed yet.** Phase 1 is finished and tested in code, but nothing is live until the release is deployed and `medusa db:migrate` has been run. Until then the live database lacks the new tables and the fixes are not in effect:
+  - the `vendor_product_import` table (product imports will fail without it);
+  - the `vendor.metadata` column (idempotent; already present on the live database);
+  - the link tables for shipping profiles (`vendor-shipping-profile`) and shipping option types (`vendor-shipping-option-type`).
+- Existing shipping profiles, option types, regions and tax regions have no owner. They stay shared platform resources (visible and usable by sellers, not editable) until Phase 2 decides who owns them. No backfill is done in Phase 1.
 
 ### 10.6 Running the tests
 
