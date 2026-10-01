@@ -1667,6 +1667,14 @@ export default defineMiddlewares({
       ]
     },
     {
+      // Depth-3 path with no other entry. Explicit so authentication never
+      // depends on how the single-segment "/vendors/*" matcher behaves.
+      matcher: "/vendors/layouts/:zone/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
       matcher: "/vendors/workflow-executions",
       methods: ["GET"],
       middlewares: [
