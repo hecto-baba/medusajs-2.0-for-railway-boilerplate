@@ -4,6 +4,9 @@ import type {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
+import { getVendorCustomerGroupIds, getVendorCustomerIds } from "../customers/helpers"
+import { getVendorInventoryItemIds } from "../inventory-items/helpers"
+import { getVisibleIds } from "../shared/platform-scope"
 
 export const GetVendorSearchSchema = z.object({
   q: z.string().optional(),
@@ -160,11 +163,16 @@ export const GET = async (
   // 4. Customers
   if (shouldSearch("customer")) {
     try {
-      const { data: customers } = await query.graph({
-        entity: "customer",
-        fields: ["id", "first_name", "last_name", "email", "phone"],
-        filters: {},
-      })
+      // Only the customers this seller created or who ordered from them. An empty
+      // id list means "no constraint" downstream, so skip the query instead.
+      const customerIds = await getVendorCustomerIds(req)
+      const { data: customers } = customerIds.length
+        ? await query.graph({
+            entity: "customer",
+            fields: ["id", "first_name", "last_name", "email", "phone"],
+            filters: { id: customerIds },
+          })
+        : { data: [] as any[] }
 
       const matchedCustomers = (customers ?? []).filter((c: any) => {
         if (!c) return false
@@ -193,11 +201,14 @@ export const GET = async (
   // 5. Customer Groups
   if (shouldSearch("customerGroup")) {
     try {
-      const { data: customerGroups } = await query.graph({
-        entity: "customer_group",
-        fields: ["id", "name"],
-        filters: {},
-      })
+      const groupIds = await getVendorCustomerGroupIds(req)
+      const { data: customerGroups } = groupIds.length
+        ? await query.graph({
+            entity: "customer_group",
+            fields: ["id", "name"],
+            filters: { id: groupIds },
+          })
+        : { data: [] as any[] }
 
       const matchedGroups = (customerGroups ?? []).filter((g: any) => {
         if (!g) return false
@@ -272,11 +283,19 @@ export const GET = async (
   // 9. Collections
   if (shouldSearch("collection")) {
     try {
-      const { data: collections } = await query.graph({
+      // The seller's own collections plus shared platform collections.
+      const { owned, platform } = await getVisibleIds(req, {
+        linkField: "product_collections",
         entity: "product_collection",
-        fields: ["id", "title", "handle"],
-        filters: {},
       })
+      const collectionIds = [...owned, ...platform]
+      const { data: collections } = collectionIds.length
+        ? await query.graph({
+            entity: "product_collection",
+            fields: ["id", "title", "handle"],
+            filters: { id: collectionIds },
+          })
+        : { data: [] as any[] }
 
       const matched = (collections ?? []).filter((c: any) => {
         if (!c) return false
@@ -303,7 +322,7 @@ export const GET = async (
       const { data: categories } = await query.graph({
         entity: "product_category",
         fields: ["id", "name", "handle"],
-        filters: {},
+        filters: { is_internal: false },
       })
 
       const matched = (categories ?? []).filter((c: any) => {
@@ -328,11 +347,14 @@ export const GET = async (
   // 11. Inventory
   if (shouldSearch("inventory")) {
     try {
-      const { data: inventoryItems } = await query.graph({
-        entity: "inventory_item",
-        fields: ["id", "title", "sku"],
-        filters: {},
-      })
+      const inventoryIds = await getVendorInventoryItemIds(req)
+      const { data: inventoryItems } = inventoryIds.length
+        ? await query.graph({
+            entity: "inventory_item",
+            fields: ["id", "title", "sku"],
+            filters: { id: inventoryIds },
+          })
+        : { data: [] as any[] }
 
       const matched = (inventoryItems ?? []).filter((i: any) => {
         if (!i) return false

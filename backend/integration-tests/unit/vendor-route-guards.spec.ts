@@ -43,7 +43,7 @@ const BACKLOG: string[] = [
 ]
 
 // Routes that query a whole entity table with no filter. Must only shrink.
-const UNFILTERED_QUERY_BACKLOG: string[] = ["search/route.ts"]
+const UNFILTERED_QUERY_BACKLOG: string[] = []
 
 const collectRoutes = (dir: string): string[] =>
   fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
