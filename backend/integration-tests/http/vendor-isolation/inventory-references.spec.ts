@@ -116,21 +116,28 @@ medusaIntegrationTestRunner({
       })
 
       describe("stock locations", () => {
-        it("an inventory item can be created with levels at the seller's own and a platform location", async () => {
+        it("an inventory item can be created with a level at the seller's own location", async () => {
           const res = await call(
             api.post(
               "/vendors/inventory-items",
-              {
-                title: "Ok item",
-                location_levels: [
-                  { location_id: locationA, stocked_quantity: 1 },
-                  { location_id: platformLocation, stocked_quantity: 2 },
-                ],
-              },
+              { title: "Ok item", location_levels: [{ location_id: locationA, stocked_quantity: 1 }] },
               sellerA.headers
             )
           )
           expect({ status: res.status, body: res.status === 201 ? "ok" : res.data }).toEqual({ status: 201, body: "ok" })
+        })
+
+        it("a platform location is no longer usable for new stock (404, nothing created)", async () => {
+          const before = await itemCount()
+          const res = await call(
+            api.post(
+              "/vendors/inventory-items",
+              { title: "Platform item", location_levels: [{ location_id: platformLocation, stocked_quantity: 2 }] },
+              sellerA.headers
+            )
+          )
+          expect(res.status).toBe(404)
+          expect(await itemCount()).toBe(before)
         })
 
         it("an inventory item cannot be created with a level at another seller's location (404, nothing created)", async () => {

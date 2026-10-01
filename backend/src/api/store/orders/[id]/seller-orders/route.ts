@@ -1,6 +1,7 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { MARKETPLACE_MODULE } from "../../../../../modules/marketplace"
+import { canBuyerSeeOrder } from "../../../helpers/order-access"
 
 /**
  * Who is shipping what for a placed order (Phase 3, step 7).
@@ -18,6 +19,15 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const { id } = req.params
   const query: any = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const marketplace: any = req.scope.resolve(MARKETPLACE_MODULE)
+
+  // Only the buyer's own order (or a guest's): the same rule as the order itself.
+  const {
+    data: [parent],
+  } = await query.graph({ entity: "order", fields: ["id", "customer_id", "metadata"], filters: { id } })
+  if (!parent || !(await canBuyerSeeOrder(req, parent))) {
+    res.status(404).json({ message: "Order not found" })
+    return
+  }
 
   const splits: any[] = await marketplace.listVendorOrderSplits({ parent_order_id: id })
   if (!splits.length) {

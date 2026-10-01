@@ -65,6 +65,7 @@ export const runPhase2Backfill = async (
       "stock_locations.name",
       "stock_locations.address.country_code",
       "stock_locations.fulfillment_sets.id",
+      "stock_locations.fulfillment_sets.service_zones.shipping_options.id",
     ],
   })
 
@@ -125,7 +126,15 @@ export const runPhase2Backfill = async (
       }
     }
 
-    // 2. Products on a shared profile (or none) move to the seller's own.
+    // 2. Products on a shared profile (or none) move to the seller's own, but only for a
+    // seller who already ships on their own (has a shipping option). Otherwise their
+    // products stay on the platform profile so checkout keeps working; they move when
+    // the seller creates their first option.
+    const hasOwnOption = locations.some((location) =>
+      (location.fulfillment_sets ?? []).some((set: any) =>
+        (set.service_zones ?? []).some((zone: any) => (zone.shipping_options ?? []).length > 0)
+      )
+    )
     const ownIds = new Set(ownProfiles.map((profile) => profile.id))
     for (const product of products) {
       const current: string | undefined = product.shipping_profile?.id
@@ -134,6 +143,9 @@ export const runPhase2Backfill = async (
       }
       if (current && claimedProfiles.has(current)) {
         report.needsAttention.productsOnAnotherSellersProfile.push({ product_id: product.id, vendor_id: vendor.id })
+        continue
+      }
+      if (!hasOwnOption) {
         continue
       }
       report.productsToMove.push({ product_id: product.id, vendor_id: vendor.id })

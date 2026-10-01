@@ -41,7 +41,11 @@ export const createVendorProductWorkflow = createWorkflow(
 
     const { data: vendorAdmins } = useQueryGraphStep({
       entity: "vendor_admin",
-      fields: ["vendor.id", "vendor.shipping_profiles.id"],
+      fields: [
+        "vendor.id",
+        "vendor.shipping_profiles.id",
+        "vendor.stock_locations.fulfillment_sets.service_zones.shipping_options.id",
+      ],
       filters: { id: input.vendor_admin_id },
     }).config({ name: "retrieve-vendor-admins" })
 
@@ -82,11 +86,23 @@ export const createVendorProductWorkflow = createWorkflow(
           return requested as string
         }
 
-        const own = visible.filter((profile: any) => ownedIds.has(profile.id))
+        // The seller's own profile is only worth using once they ship on their own (at
+        // least one shipping option). Before that their products stay on the shared
+        // platform profile so checkout keeps working with the platform's shipping.
+        const hasOwnOption = ((data.vendorAdmins?.[0]?.vendor as any)?.stock_locations ?? []).some((location: any) =>
+          (location?.fulfillment_sets ?? []).some((set: any) =>
+            (set?.service_zones ?? []).some((zone: any) => (zone?.shipping_options ?? []).length > 0)
+          )
+        )
+        const own = hasOwnOption ? visible.filter((profile: any) => ownedIds.has(profile.id)) : []
+        // Shared platform profiles: visible ones that are not the seller's own.
+        const platform = visible.filter((profile: any) => !ownedIds.has(profile.id))
         const chosen =
           own.find((profile: any) => profile.type === "default") ||
           own[0] ||
-          visible.find((profile: any) => profile.type === "default") ||
+          platform.find((profile: any) => profile.type === "default") ||
+          platform[0] ||
+          // No platform profile exists at all: the seller's own beats no profile.
           visible[0]
 
         return chosen?.id as string | undefined

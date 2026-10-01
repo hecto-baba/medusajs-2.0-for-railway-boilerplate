@@ -10,6 +10,10 @@ import {
  * pass `shipping_profile_id` as a plain field but the Medusa 2.x product
  * module stores the relationship in a separate link table instead.
  *
+ * A product that belongs to a seller who has their own shipping profile gets that
+ * profile; every other product gets the shared platform profile (one no seller
+ * owns). A seller's profile is never handed to anyone else's product.
+ *
  * Run with:  npx medusa exec src/scripts/fix-shipping-profiles.ts
  */
 export default async function fixShippingProfiles({ container }: ExecArgs) {
@@ -19,8 +23,28 @@ export default async function fixShippingProfiles({ container }: ExecArgs) {
 
   logger.info("Looking up default shipping profile...")
 
-  // Find the default shipping profile
-  const allProfiles = await fulfillmentModuleService.listShippingProfiles({})
+  // Profiles claimed by a seller, and each seller's own default profile per product.
+  const { data: vendors } = await query.graph({
+    entity: "vendor",
+    fields: ["id", "products.id", "shipping_profiles.id", "shipping_profiles.type"],
+  })
+  const claimed = new Set<string>()
+  const ownProfileOfProduct = new Map<string, string>()
+  for (const vendor of vendors as any[]) {
+    const profiles = (vendor.shipping_profiles ?? []) as any[]
+    profiles.forEach((profile) => claimed.add(profile.id))
+    const own = profiles.find((profile) => profile.type === "default") ?? profiles[0]
+    if (own) {
+      for (const product of vendor.products ?? []) {
+        ownProfileOfProduct.set(product.id, own.id)
+      }
+    }
+  }
+
+  // The shared platform default: a profile no seller owns.
+  const allProfiles = (await fulfillmentModuleService.listShippingProfiles({})).filter(
+    (sp) => !claimed.has(sp.id)
+  )
   const defaultProfile =
     allProfiles.find((sp) => sp.type === "default") || allProfiles[0]
 
@@ -58,7 +82,7 @@ export default async function fixShippingProfiles({ container }: ExecArgs) {
           product_id: product.id,
         },
         [Modules.FULFILLMENT]: {
-          shipping_profile_id: defaultProfile.id,
+          shipping_profile_id: ownProfileOfProduct.get(product.id) ?? defaultProfile.id,
         },
       })
       logger.info(`  ✓ Linked "${product.title}" (${product.id})`)

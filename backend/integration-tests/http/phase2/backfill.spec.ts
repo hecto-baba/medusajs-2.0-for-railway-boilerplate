@@ -119,7 +119,8 @@ medusaIntegrationTestRunner({
         const dry = await runPhase2Backfill(container)
         expect(dry.applied).toBe(false)
         expect(dry.profilesToCreate).toEqual([legacy.vendorId])
-        expect(dry.productsToMove).toEqual([{ product_id: legacyProduct, vendor_id: legacy.vendorId }])
+        // No shipping option yet, so their product stays on the shared platform profile.
+        expect(dry.productsToMove).toEqual([])
         expect(dry.locationsToProvision.map((l) => l.location_id)).toEqual([legacyLocation])
         expect(dry.needsAttention.unownedProducts).toBe(1)
         expect(await profileOf(legacyProduct)).toBe(platformProfile)
@@ -132,13 +133,39 @@ medusaIntegrationTestRunner({
 
         const ownProfiles = await ownProfilesOf(legacy.vendorId)
         expect(ownProfiles).toHaveLength(1)
-        expect(await profileOf(legacyProduct)).toBe(ownProfiles[0].id)
+        // Still on the platform profile: the seller does not ship on their own yet.
+        expect(await profileOf(legacyProduct)).toBe(platformProfile)
 
         const location = await locationState(legacyLocation)
         expect(location.fulfillment_sets).toHaveLength(1)
         expect(location.fulfillment_sets[0].service_zones[0].geo_zones.map((g: any) => g.country_code)).toEqual(["us"])
         expect(location.fulfillment_providers.map((p: any) => p.id)).toContain("manual_manual")
         expect(location.sales_channels.map((c: any) => c.id)).toContain(channelId)
+
+        // When the seller creates their FIRST shipping option, their products move onto
+        // their own profile (the profile that option ships).
+        const zone = (await query().graph({ entity: "stock_location", fields: ["fulfillment_sets.service_zones.id"], filters: { id: legacyLocation } })).data[0].fulfillment_sets[0].service_zones[0].id
+        const type = (await must("type", api.post("/vendors/shipping-option-types", { label: "Std", code: "std" }, legacy.headers))).data.shipping_option_type.id
+        const created = await must(
+          "first option",
+          api.post(
+            "/vendors/shipping-options",
+            { name: "Std", service_zone_id: zone, shipping_profile_id: ownProfiles[0].id, shipping_option_type_id: type, prices: [{ currency_code: "usd", amount: 5 }] },
+            legacy.headers
+          )
+        )
+        expect(created.data.adopted_products).toBe(1)
+        expect(await profileOf(legacyProduct)).toBe(ownProfiles[0].id)
+        // A second option moves nothing more.
+        const second = await must(
+          "second option",
+          api.post(
+            "/vendors/shipping-options",
+            { name: "Fast", service_zone_id: zone, shipping_profile_id: ownProfiles[0].id, shipping_option_type_id: type, prices: [{ currency_code: "usd", amount: 9 }] },
+            legacy.headers
+          )
+        )
+        expect(second.data.adopted_products).toBe(0)
 
         // The seller already on the new model is untouched.
         expect(await profileOf(modernProduct)).toBe(modernProfile)
@@ -148,6 +175,7 @@ medusaIntegrationTestRunner({
         const again = await runPhase2Backfill(container, { apply: true })
         expect(again.profilesToCreate).toEqual([])
         expect(again.productsToMove).toEqual([])
+        expect(again.profilesToCreate).toEqual([])
         expect(again.locationsToProvision).toEqual([])
         expect(again.needsAttention.unownedProducts).toBe(1)
       })

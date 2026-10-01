@@ -106,7 +106,13 @@ async function main() {
     } catch (error) {
       console.error("[tests] failed to stop Postgres cleanly:", error.message)
     }
-    fs.rmSync(dataDir, { recursive: true, force: true })
+    // Windows can hold the data folder for a moment after Postgres stops (EBUSY);
+    // retry, and never let cleanup of a temp folder turn a passing run into a failure.
+    try {
+      fs.rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 500 })
+    } catch (error) {
+      console.error(`[tests] could not remove ${dataDir} (harmless, in the temp folder): ${error.code}`)
+    }
     console.log("[tests] local Postgres stopped and its data removed")
   }
 

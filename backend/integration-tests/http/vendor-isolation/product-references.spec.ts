@@ -89,10 +89,10 @@ medusaIntegrationTestRunner({
           .product.id
       })
 
-      it("a product created without a profile gets the seller's own profile, linked once", async () => {
+      it("a seller with no shipping option yet gets the shared platform profile, so checkout keeps working", async () => {
         const res = await call(api.post("/vendors/products", productBody("A product"), sellerA.headers))
         expect({ status: res.status, body: res.status === 201 ? "ok" : res.data }).toEqual({ status: 201, body: "ok" })
-        expect(await profileOf(res.data.product.id)).toBe(profileA)
+        expect(await profileOf(res.data.product.id)).toBe(platformProfile)
       })
 
       it("a product can use a shared platform profile", async () => {
@@ -127,7 +127,7 @@ medusaIntegrationTestRunner({
           api.post(`/vendors/products/${ownProduct}`, { shipping_profile_id: profileB }, sellerA.headers)
         )
         expect(res.status).toBe(404)
-        expect(await profileOf(ownProduct)).toBe(profileA)
+        expect(await profileOf(ownProduct)).toBe(platformProfile)
       })
 
       it("a product cannot be created with another seller's type (404, nothing created)", async () => {

@@ -5,6 +5,7 @@ import type {
 import { z } from "@medusajs/framework/zod"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import { getVendorId } from "../shared/vendor-scope"
+import { round, toNumber } from "../../../lib/money"
 
 const QuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -40,9 +41,9 @@ export const GET = async (
     totals[row.currency_code] ??= { owed: 0, paid: 0, void: 0, refunded: 0 }
     // Money already returned to buyers on these orders; the seller is owed total minus this.
     totals[row.currency_code].refunded =
-      Math.round(((totals[row.currency_code].refunded ?? 0) + Number(row.refunded_total ?? 0)) * 100) / 100
+      round((totals[row.currency_code].refunded ?? 0) + toNumber(row.refunded_total))
     totals[row.currency_code][row.payout_status] =
-      Math.round(((totals[row.currency_code][row.payout_status] ?? 0) + Number(row.total)) * 100) / 100
+      round((totals[row.currency_code][row.payout_status] ?? 0) + toNumber(row.total))
   }
 
   res.json({ payouts: entries, count, limit, offset, totals })

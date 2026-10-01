@@ -3,6 +3,7 @@ import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { createOrdersWorkflow } from "@medusajs/medusa/core-flows"
 import { MARKETPLACE_MODULE } from "../modules/marketplace"
 import { loadProductSellers } from "./cart-shipping"
+import { round, toNumber } from "./money"
 
 /**
  * Seller orders (Phase 3, decision D5).
@@ -31,22 +32,6 @@ export type SplitOrderResult = {
   created_child_ids: string[]
 }
 
-// Order amounts come back from the query as numbers, numeric strings, or BigNumber
-// objects ({ numeric_ } / { value }); Number() on the object is NaN.
-const toNumber = (value: any): number => {
-  if (value === null || value === undefined) {
-    return 0
-  }
-  if (typeof value === "number") {
-    return value
-  }
-  if (typeof value === "object") {
-    return toNumber(value.numeric_ ?? value.value ?? value.raw_?.value)
-  }
-  const parsed = Number(value)
-  return Number.isNaN(parsed) ? 0 : parsed
-}
-
 // An order line item keeps its quantity on the order-item detail record.
 const quantityOf = (item: any): number => {
   const quantity = toNumber(item.detail?.quantity ?? item.quantity)
@@ -54,11 +39,6 @@ const quantityOf = (item: any): number => {
     throw new Error(`Cannot copy a line item with no quantity: ${JSON.stringify(item)}`)
   }
   return quantity
-}
-
-const round = (value: number, decimals = 2) => {
-  const factor = Math.pow(10, decimals)
-  return Math.round((value + Number.EPSILON) * factor) / factor
 }
 
 const toTaxLines = (lines: any[] | undefined) =>

@@ -6,6 +6,7 @@ import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/util
 import { z } from "@medusajs/framework/zod"
 import { refundPaymentWorkflow } from "@medusajs/medusa/core-flows"
 import { MARKETPLACE_MODULE } from "../../../../../modules/marketplace"
+import { round, toNumber } from "../../../../../lib/money"
 import {
   assertOrderNotShared,
   assertVendorOwnsOrder,
@@ -20,16 +21,6 @@ const BodySchema = z
     note: z.string().max(500).optional(),
   })
   .strict()
-
-const toNumber = (value: any): number => {
-  if (value === null || value === undefined) return 0
-  if (typeof value === "number") return value
-  if (typeof value === "object") return toNumber(value.numeric_ ?? value.value ?? value.raw_?.value)
-  const parsed = Number(value)
-  return Number.isNaN(parsed) ? 0 : parsed
-}
-
-const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
 
 /**
  * Refunds the buyer for the seller's own order.
@@ -56,7 +47,7 @@ export const POST = async (
   const paymentOrderId = entry ? entry.parent_order_id : id
 
   if (entry) {
-    const remaining = round(Number(entry.total) - Number(entry.refunded_total ?? 0))
+    const remaining = round(toNumber(entry.total) - toNumber(entry.refunded_total))
     if (body.amount > remaining) {
       throw new MedusaError(
         MedusaError.Types.NOT_ALLOWED,
@@ -101,7 +92,7 @@ export const POST = async (
     const marketplace: any = req.scope.resolve(MARKETPLACE_MODULE)
     await marketplace.updateVendorOrderSplits({
       id: entry.id,
-      refunded_total: round(Number(entry.refunded_total ?? 0) + body.amount),
+      refunded_total: round(toNumber(entry.refunded_total) + body.amount),
     })
   }
 

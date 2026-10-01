@@ -1,6 +1,7 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { QUOTE_MODULE } from "../../../../modules/quote"
+import { canAccessQuote } from "../../helpers/quote-access"
 
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
@@ -36,7 +37,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
       },
     })
 
-    if (!quote) {
+    if (!quote || !(await canAccessQuote(req, quote))) {
       return res.status(404).json({ message: "Quote not found" })
     }
 

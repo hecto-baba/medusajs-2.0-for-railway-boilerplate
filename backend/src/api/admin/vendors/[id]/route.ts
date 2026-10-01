@@ -32,7 +32,7 @@ export const GET = async (
         "price_lists.id",
         "promotions.id",
         "campaigns.id",
-        "collections.id",
+        "product_collections.id",
         "categories.id",
         "customers.id",
         "customer_groups.id",
@@ -414,7 +414,7 @@ export const GET = async (
   }
 
   // 7. Collections (direct + linked products)
-  const directColIds = (vendor.collections || []).map((c: any) => c?.id).filter(Boolean)
+  const directColIds = (vendor.product_collections || []).map((c: any) => c?.id).filter(Boolean)
   const prodColIds = vendorProducts
     .map((p: any) => p?.collection_id || p?.collection?.id)
     .filter(Boolean)

@@ -1,12 +1,20 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { APPROVAL_MODULE } from "../../../../../modules/approval"
+import { canUseCart } from "../../../helpers/cart-access"
 
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const approvalModule = req.scope.resolve(APPROVAL_MODULE) as any
   const remoteLink = req.scope.resolve(ContainerRegistrationKeys.LINK)
   const cartId = req.params.id
-  const actorId = (req as any).auth_context?.actor_id || "employee"
+  const actorId = (req as any).auth_context?.actor_id
+  // Anonymous callers used to be recorded as "employee" and could queue approvals on any cart.
+  if (!actorId) {
+    return res.status(401).json({ message: "Not authenticated" })
+  }
+  if (!(await canUseCart(req, cartId))) {
+    return res.status(404).json({ message: "Cart not found" })
+  }
 
   try {
     const approval = await approvalModule.createApprovals({

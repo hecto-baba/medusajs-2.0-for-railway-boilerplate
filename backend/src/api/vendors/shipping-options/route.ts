@@ -5,6 +5,7 @@ import type {
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { createShippingOptionsWorkflow } from "@medusajs/medusa/core-flows"
+import { adoptOwnShippingProfile, sellerHasShippingOption } from "../../../lib/adopt-own-profile"
 import { syncVendorTaxRules } from "../../../lib/vendor-tax"
 import { getVendorId } from "../shared/vendor-scope"
 import {
@@ -83,6 +84,10 @@ export const POST = async (
     )
   }
 
+  // Is this the seller's first option? (Checked before it exists.)
+  const vendorId = await getVendorId(req)
+  const hadOptions = await sellerHasShippingOption(req.scope, vendorId)
+
   const { result } = await createShippingOptionsWorkflow(req.scope).run({
     input: [
       {
@@ -103,7 +108,14 @@ export const POST = async (
   })
 
   // The seller's tax rates must cover the new option (shipping is taxed too).
-  await syncVendorTaxRules(req.scope, await getVendorId(req))
+  await syncVendorTaxRules(req.scope, vendorId)
 
-  res.status(201).json({ shipping_option: await refetchShippingOption(req, result[0].id) })
+  // First option: the seller now ships on their own, so their products move off the
+  // shared platform profile onto the profile this option ships.
+  const adopted = hadOptions ? 0 : await adoptOwnShippingProfile(req.scope, vendorId, body.shipping_profile_id)
+
+  res.status(201).json({
+    shipping_option: await refetchShippingOption(req, result[0].id),
+    adopted_products: adopted,
+  })
 }

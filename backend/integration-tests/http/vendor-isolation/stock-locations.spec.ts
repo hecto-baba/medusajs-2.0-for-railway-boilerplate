@@ -82,24 +82,26 @@ medusaIntegrationTestRunner({
         expect(owner.status).toBe(200)
       })
 
-      it("a list shows the seller's own and platform locations, never another seller's", async () => {
+      it("a list shows only the seller's own locations: another seller's never, a platform one only where they hold stock", async () => {
         const res = await call(api.get("/vendors/stock-locations", sellerA.headers))
         const ids = (res.data.stock_locations ?? []).map((l: any) => l.id)
         expect(ids).toContain(locationA)
-        expect(ids).toContain(platformLocation)
+        // Phase 2 retired the platform location from seller view (see platform-leftovers.spec.ts
+        // for the seller who still holds stock there).
+        expect(ids).not.toContain(platformLocation)
         expect(ids).not.toContain(locationB)
       })
 
-      it("a seller with no locations sees only platform locations, not other sellers'", async () => {
+      it("a seller with no locations sees none: not the platform's, not other sellers'", async () => {
         const res = await call(api.get("/vendors/stock-locations", sellerWithNothing.headers))
         expect(res.status).toBe(200)
         const ids = (res.data.stock_locations ?? []).map((l: any) => l.id)
-        expect(ids).toEqual([platformLocation])
+        expect(ids).toEqual([])
       })
 
-      it("a platform location is readable but cannot be edited or deleted by a seller", async () => {
+      it("a platform location is not visible, and cannot be edited or deleted, by a seller with no stock there", async () => {
         const read = await call(api.get(`/vendors/stock-locations/${platformLocation}`, sellerA.headers))
-        expect(read.status).toBe(200)
+        expect(read.status).toBe(404)
 
         const update = await call(
           api.post(`/vendors/stock-locations/${platformLocation}`, { name: "hijacked" }, sellerA.headers)
@@ -123,7 +125,7 @@ medusaIntegrationTestRunner({
         // The old fallback leaked every location to a seller that owned none.
         const empty = await call(api.get("/vendors/taxonomy", sellerWithNothing.headers))
         const emptyIds = (empty.data.stock_locations ?? []).map((l: any) => l.id)
-        expect(emptyIds).toEqual([platformLocation])
+        expect(emptyIds).toEqual([])
       })
     })
   },

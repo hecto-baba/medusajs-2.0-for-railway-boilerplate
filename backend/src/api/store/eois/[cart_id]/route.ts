@@ -1,4 +1,5 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import { canUseCart } from "../../helpers/cart-access"
 import { createEoiOrderWorkflow } from "../../../../workflows/create-eoi-order"
 import { MedusaError } from "@medusajs/framework/utils"
 
@@ -16,6 +17,11 @@ export const POST = async (
   res: MedusaResponse
 ) => {
   const { cart_id } = req.params
+
+  if (!(await canUseCart(req, cart_id))) {
+    return res.status(404).json({ message: "Cart not found" })
+  }
+
 
   try {
     const { result } = await createEoiOrderWorkflow(req.scope).run({

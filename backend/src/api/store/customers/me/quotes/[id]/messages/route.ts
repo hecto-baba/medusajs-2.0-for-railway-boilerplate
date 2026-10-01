@@ -1,5 +1,6 @@
 import type { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { QUOTE_MODULE } from "../../../../../../../modules/quote"
+import { canAccessQuote } from "../../../../../helpers/quote-access"
 
 export const POST = async (req: AuthenticatedMedusaRequest, res: MedusaResponse) => {
   const quoteModule = req.scope.resolve(QUOTE_MODULE) as any
@@ -11,7 +12,7 @@ export const POST = async (req: AuthenticatedMedusaRequest, res: MedusaResponse)
     return res.status(404).json({ message: "Quote not found" })
   }
 
-  if (!quote) {
+  if (!quote || !(await canAccessQuote(req, quote))) {
     return res.status(404).json({ message: "Quote not found" })
   }
 

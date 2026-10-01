@@ -4,6 +4,7 @@ import { z } from "@medusajs/framework/zod"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import { assertVendorOwns, getOwnedIds } from "../shared/vendor-scope"
 import { getOwnedShippingOptionIds } from "../shared/shipping-option-scope"
+import { toNumber } from "../../../lib/money"
 
 /**
  * Guards for what a seller may DO to an order (Phase 4): fulfil, ship, deliver,
@@ -41,14 +42,6 @@ export type SellerOrderContext = {
   shippingOptionIds: Set<string>
   fulfillmentIds: Set<string>
   items: Array<{ id: string; quantity: number; fulfilled_quantity: number }>
-}
-
-const toNumber = (value: any): number => {
-  if (value === null || value === undefined) return 0
-  if (typeof value === "number") return value
-  if (typeof value === "object") return toNumber(value.numeric_ ?? value.value ?? value.raw_?.value)
-  const parsed = Number(value)
-  return Number.isNaN(parsed) ? 0 : parsed
 }
 
 /** Loads the order for an action; the caller has already run assertVendorOwnsOrder. */

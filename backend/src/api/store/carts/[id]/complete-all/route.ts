@@ -1,4 +1,5 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import { canUseCart } from "../../../helpers/cart-access"
 import { completeCartMarketplaceWorkflow } from "../../../../../workflows/complete-cart-marketplace"
 
 /**
@@ -11,6 +12,11 @@ import { completeCartMarketplaceWorkflow } from "../../../../../workflows/comple
  */
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const { id } = req.params
+
+  if (!(await canUseCart(req, id))) {
+    return res.status(404).json({ message: "Cart not found" })
+  }
+
 
   const { result } = await completeCartMarketplaceWorkflow(req.scope).run({
     input: { cart_id: id },

@@ -1,6 +1,6 @@
 # Tenant Isolation and Multi-Tenancy Plan
 
-Status: Phases 0 and 1 complete; Phases 2, 3 and 4 code complete and automatically tested; browser checks, QA rollout, ledger screens and owner decisions pending (see sections 11.5 and 12.8). Branch: `feature/tenant-isolation` (off `feature/marketplace`).
+Status: Phases 0 and 1 complete; Phases 1 to 4 code complete and automatically tested; the open list is section 14 (testing, rollout and decisions only); browser checks, QA rollout, ledger screens and owner decisions pending (see sections 11.5 and 12.8). Branch: `feature/tenant-isolation` (off `feature/marketplace`).
 Scope: the seller (vendor) API `backend/src/api/vendors/**`, the seller panel `sellers/`, and bringing the missing admin features to sellers.
 Out of scope: Vendor Transactions (stays admin-only), drivers, and the admin API / store routes (see "What this plan does not cover").
 
@@ -608,3 +608,58 @@ Reservation moved to the seller's order at the seller's location and the parent'
 - [ ] Admin screen for the payout ledger and a seller earnings screen are still API only (Phase 3 item A).
 - [ ] Return shipping labels and a return shipping option for sellers are not offered: returns are recorded, the physical return is arranged outside the system.
 - [ ] Partial refunds do not yet adjust how a payout is described to the seller beyond the `refunded` total.
+
+## 14. Every pending item from Phases 1 to 4, and what became of it
+
+Status key: **Resolved** (built and tested), **Testing** (set aside on purpose, needs a browser, a real provider or QA), **Owner** (needs your access or action), **Decision** (yours to make), **Backlog** (a feature that was never in scope).
+
+### 14.1 Resolved in this pass
+
+| Item (where it was listed) | What was done | Test |
+|---|---|---|
+| Ledger amounts stored as 32-bit floats (12.8 D) | Exact decimals (Medusa BigNumber) in the ledger migrations (not yet released, so edited in place); one shared money helper | `platform-leftovers`: a large amount keeps its cents |
+| Admin screen for the payout ledger (12.8 A) | Admin > Vendors > **Seller Payouts**: list by status, seller name, order number, net owed after refunds, mark paid with a bank reference, void. The admin API now returns names, order numbers, net totals and totals per currency | `platform-leftovers`, `order-split` |
+| Seller earnings screen (12.8 A, 13.4) | Seller panel > Orders > **Earnings**: totals per currency, entries with status and reference | typechecked and linted |
+| Storefront order lookup took any id (12.8 D) | `GET /store/orders/:id` and `/seller-orders`: only the customer (and their company) or, for a guest order, the id holder. A seller's child order is never the buyer's | `store-isolation` (13 tests) |
+| Store and admin API not audited (10.5) | Audited. Confirmed and fixed: quotes were readable, acceptable (account takeover) and rejectable by anyone with the id; three storefront routes (`pay`, `dispatch`, `deliver`) let any caller mark a quote paid, shipped or delivered with no payment (the storefront never called them; removed, the admin versions remain); a manager could decide another company's approval; cart-id routes (complete, rentals, EOI, deliveries, submit-approval) returned the finished order to anyone with a cart id; a delivery route trusted any website with credentials; new employees got the shared password `Password123!` and an existing customer's credentials could be overwritten. Guests keep their handle (an ownerless quote, a guest cart or order work by id) | `store-isolation` |
+| "Seller token on admin routes" unchecked (audit) | Verified at runtime: eight admin routes answer 401 to a seller token | `platform-leftovers` |
+| Uploaded files not tied to a seller (10.5) | Each upload is recorded against its seller (`vendor_upload`, migration 20261001170000); `GET /vendors/uploads` lists a seller's own. File URLs stay public, like product images | `platform-leftovers` |
+| Deleted location left its fulfilment set behind (11.5 F) | Deleting a location removes its shipping options, fulfilment sets and zones | `platform-leftovers` |
+| Seller with no shipping options at checkout (11.5 E) | Decided as the safe default: a seller's products use the shared platform profile until the seller creates their FIRST shipping option, which moves their products onto their own profile (`adopted_products` in the response). The backfill only moves products for a seller who already has an option. A seller with no shipping set up is never a dead end | `backfill`, `product-references` |
+| Platform stock location still visible to sellers (11.5 E) | Retired: a seller sees and uses only their own locations, plus one platform location only where they already hold stock (nothing disappears under existing sellers) | `stock-locations`, `inventory-references`, `platform-leftovers` |
+| Admin vendor page read collections from a field that does not exist (10) | Reads `product_collections` | `platform-leftovers` |
+| `fix-shipping-profiles` script handed every product the same profile (Phase 1 step 5) | A seller's product gets the seller's own profile, everything else the shared platform one | script only |
+| Test runner reported a failure after a passing run (Windows file lock on the temp folder) | Cleanup retries and never fails the run | n/a |
+| Lint errors in the seller order screen | Fixed | lint |
+
+### 14.2 Set aside as testing (as agreed)
+
+- Run in a browser: seller panel Orders actions, Earnings, Shipping Options, My Tax Rates; admin Seller Payouts; storefront checkout and the order pages.
+- Buyer emails (order, shipment, delivery) with a real email provider.
+- Seller order list: free-text search plus a payment-status filter on split orders.
+- A real two-seller purchase on QA, including a rental or a ticket.
+- Phase 2 browser checks (11.5 B) and Phase 3 and 4 browser checks (12.8 B, 13.4).
+
+### 14.3 Needs you (access or action)
+
+- [ ] `railway login`, confirm the branch QA tracks, approve the push of `feature/tenant-isolation`.
+- [ ] Back up the database, then `medusa db:migrate`. It creates, in order: the `vendor.metadata` column (20261001120000, idempotent), `vendor_product_import` (130000), `vendor_order_split` with exact-decimal amounts (140000), the missing `quote.metadata` column (150000, idempotent), the ledger `refunded_total` (160000), `vendor_upload` (170000), plus the link tables vendor-shipping-profile, vendor-shipping-option-type and vendor-tax-rate.
+- [ ] Deploy the storefront together with the backend (it calls `/store/carts/:id/complete-all` and the new order lookups).
+- [ ] Phase 2 backfill: dry run (`npx medusa exec ./src/scripts/phase2-backfill.ts`), read the counts, then apply. Safe to repeat.
+- [ ] After deploy: any storefront page that reads `/store/quotes/:id/pay|dispatch|deliver` will 404 (none does today).
+
+### 14.4 Decisions for you
+
+- [ ] Accept keeping payment, emails, tickets, rentals and bookings on the PARENT order, with sellers reaching them through their child order (12.8 D).
+- [ ] The unowned products, inventory items and customers the backfill only reports (the earlier live report: 46, 87 and 17).
+- [ ] `POST /store/quotes` still lets an anonymous caller create a quote on a cart (spam risk only); requiring sign-in changes the guest quote flow.
+- [ ] `GET /store/restaurants` returns each restaurant's phone and email to anyone. Fine if those are public business contacts.
+- [ ] New employee passwords: a manager can now choose one (8+ characters) or the system returns a random one-time password. The storefront form should show `temporary_password` once; today it does not.
+
+### 14.5 Backlog (features nobody scoped, listed so they are not lost)
+
+- Seller tax is country level only (no province rates). Seller shipping options are flat price only.
+- Return shipping options and labels for sellers: a return is recorded, the parcel is arranged outside the system.
+- Restaurant delivery orders stay unpaid and unlinked to a seller until Phase 5 (restaurants).
+- Postgres row-level security is not planned: isolation is enforced in code and by the tests.
+- The `/vendors/layouts/*` routes are inert and left as they are.

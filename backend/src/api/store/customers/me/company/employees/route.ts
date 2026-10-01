@@ -3,6 +3,7 @@ import type {
   MedusaResponse,
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
+import { randomBytes } from "crypto"
 import { COMPANY_MODULE } from "../../../../../../modules/company"
 
 export const POST = async (
@@ -47,7 +48,7 @@ export const POST = async (
     first_name,
     last_name,
     email,
-    password = "Password123!",
+    password,
     is_admin = false,
     spending_limit = null,
     phone,
@@ -57,8 +58,18 @@ export const POST = async (
     return res.status(400).json({ message: "Email is required" })
   }
 
+  // The initial password is the manager's choice (8+ characters) or, when left out,
+  // a random one returned ONCE in the response. It used to default to the same
+  // well-known "Password123!" for every new employee.
+  if (password !== undefined && (typeof password !== "string" || password.length < 8)) {
+    return res.status(400).json({ message: "The password must be at least 8 characters." })
+  }
+  const initialPassword: string = password ?? randomBytes(12).toString("base64url")
+  const generatedPassword = password === undefined
+
   // 2. Find or create customer
   let customer: any
+  let createdNow = false
   const existingCustomers = await customerModule.listCustomers({ email })
   if (existingCustomers && existingCustomers.length > 0) {
     customer = existingCustomers[0]
@@ -69,16 +80,19 @@ export const POST = async (
       last_name: last_name || "",
       phone,
     })
+    createdNow = true
   }
 
-  // 3. Register auth credentials
+  // 3. Register auth credentials, ONLY for a customer created just now. Someone who
+  // already has an account keeps their own credentials: a manager must not be able
+  // to set a password on another person's account by adding their email.
   try {
     const authModule = req.scope.resolve(Modules.AUTH) as any
-    if (authModule) {
+    if (authModule && createdNow) {
       const registerRes = await authModule.register("emailpass", {
         body: {
           email,
-          password,
+          password: initialPassword,
         },
       })
 
@@ -120,5 +134,7 @@ export const POST = async (
       ...employee,
       customer,
     },
+    // Shown once, only when the manager did not choose one and the account is new.
+    ...(generatedPassword && createdNow ? { temporary_password: initialPassword } : {}),
   })
 }
