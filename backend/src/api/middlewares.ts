@@ -722,10 +722,9 @@ export default defineMiddlewares({
         validateAndTransformQuery(GetVendorOrdersSchema, {})
       ]
     },
-    // "/vendors/*" only matches a single path segment (see the comment above
-    // "/vendors/products/:id/*"), so the previously order-list-only /vendors/orders
-    // namespace needs its own explicit entry now that /vendors/orders/:id/rentals
-    // exists one level deeper.
+    // Explicit entry for the /vendors/orders/:id/* namespace (rentals live one level
+    // deeper). NOTE: "/vendors/*" is a prefix match and already authenticates every
+    // depth (verified at runtime, see integration-tests/http/probes).
     {
       matcher: "/vendors/orders/:id/*",
       middlewares: [
@@ -877,9 +876,8 @@ export default defineMiddlewares({
         validateAndTransformBody(PostVendorRentalConfigSchema)
       ]
     },
-    // "/vendors/*" only matches a single path segment, so /vendors/rentals/:id
-    // and its /deposit sub-route need their own explicit auth entry - same
-    // reasoning as "/vendors/products/:id/*" above.
+    // Explicit auth entry for /vendors/rentals/:id and its /deposit sub-route.
+    // Redundant for auth ("/vendors/*" is a prefix match), kept for clarity.
     {
       matcher: "/vendors/rentals/:id/*",
       middlewares: [
@@ -1667,8 +1665,9 @@ export default defineMiddlewares({
       ]
     },
     {
-      // Depth-3 path with no other entry. Explicit so authentication never
-      // depends on how the single-segment "/vendors/*" matcher behaves.
+      // Explicit auth entry for the layouts namespace. "/vendors/*" is a prefix match
+      // and already authenticates every depth (verified at runtime, see
+      // integration-tests/http/probes); kept so the namespace stays covered regardless.
       matcher: "/vendors/layouts/:zone/*",
       middlewares: [
         authenticate("vendor", ["session", "bearer"])

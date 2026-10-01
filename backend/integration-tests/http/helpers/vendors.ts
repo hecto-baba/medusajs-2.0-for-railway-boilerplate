@@ -18,6 +18,20 @@ const PASSWORD = "supersecret-Test-1"
 
 let counter = 0
 
+/** Re-throws an axios error with the response body, which axios hides by default. */
+async function explain<T>(step: string, request: Promise<T>): Promise<T> {
+  try {
+    return await request
+  } catch (error: any) {
+    if (error?.response) {
+      throw new Error(
+        `${step} failed: HTTP ${error.response.status} ${JSON.stringify(error.response.data)}`
+      )
+    }
+    throw error
+  }
+}
+
 export async function createTestVendor(
   api: any,
   label: string
@@ -26,26 +40,29 @@ export async function createTestVendor(
   const unique = `${label}-${Date.now()}-${counter}`
   const email = `${unique}@isolation-test.local`
 
-  const registration = await api.post("/auth/vendor/emailpass/register", {
-    email,
-    password: PASSWORD,
-  })
+  const registration: any = await explain(
+    "register identity",
+    api.post("/auth/vendor/emailpass/register", { email, password: PASSWORD })
+  )
 
-  const created = await api.post(
-    "/vendors",
-    {
-      name: `Test Vendor ${unique}`,
-      handle: unique,
-      admin: { email, first_name: label, last_name: "Tester" },
-    },
-    { headers: { authorization: `Bearer ${registration.data.token}` } }
+  const created: any = await explain(
+    "create vendor",
+    api.post(
+      "/vendors",
+      {
+        name: `Test Vendor ${unique}`,
+        handle: unique,
+        admin: { email, first_name: label, last_name: "Tester" },
+      },
+      { headers: { authorization: `Bearer ${registration.data.token}` } }
+    )
   )
 
   // Fresh login: only this token carries the actor_id.
-  const login = await api.post("/auth/vendor/emailpass", {
-    email,
-    password: PASSWORD,
-  })
+  const login: any = await explain(
+    "login",
+    api.post("/auth/vendor/emailpass", { email, password: PASSWORD })
+  )
 
   return {
     label,

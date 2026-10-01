@@ -4,18 +4,20 @@ loadEnv("test", process.cwd())
 
 module.exports = {
   transform: {
-    "^.+\.[jt]s$": [
+    "^.+\.[jt]sx?$": [
       "@swc/jest",
       {
         jsc: {
-          parser: { syntax: "typescript", decorators: true },
+          parser: { syntax: "typescript", tsx: true, decorators: true },
+          transform: { react: { runtime: "automatic" } },
           target: "es2021",
         },
       },
     ],
   },
   testEnvironment: "node",
-  moduleFileExtensions: ["js", "ts", "json"],
+  // tsx/jsx: the email templates under src/modules/email-notifications are React.
+  moduleFileExtensions: ["js", "jsx", "ts", "tsx", "json"],
   // Mirrors tsconfig `paths: { "*": ["./src/*"] }` (e.g. imports like "lib/constants").
   modulePaths: ["<rootDir>/src"],
   modulePathIgnorePatterns: ["dist/", "<rootDir>/.medusa/"],

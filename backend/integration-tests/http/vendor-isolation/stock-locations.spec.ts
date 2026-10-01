@@ -1,7 +1,9 @@
 import { medusaIntegrationTestRunner } from "@medusajs/test-utils"
 import { call, createTestVendor, TestVendor } from "../helpers/vendors"
 
-jest.setTimeout(120 * 1000)
+// The runner creates and migrates a throwaway database before the first test;
+// over a remote server that alone can take minutes.
+jest.setTimeout(15 * 60 * 1000)
 
 /**
  * Phase 1, step 3 of docs/tenant-isolation-and-multi-tenancy.md.

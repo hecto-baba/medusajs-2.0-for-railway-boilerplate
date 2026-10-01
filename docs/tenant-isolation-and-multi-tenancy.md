@@ -1,6 +1,6 @@
 # Tenant Isolation and Multi-Tenancy Plan
 
-Status: proposed, not started. Branch to create: a new branch off `feature/marketplace`.
+Status: Phase 0 complete; Phase 1 next. Branch: `feature/tenant-isolation` (off `feature/marketplace`).
 Scope: the seller (vendor) API `backend/src/api/vendors/**`, the seller panel `sellers/`, and bringing the missing admin features to sellers.
 Out of scope: Vendor Transactions (stays admin-only), drivers, and the admin API / store routes (see "What this plan does not cover").
 
@@ -27,7 +27,7 @@ Legend: **V** = verified by reading the code myself. **R** = reported by a code 
 
 | Route | Impact | Status |
 |---|---|---|
-| `api-keys/[id]` GET/POST/DELETE, `api-keys/[id]/revoke` | Read (including `token`), change, delete or revoke any key. `POST /vendors/api-keys` accepts `type: "secret"`, which may mint admin-level credentials | V (by-id), U (admin access) |
+| `api-keys/[id]` GET/POST/DELETE, `api-keys/[id]/revoke` | Read, change, delete or revoke any key, including the platform's (e.g. the storefront's publishable key, which would break the shop). Sellers can also create `secret` keys. Runtime probe: the secret key's token is never returned to the seller, so admin-level escalation was **not demonstrated** | V (by-id), probe (escalation not shown) |
 | `team/[id]` GET/POST/DELETE | Read, rename, delete any seller's admin account | V |
 | `stock-locations/[id]` GET/POST/DELETE | Read, edit, delete any stock location | V |
 | `draft-orders/[id]` GET/DELETE, `draft-orders/[id]/convert` | Read (customer + addresses), delete, convert any draft order | V |
@@ -49,7 +49,7 @@ Legend: **V** = verified by reading the code myself. **R** = reported by a code 
 | `shipping-profiles` GET, `shipping-option-types` GET, `tax-regions` GET, `regions` GET | Entire table, no scoping | V (profiles, tax regions), R (others) |
 | `sales-channels` GET and `[id]` GET | All channels, plus `products.id` of every product | R |
 | `taxonomy` | Stock-location fallback returns all locations with addresses | R |
-| `notifications` | `to:""` and `channel:"feed"` branches return platform-wide rows | R |
+| `notifications` | `to:""` and `channel:"feed"` branches return platform-wide rows. Runtime probe: a feed notification addressed to someone else was returned to a different seller | V (runtime) |
 | `workflow-executions` | Scoped by text match over raw JSON, not a real filter | R |
 
 ### 3.3 Body-supplied ids not validated as owned
@@ -110,7 +110,7 @@ Regions, country tax regions, shared taxonomy (category and collection lists), p
 
 ## 6. Phases
 
-### Phase 0: Foundation
+### Phase 0: Foundation (COMPLETE, see section 7)
 
 1. **Environment.** Resolve D3. Create the branch off `feature/marketplace`. Copy the files that will be touched to a backup folder.
 2. **Runtime checks on the uncertain items** (U above):
@@ -225,14 +225,68 @@ Each feature gets: a link where needed, guarded `/vendors` routes, client helper
 
 ---
 
-## 7. What this plan does not cover
+## 7. Phase 0 results (completed)
+
+Run on a throwaway local Postgres 16 (embedded-postgres), never on a real database.
+
+### 7.1 Runtime checks (`integration-tests/http/probes/phase0-runtime-probe.spec.ts`)
+
+| Question | Result |
+|---|---|
+| Do deep `/vendors` paths require authentication? | **Yes.** Nine deep paths tested without a token (layouts, variant inventory-levels, price-list batch, show scan, import confirm, taxonomy, customer address, location-levels batch, list) all returned 401. `/vendors/*` is a prefix match. The comments in `middlewares.ts` claiming single-segment matching were wrong and are corrected. |
+| Can a seller-minted secret API key reach the admin API? | **Not demonstrated.** A seller can create a `secret` key (201) but its token is never returned by the create, by-id or list routes, so it cannot be used. The real risk is cross-seller read/revoke/delete of any key, including platform keys. Sellers should still not create secret keys. |
+| Do feed/broadcast notifications reach other sellers? | **Yes, confirmed.** A feed notification addressed to someone else was returned to seller B. |
+| Do the `layouts/*` routes do anything? | **No.** Authenticated GET returns null configurations; the routes are inert. |
+| Campaign create body accepting foreign `promotions[]` | Still unverified; checked in Phase 1 step 11. |
+
+### 7.2 Read-only data report (live database, counts only)
+
+| Item | Count |
+|---|---|
+| Sellers / seller admins | 70 / 70 |
+| API keys | 2, both publishable, none linked to a seller (no seller-created secret keys exist) |
+| Orders | 15 total, 1 linked to a seller, 0 linked to more than one seller |
+| Products | 74 total, 28 linked |
+| Inventory items | 127 total, 40 linked |
+| Customers | 18 total, 1 linked |
+| Price lists / promotions | 3 total, 1 linked / 2 total, 1 linked |
+| Product options / types / tags | 104 / 4 / 0 total, none linked |
+| Stock locations | 1 total, 0 linked (no seller has created one; the platform's is visible to every seller through the list fallback) |
+| Sales channels | 2 total, 0 linked |
+| Shipping profiles / options / tax regions / regions | 1 / 2 / 7 / 1, no seller link exists |
+
+Notes: 14 of 15 orders have no seller link (to be investigated in Phase 1: it may be the `link-vendor-order` subscriber failing). The unowned rows for the Phase 2 backfill are small (46 products, 87 inventory items, 17 customers, plus platform configuration).
+
+### 7.3 New finding: a missing migration
+
+The `Vendor` model declares `metadata`, but no migration created the column, so a database built only from migrations could not register a seller (`column "metadata" of relation "vendor" does not exist`). The live database already has the column. Fixed with an idempotent migration (`Migration20261001120000`) and an updated snapshot.
+
+### 7.4 First cross-seller test (stock locations) against the current code
+
+| Test | Result |
+|---|---|
+| A reads/updates/deletes A's own location | pass |
+| A's list contains A's location and not B's | pass |
+| A reads B's location | **fails: 200, expected 404** |
+| A updates B's location | **fails: 200, expected 404** |
+| A deletes B's location | **fails: 200, expected 404** |
+| A seller with no locations sees an empty list | **fails: sees the store's locations** |
+
+These four failures prove the hole and become the Phase 1 step 3 acceptance test.
+
+### 7.5 How to run the tests
+
+- `pnpm run test:unit`: database-free guard ratchet and safety check.
+- `pnpm run test:integration [-- <path>]`: starts a local embedded Postgres, runs the HTTP specs, and removes it afterwards.
+
+## 8. What this plan does not cover
 
 - Postgres row-level security as a second layer.
 - Auditing the admin API, the store routes, the restaurant and driver logins, and the TrustClaw onboarding store.
 - Stricter customer visibility (D1 can be tightened later).
 - Order splitting for existing legacy orders.
 
-## 8. Files most likely to change
+## 9. Files most likely to change
 
 - Backend routes: `backend/src/api/vendors/**`, `backend/src/api/middlewares.ts`, `backend/src/api/vendors/shared/vendor-scope.ts`
 - New links: `backend/src/links/` (shipping profile, shipping option type, restaurant, tax rate, others)

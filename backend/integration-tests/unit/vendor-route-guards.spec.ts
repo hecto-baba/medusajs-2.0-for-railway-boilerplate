@@ -114,3 +114,29 @@ describe("seller route guards (static ratchet)", () => {
     }).toEqual({ added: [], fixed: [] })
   })
 })
+
+/**
+ * Safety: the test login can be a database superuser, and the Medusa test
+ * runner drops schemas and databases it owns. It is safe only because it
+ * generates a random throwaway database name. No test may choose its own name,
+ * which could point it at a real database.
+ */
+describe("integration test safety", () => {
+  const collectSpecs = (dir: string): string[] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        return collectSpecs(full)
+      }
+      return /\.(spec|test)\.[jt]s$/.test(entry.name) ? [full] : []
+    })
+
+  it("no test passes dbName or DB_TEMP_NAME to the test runner", () => {
+    const offenders = collectSpecs(path.join(process.cwd(), "integration-tests"))
+      .filter((file) => !file.endsWith("vendor-route-guards.spec.ts"))
+      .filter((file) => /\bdbName\s*:|DB_TEMP_NAME/.test(fs.readFileSync(file, "utf8")))
+      .map((file) => path.relative(process.cwd(), file))
+
+    expect(offenders).toEqual([])
+  })
+})
