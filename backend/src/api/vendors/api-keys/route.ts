@@ -19,7 +19,14 @@ export const GetVendorApiKeysSchema = z.object({
 
 export const CreateVendorApiKeySchema = z.object({
   title: z.string().min(1),
-  type: z.enum(["publishable", "secret"]).default("publishable"),
+  // Sellers get storefront (publishable) keys only. A secret key authenticates
+  // against the admin API, which is not a seller capability.
+  type: z
+    .enum(["publishable", "secret"])
+    .default("publishable")
+    .refine((value) => value === "publishable", {
+      message: "Sellers can only create publishable API keys.",
+    }),
 })
 
 export const POST = async (

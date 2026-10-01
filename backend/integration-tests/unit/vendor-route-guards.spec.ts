@@ -35,8 +35,6 @@ const REVIEWED_SAFE: Record<string, string> = {
 }
 
 const BACKLOG: string[] = [
-  "api-keys/[id]/revoke/route.ts",
-  "api-keys/[id]/route.ts",
   "categories/[id]/products/route.ts",
   "collections/[id]/products/route.ts",
   "collections/[id]/route.ts",

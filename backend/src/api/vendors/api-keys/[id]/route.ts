@@ -4,6 +4,7 @@ import type {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
+import { assertVendorOwns } from "../../shared/vendor-scope"
 import {
   updateApiKeysWorkflow,
   deleteApiKeysWorkflow,
@@ -19,6 +20,8 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const keyId = req.params.id
+
+  await assertVendorOwns(req, "api_keys", keyId, "API key not found.")
 
   const { data: keys } = await query.graph({
     entity: "api_key",
@@ -49,6 +52,8 @@ export const POST = async (
 ) => {
   const keyId = req.params.id
 
+  await assertVendorOwns(req, "api_keys", keyId, "API key not found.")
+
   const { result } = await updateApiKeysWorkflow(req.scope).run({
     input: {
       selector: { id: keyId },
@@ -64,6 +69,8 @@ export const DELETE = async (
   res: MedusaResponse
 ) => {
   const keyId = req.params.id
+
+  await assertVendorOwns(req, "api_keys", keyId, "API key not found.")
 
   await deleteApiKeysWorkflow(req.scope).run({
     input: { ids: [keyId] },
