@@ -174,16 +174,19 @@ export async function vendorLogin(
     return "Enter your email and password."
   }
 
+  let token: string
+
   try {
-    const token = await sdk.auth.login("vendor", "emailpass", {
+    const loginToken = await sdk.auth.login("vendor", "emailpass", {
       email,
       password,
     })
 
-    if (typeof token !== "string") {
+    if (typeof loginToken !== "string") {
       return "This account needs an extra verification step that the vendor panel does not support yet."
     }
 
+    token = loginToken
     await setVendorAuthToken(token)
   } catch (error) {
     // The backend answers a failed sign-in with "Invalid email or password",
@@ -191,6 +194,25 @@ export async function vendorLogin(
     // the email exists. The fallback only covers the case where the request
     // never reached it at all.
     return toMessage(error, "Could not sign you in. Please try again.")
+  }
+
+  // Verify that this account has an active store associated with it
+  try {
+    const { vendor_admin } = await sdk.client.fetch<{
+      vendor_admin: VendorAdmin
+    }>("/vendors/me", {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+      cache: "no-store",
+    })
+
+    if (!vendor_admin) {
+      await removeVendorAuthToken()
+      return "This account does not have a store associated with it yet. Please sign up to create your store."
+    }
+  } catch {
+    await removeVendorAuthToken()
+    return "This account does not have a store associated with it yet. Please sign up to create your store."
   }
 
   redirect("/dashboard")

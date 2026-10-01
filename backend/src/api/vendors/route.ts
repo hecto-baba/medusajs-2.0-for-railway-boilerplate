@@ -2,7 +2,7 @@ import type {
   AuthenticatedMedusaRequest,
   MedusaResponse,
 } from "@medusajs/framework/http"
-import { MedusaError } from "@medusajs/framework/utils"
+import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import {
   createVendorWorkflow,
@@ -56,6 +56,32 @@ export const POST = async (
 
     res.json({ vendor: result.vendor })
   } catch (err: any) {
+    if (
+      err?.message?.includes("metadata") ||
+      err?.code === "42703"
+    ) {
+      try {
+        const pg = req.scope.resolve(ContainerRegistrationKeys.PG_CONNECTION) as any
+        if (pg) {
+          if (typeof pg.raw === "function") {
+            await pg.raw('ALTER TABLE IF EXISTS "vendor" ADD COLUMN IF NOT EXISTS "metadata" jsonb;')
+          } else if (typeof pg.query === "function") {
+            await pg.query('ALTER TABLE IF EXISTS "vendor" ADD COLUMN IF NOT EXISTS "metadata" jsonb;')
+          }
+        }
+        const { result } = await createVendorWorkflow(req.scope).run({
+          input: {
+            ...req.validatedBody,
+            name: req.validatedBody.name.trim(),
+            handle: cleanHandle,
+            authIdentityId: req.auth_context.auth_identity_id,
+          } as CreateVendorWorkflowInput,
+        })
+        return res.json({ vendor: result.vendor })
+      } catch (retryErr: any) {
+        throw retryErr
+      }
+    }
     if (
       err?.code === "23505" ||
       err?.message?.includes("unique") ||
