@@ -5,6 +5,7 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { MARKETPLACE_MODULE } from "../../../../modules/marketplace"
+import { assertVendorOwnsTeamMember } from "../helpers"
 
 export const UpdateVendorMemberSchema = z.object({
   first_name: z.string().optional(),
@@ -17,6 +18,8 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const memberId = req.params.id
+
+  await assertVendorOwnsTeamMember(req, memberId)
 
   const { data: members } = await query.graph({
     entity: "vendor_admin",
@@ -48,6 +51,8 @@ export const POST = async (
   const marketplaceService = req.scope.resolve(MARKETPLACE_MODULE)
   const memberId = req.params.id
 
+  await assertVendorOwnsTeamMember(req, memberId)
+
   const updatedMember = await (marketplaceService as any).updateVendorAdmins({
     id: memberId,
     ...req.validatedBody,
@@ -62,6 +67,8 @@ export const DELETE = async (
 ) => {
   const marketplaceService = req.scope.resolve(MARKETPLACE_MODULE)
   const memberId = req.params.id
+
+  await assertVendorOwnsTeamMember(req, memberId)
 
   if (memberId === req.auth_context.actor_id) {
     res.status(400).json({ message: "You cannot remove your own account from the team." })
