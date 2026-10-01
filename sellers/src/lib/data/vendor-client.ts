@@ -1353,6 +1353,7 @@ export const listVendorCustomerGroups = (params: {
   offset: number
   q?: string
   created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ customer_groups: VendorCustomerGroup[] }>>(
@@ -1455,6 +1456,7 @@ export const listVendorPriceLists = (params: {
   status?: string | string[]
   type?: string | string[]
   created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ price_lists: VendorPriceList[] }>>(

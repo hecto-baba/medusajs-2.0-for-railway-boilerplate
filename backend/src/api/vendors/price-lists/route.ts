@@ -22,6 +22,7 @@ export const GetVendorPriceListsSchema = z.object({
   status: z.union([z.string(), z.array(z.string())]).optional(),
   type: z.union([z.string(), z.array(z.string())]).optional(),
   created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
   order: z.string().optional(),
 })
 
@@ -51,7 +52,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, status, type, created_at_gte, order } = (
+  const { limit, offset, q, status, type, created_at_gte, updated_at_gte, order } = (
     req.validatedQuery ?? {}
   ) as z.infer<typeof GetVendorPriceListsSchema>
 
@@ -81,6 +82,10 @@ export const GET = async (
 
   if (created_at_gte) {
     filters.created_at = { $gte: created_at_gte }
+  }
+
+  if (updated_at_gte) {
+    filters.updated_at = { $gte: updated_at_gte }
   }
 
   if (q && q.trim()) {

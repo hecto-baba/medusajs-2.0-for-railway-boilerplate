@@ -53,7 +53,10 @@ export const CustomerGroupsTable = () => {
     pageSize: 20,
   })
   const [filtering, setFiltering] = useState<DataTableFilteringState>({})
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "name",
+    desc: false,
+  })
   const [search, setSearch] = useState<string>("")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<VendorCustomerGroup | null>(null)
@@ -71,11 +74,28 @@ export const CustomerGroupsTable = () => {
     return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
   }, [dateFilterVal])
 
+  const updatedFilterVal = extractFilterVal(filtering.updated_at_gte)
+  const updatedAtGte = useMemo(() => {
+    if (!updatedFilterVal) return undefined
+    const days = updatedFilterVal === "7d" ? 7 : updatedFilterVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [updatedFilterVal])
+
   const filters = useMemo(
     () => [
       filterHelper.custom({
         id: "created_at_gte",
-        label: "Date Created",
+        label: "Created",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      }),
+      filterHelper.custom({
+        id: "updated_at_gte",
+        label: "Updated",
         type: "select",
         options: [
           { label: "Last 7 days", value: "7d" },
@@ -90,7 +110,7 @@ export const CustomerGroupsTable = () => {
   const { data, isLoading } = useQuery({
     queryKey: [
       "vendor-customer-groups",
-      { limit, offset, q: search, created_at_gte: createdAtGte, order },
+      { limit, offset, q: search, created_at_gte: createdAtGte, updated_at_gte: updatedAtGte, order },
     ],
     queryFn: () =>
       listVendorCustomerGroups({
@@ -98,6 +118,7 @@ export const CustomerGroupsTable = () => {
         offset,
         q: search || undefined,
         created_at_gte: createdAtGte,
+        updated_at_gte: updatedAtGte,
         order,
       }),
   })
@@ -138,10 +159,12 @@ export const CustomerGroupsTable = () => {
   const columns = useMemo(
     () => [
       columnHelper.accessor("name", {
+        id: "name",
         header: "Name",
         enableSorting: true,
-        sortAscLabel: "A-Z",
-        sortDescLabel: "Z-A",
+        sortLabel: "Name",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           return (
             <Link
@@ -161,12 +184,25 @@ export const CustomerGroupsTable = () => {
         },
       }),
       columnHelper.accessor("created_at", {
+        id: "created_at",
         header: "Created",
         enableSorting: true,
-        sortAscLabel: "Oldest first",
-        sortDescLabel: "Newest first",
+        sortLabel: "Created",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           return <DateCell date={row.original.created_at} />
+        },
+      }),
+      columnHelper.accessor("updated_at", {
+        id: "updated_at",
+        header: "Updated",
+        enableSorting: true,
+        sortLabel: "Updated",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => {
+          return <DateCell date={row.original.updated_at} />
         },
       }),
       columnHelper.display({
