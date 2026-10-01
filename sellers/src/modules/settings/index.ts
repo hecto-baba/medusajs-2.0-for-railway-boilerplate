@@ -25,6 +25,7 @@ export { LocationCreateModal } from "./components/locations/location-create-moda
 export { LocationEditDrawer } from "./components/locations/location-edit-drawer"
 export { LocationDetail } from "./components/locations/location-detail"
 export { ShippingProfilesCard } from "./components/locations/shipping-profiles-card"
+export { ShippingOptionTypesCard } from "./components/locations/shipping-option-types-card"
 
 // Sales Channels
 export { SalesChannelsTable } from "./components/sales-channels/sales-channels-table"

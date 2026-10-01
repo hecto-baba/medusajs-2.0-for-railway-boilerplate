@@ -27,9 +27,19 @@ export const GetVendorInventoryItemsSchema = z.object({
   origin_country: z.string().optional(),
   mid_code: z.string().optional(),
   hs_code: z.string().optional(),
-  material: z.string().optional(),
-  requires_shipping: z.coerce.boolean().optional(),
+  material: z.union([z.string(), z.array(z.string())]).optional(),
+  requires_shipping: z.preprocess((val) => {
+    if (typeof val === "string") {
+      if (val === "true") return true
+      if (val === "false") return false
+    }
+    return val
+  }, z.boolean().optional()),
   location_id: z.union([z.string(), z.array(z.string())]).optional(),
+  height: z.union([z.coerce.number(), z.record(z.string(), z.any())]).optional(),
+  width: z.union([z.coerce.number(), z.record(z.string(), z.any())]).optional(),
+  length: z.union([z.coerce.number(), z.record(z.string(), z.any())]).optional(),
+  weight: z.union([z.coerce.number(), z.record(z.string(), z.any())]).optional(),
   order: z.string().optional(),
 })
 
@@ -75,6 +85,11 @@ export const GET = async (
     hs_code,
     material,
     requires_shipping,
+    location_id,
+    height,
+    width,
+    length,
+    weight,
     order,
   } = (req.validatedQuery ?? {}) as z.infer<
     typeof GetVendorInventoryItemsSchema
@@ -116,6 +131,26 @@ export const GET = async (
   if (requires_shipping !== undefined) {
     filters.requires_shipping = requires_shipping
   }
+  if (height !== undefined) {
+    filters.height = height
+  }
+  if (width !== undefined) {
+    filters.width = width
+  }
+  if (length !== undefined) {
+    filters.length = length
+  }
+  if (weight !== undefined) {
+    filters.weight = weight
+  }
+  if (location_id) {
+    const locArr = Array.isArray(location_id) ? location_id : [location_id]
+    if (locArr.length) {
+      filters.location_levels = {
+        location_id: locArr,
+      }
+    }
+  }
   if (q) {
     filters.$or = [
       { title: { $ilike: `%${q}%` } },
@@ -124,9 +159,17 @@ export const GET = async (
     ]
   }
 
-  const orderConfig = order
-    ? { [order.replace(/^-/, "")]: order.startsWith("-") ? "DESC" : "ASC" }
-    : { created_at: "DESC" }
+  const orderField = order ? order.replace(/^-/, "") : null
+  const orderDirection = order?.startsWith("-") ? "DESC" : "ASC"
+
+  let orderConfig: Record<string, any> = { created_at: "DESC" }
+  let inMemorySortField: "stocked_quantity" | "reserved_quantity" | null = null
+
+  if (orderField === "stocked_quantity" || orderField === "reserved_quantity") {
+    inMemorySortField = orderField
+  } else if (orderField) {
+    orderConfig = { [orderField]: orderDirection }
+  }
 
   const { data: inventory_items, metadata } = await query.graph({
     entity: "inventory_item",
@@ -154,6 +197,14 @@ export const GET = async (
       reserved_quantity: totalReserved,
     }
   })
+
+  if (inMemorySortField) {
+    itemsWithComputedQuantities.sort((a: any, b: any) => {
+      const aVal = Number(a[inMemorySortField!]) || 0
+      const bVal = Number(b[inMemorySortField!]) || 0
+      return orderDirection === "DESC" ? bVal - aVal : aVal - bVal
+    })
+  }
 
   res.json({
     inventory_items: itemsWithComputedQuantities,

@@ -2,6 +2,7 @@
 
 import {
   deleteVendorCustomer,
+  listVendorCustomerGroups,
   listVendorCustomers,
   type VendorCustomer,
 } from "@lib/data/vendor-client"
@@ -53,6 +54,37 @@ const extractFilterVal = (val: any): string | undefined => {
   return undefined
 }
 
+const resolveDateFilter = (val: any): string | undefined => {
+  if (!val || val === "all") return undefined
+  if (typeof val === "object") {
+    if (val.$gte)
+      return typeof val.$gte === "string"
+        ? val.$gte
+        : new Date(val.$gte).toISOString()
+    const flat = Object.values(val).flat()
+    val = flat[0]
+  }
+  if (Array.isArray(val)) val = val[0]
+  if (typeof val !== "string" || val === "all") return undefined
+  const now = new Date()
+  if (val === "7d") {
+    now.setDate(now.getDate() - 7)
+    return now.toISOString()
+  }
+  if (val === "30d") {
+    now.setDate(now.getDate() - 30)
+    return now.toISOString()
+  }
+  if (val === "90d") {
+    now.setDate(now.getDate() - 90)
+    return now.toISOString()
+  }
+  if (!isNaN(Date.parse(val))) {
+    return new Date(val).toISOString()
+  }
+  return undefined
+}
+
 export const CustomersTable = () => {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -61,6 +93,13 @@ export const CustomersTable = () => {
   const [search, setSearch] = useState("")
   const [filtering, setFiltering] = useState<DataTableFilteringState>({})
   const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [columnVisibility, setColumnVisibility] = useState<
+    Record<string, boolean>
+  >({
+    first_name: false,
+    last_name: false,
+    updated_at: false,
+  })
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: PAGE_SIZE,
@@ -79,21 +118,59 @@ export const CustomersTable = () => {
   const accountFilter =
     rawAccount === "true" ? true : rawAccount === "false" ? false : undefined
 
-  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
-  const createdAtGte = useMemo(() => {
-    if (!dateFilterVal) return undefined
-    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [dateFilterVal])
+  const createdAtVal = filtering.created_at ?? filtering.created_at_gte
+  const createdAtGte = useMemo(
+    () => resolveDateFilter(createdAtVal),
+    [createdAtVal]
+  )
+
+  const updatedAtVal = filtering.updated_at ?? filtering.updated_at_gte
+  const updatedAtGte = useMemo(
+    () => resolveDateFilter(updatedAtVal),
+    [updatedAtVal]
+  )
+
+  const groupsFilterVal = filtering.groups
+  const groupIds = useMemo(() => {
+    if (!groupsFilterVal) return undefined
+    if (Array.isArray(groupsFilterVal)) {
+      const filtered = groupsFilterVal.filter(Boolean) as string[]
+      return filtered.length ? filtered : undefined
+    }
+    if (typeof groupsFilterVal === "string") {
+      return [groupsFilterVal]
+    }
+    if (typeof groupsFilterVal === "object") {
+      const flat = Object.values(groupsFilterVal)
+        .flat()
+        .filter(Boolean) as string[]
+      return flat.length ? flat : undefined
+    }
+    return undefined
+  }, [groupsFilterVal])
 
   const order = sorting
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
+  const { data: customerGroupsData } = useQuery({
+    queryKey: ["vendor-customer-groups"],
+    queryFn: () => listVendorCustomerGroups({ limit: 100, offset: 0 }),
+  })
+
   const { data, isLoading } = useQuery({
     queryKey: [
       "vendor-customers",
-      { limit, offset, q: search, has_account: accountFilter, created_at_gte: createdAtGte, order },
+      {
+        limit,
+        offset,
+        q: search,
+        has_account: accountFilter,
+        groups: groupIds,
+        created_at_gte: createdAtGte,
+        updated_at_gte: updatedAtGte,
+        order,
+      },
     ],
     queryFn: () =>
       listVendorCustomers({
@@ -101,7 +178,9 @@ export const CustomersTable = () => {
         offset,
         q: search || undefined,
         has_account: accountFilter,
+        groups: groupIds,
         created_at_gte: createdAtGte,
+        updated_at_gte: updatedAtGte,
         order,
       }),
   })
@@ -139,8 +218,21 @@ export const CustomersTable = () => {
     }
   }
 
-  const filters = useMemo(
-    () => [
+  const filters = useMemo(() => {
+    const groupOptions = (customerGroupsData?.customer_groups ?? []).map(
+      (g) => ({
+        label: g.name,
+        value: g.id,
+      })
+    )
+
+    return [
+      filterHelper.custom({
+        id: "groups",
+        label: "Customer Groups",
+        type: "select",
+        options: groupOptions,
+      }),
       filterHelper.accessor("has_account", {
         type: "select",
         label: "Account",
@@ -150,8 +242,8 @@ export const CustomersTable = () => {
         ],
       }),
       filterHelper.custom({
-        id: "created_at_gte",
-        label: "Date Created",
+        id: "created_at",
+        label: "Account Created",
         type: "select",
         options: [
           { label: "Last 7 days", value: "7d" },
@@ -159,17 +251,27 @@ export const CustomersTable = () => {
           { label: "Last 90 days", value: "90d" },
         ],
       }),
-    ],
-    []
-  )
+      filterHelper.custom({
+        id: "updated_at",
+        label: "Updated",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      }),
+    ]
+  }, [customerGroupsData])
 
   const columns = useMemo(
     () => [
       columnHelper.accessor("email", {
         header: () => <EmailHeader />,
         enableSorting: true,
-        sortAscLabel: "A-Z",
-        sortDescLabel: "Z-A",
+        sortLabel: "Email",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ getValue, row }) => (
           <div
             className="cursor-pointer font-medium hover:text-ui-fg-interactive transition-colors"
@@ -178,6 +280,22 @@ export const CustomersTable = () => {
             <EmailCell email={getValue()} />
           </div>
         ),
+      }),
+      columnHelper.accessor("first_name", {
+        id: "first_name",
+        header: "First Name",
+        enableSorting: true,
+        sortLabel: "First Name",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+      }),
+      columnHelper.accessor("last_name", {
+        id: "last_name",
+        header: "Last Name",
+        enableSorting: true,
+        sortLabel: "Last Name",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
       }),
       columnHelper.display({
         id: "name",
@@ -190,14 +308,24 @@ export const CustomersTable = () => {
       }),
       columnHelper.accessor("has_account", {
         header: () => <AccountHeader />,
-        enableSorting: true,
+        enableSorting: false,
         cell: ({ getValue }) => <AccountCell hasAccount={getValue()} />,
       }),
       columnHelper.accessor("created_at", {
         header: () => <FirstSeenHeader />,
         enableSorting: true,
-        sortAscLabel: "Oldest first",
-        sortDescLabel: "Newest first",
+        sortLabel: "Account Created",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ getValue }) => <DateCell date={getValue()} />,
+      }),
+      columnHelper.accessor("updated_at", {
+        id: "updated_at",
+        header: "Updated",
+        enableSorting: true,
+        sortLabel: "Updated",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ getValue }) => <DateCell date={getValue()} />,
       }),
       columnHelper.display({
@@ -237,6 +365,10 @@ export const CustomersTable = () => {
     getRowId: (row) => row.id,
     isLoading,
     filters,
+    columnVisibility: {
+      state: columnVisibility,
+      onColumnVisibilityChange: setColumnVisibility,
+    },
     pagination: {
       state: pagination,
       onPaginationChange: setPagination,

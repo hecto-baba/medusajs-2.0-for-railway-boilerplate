@@ -161,8 +161,16 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  const redirectPath =
+  let redirectPath =
     request.nextUrl.pathname === "/" ? "" : request.nextUrl.pathname
+
+  // If the first segment is an unsupported 2-letter country code (e.g. /us/restaurants),
+  // strip it so we redirect cleanly to /[countryCode]/restaurants instead of /[countryCode]/us/restaurants
+  const firstSegment = request.nextUrl.pathname.split("/")[1]?.toLowerCase()
+  if (firstSegment && firstSegment.length === 2 && !regionMap?.has(firstSegment)) {
+    const remaining = request.nextUrl.pathname.split("/").slice(2).join("/")
+    redirectPath = remaining ? `/${remaining}` : ""
+  }
 
   const queryString = request.nextUrl.search ? request.nextUrl.search : ""
 

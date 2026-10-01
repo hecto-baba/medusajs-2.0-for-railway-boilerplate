@@ -30,6 +30,22 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
+  const {
+    data: [vendorAdmin],
+  } = await query.graph({
+    entity: "vendor_admin",
+    fields: ["vendor.id", "vendor.stock_locations.id", "vendor.metadata"],
+    filters: { id: [req.auth_context.actor_id] },
+  }).catch(() => ({ data: [] }))
+
+  const vendorLocationIds = (vendorAdmin?.vendor?.stock_locations || [])
+    .map((l: any) => l?.id)
+    .filter(Boolean)
+
+  const stockLocationFilters = vendorLocationIds.length
+    ? { id: vendorLocationIds }
+    : {}
+
   const [
     collections,
     categories,
@@ -81,8 +97,9 @@ export const GET = async (
     }),
     query.graph({
       entity: "stock_location",
-      fields: ["id", "name"],
-      pagination: { order: { name: "ASC" } },
+      fields: ["id", "name", "address.*"],
+      filters: stockLocationFilters,
+      pagination: { order: { created_at: "ASC" } },
     }),
   ])
 
@@ -93,12 +110,21 @@ export const GET = async (
     types: types.data,
     sales_channels: salesChannels.data,
     shipping_profiles: shippingProfiles.data,
-    currencies: (stores.data[0]?.supported_currencies ?? []).map(
-      (currency: any) => ({
-        code: currency.currency_code,
-        is_default: Boolean(currency.is_default),
-      })
-    ),
+    currencies: (() => {
+      const vendorMetaCurrencies = vendorAdmin?.vendor?.metadata?.currencies as any[]
+      if (vendorMetaCurrencies && Array.isArray(vendorMetaCurrencies) && vendorMetaCurrencies.length > 0) {
+        return vendorMetaCurrencies.map((c) => ({
+          code: (c.code || "").toLowerCase(),
+          is_default: Boolean(c.is_default),
+        }))
+      }
+      return (stores.data[0]?.supported_currencies ?? []).map(
+        (currency: any) => ({
+          code: currency.currency_code,
+          is_default: Boolean(currency.is_default),
+        })
+      )
+    })(),
     stock_locations: stockLocations.data,
   })
 }

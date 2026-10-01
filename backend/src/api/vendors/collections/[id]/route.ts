@@ -19,6 +19,10 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  if (!req.auth_context?.actor_id) {
+    res.status(401).json({ message: "Unauthorized" })
+    return
+  }
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const collectionId = req.params.id
 
@@ -81,6 +85,10 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<z.infer<typeof UpdateVendorCollectionSchema>>,
   res: MedusaResponse
 ) => {
+  if (!req.auth_context?.actor_id) {
+    res.status(401).json({ message: "Unauthorized" })
+    return
+  }
   const collectionId = req.params.id
 
   const { result } = await updateCollectionsWorkflow(req.scope).run({
@@ -97,6 +105,10 @@ export const DELETE = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  if (!req.auth_context?.actor_id) {
+    res.status(401).json({ message: "Unauthorized" })
+    return
+  }
   const collectionId = req.params.id
 
   await deleteCollectionsWorkflow(req.scope).run({

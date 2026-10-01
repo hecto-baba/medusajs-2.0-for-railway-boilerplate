@@ -113,14 +113,31 @@ const useColumns = (onDelete: (product: VendorProduct) => void) => [
     header: "Created",
     enableSorting: true,
     sortLabel: "Created",
-    sortAscLabel: "Oldest first",
-    sortDescLabel: "Newest first",
+    sortAscLabel: "Ascending",
+    sortDescLabel: "Descending",
     cell: ({ row }) =>
       new Date(row.original.created_at).toLocaleDateString(undefined, {
         year: "numeric",
         month: "short",
         day: "numeric",
       }),
+  }),
+  columnHelper.accessor("updated_at" as any, {
+    id: "updated_at",
+    header: "Updated",
+    enableSorting: true,
+    sortLabel: "Updated",
+    sortAscLabel: "Ascending",
+    sortDescLabel: "Descending",
+    cell: ({ row }) => {
+      const val = (row.original as any).updated_at
+      if (!val) return null
+      return new Date(val).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    },
   }),
   columnHelper.action({
     actions: [
@@ -256,7 +273,20 @@ export const ProductsTable = () => {
     list.push(
       filterHelper.custom({
         id: "created_at_gte",
-        label: "Date Created",
+        label: "Created",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      })
+    )
+
+    list.push(
+      filterHelper.custom({
+        id: "updated_at_gte",
+        label: "Updated",
         type: "select",
         options: [
           { label: "Last 7 days", value: "7d" },
@@ -283,11 +313,17 @@ export const ProductsTable = () => {
   const tagId = extractFilterVal(filtering.tag_id)
   const salesChannelId = extractFilterVal(filtering.sales_channel_id)
   const dateFilterVal = extractFilterVal(filtering.created_at_gte)
+  const updatedFilterVal = extractFilterVal(filtering.updated_at_gte)
   const createdAtGte = useMemo(() => {
     if (!dateFilterVal) return undefined
     const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
     return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
   }, [dateFilterVal])
+  const updatedAtGte = useMemo(() => {
+    if (!updatedFilterVal) return undefined
+    const days = updatedFilterVal === "7d" ? 7 : updatedFilterVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [updatedFilterVal])
 
   // The backend reads a leading "-" as descending, matching the admin.
   const order = sorting
@@ -307,6 +343,7 @@ export const ProductsTable = () => {
       tagId,
       salesChannelId,
       createdAtGte,
+      updatedAtGte,
     ],
     queryFn: () =>
       listVendorProducts({
@@ -320,6 +357,7 @@ export const ProductsTable = () => {
         tag_id: tagId,
         sales_channel_id: salesChannelId,
         created_at_gte: createdAtGte,
+        updated_at_gte: updatedAtGte,
       }),
     placeholderData: (previous) => previous,
   })

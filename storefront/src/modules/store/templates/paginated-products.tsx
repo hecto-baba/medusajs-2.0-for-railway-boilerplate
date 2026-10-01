@@ -21,6 +21,7 @@ export default async function PaginatedProducts({
   categoryId,
   productsIds,
   countryCode,
+  digitalFilter = "exclude",
 }: {
   sortBy?: SortOptions
   page: number
@@ -28,6 +29,7 @@ export default async function PaginatedProducts({
   categoryId?: string
   productsIds?: string[]
   countryCode: string
+  digitalFilter?: "only" | "exclude"
 }) {
   const queryParams: PaginatedProductsParams = {
     limit: 12,
@@ -45,10 +47,6 @@ export default async function PaginatedProducts({
     queryParams["id"] = productsIds
   }
 
-  if (sortBy === "created_at") {
-    queryParams["order"] = "created_at"
-  }
-
   const region = await getRegion(countryCode)
 
   if (!region) {
@@ -62,6 +60,7 @@ export default async function PaginatedProducts({
     queryParams,
     sortBy,
     countryCode,
+    digitalFilter,
   })
 
   const totalPages = Math.ceil(count / PRODUCT_LIMIT)

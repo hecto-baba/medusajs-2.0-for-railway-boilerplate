@@ -81,7 +81,17 @@ const filters = [
     ],
   }),
   filterHelper.accessor("created_at", {
-    label: "Date Created",
+    label: "Created",
+    type: "radio",
+    options: [
+      { label: "All time", value: "all" },
+      { label: "Past 7 days", value: "7d" },
+      { label: "Past 30 days", value: "30d" },
+      { label: "Past 90 days", value: "90d" },
+    ],
+  }),
+  filterHelper.accessor("updated_at", {
+    label: "Updated",
     type: "radio",
     options: [
       { label: "All time", value: "all" },
@@ -98,8 +108,8 @@ const useColumns = (onDelete: (promotion: VendorPromotion) => void) => [
     header: "Code",
     enableSorting: true,
     sortLabel: "Code",
-    sortAscLabel: "Code A-Z",
-    sortDescLabel: "Code Z-A",
+    sortAscLabel: "Ascending",
+    sortDescLabel: "Descending",
     cell: ({ row }) => <span className="truncate font-medium">{row.original.code}</span>,
   }),
   columnHelper.accessor("type", {
@@ -107,8 +117,8 @@ const useColumns = (onDelete: (promotion: VendorPromotion) => void) => [
     header: "Type",
     enableSorting: true,
     sortLabel: "Type",
-    sortAscLabel: "Type A-Z",
-    sortDescLabel: "Type Z-A",
+    sortAscLabel: "Ascending",
+    sortDescLabel: "Descending",
     cell: ({ row }) =>
       row.original.type === "buyget" ? "Buy X, get Y" : "Amount off",
   }),
@@ -122,8 +132,8 @@ const useColumns = (onDelete: (promotion: VendorPromotion) => void) => [
     header: "Status",
     enableSorting: true,
     sortLabel: "Status",
-    sortAscLabel: "Status A-Z",
-    sortDescLabel: "Status Z-A",
+    sortAscLabel: "Ascending",
+    sortDescLabel: "Descending",
     cell: ({ row }) => <PromotionStatusCell status={row.original.status} />,
   }),
   columnHelper.accessor("created_at", {
@@ -131,14 +141,32 @@ const useColumns = (onDelete: (promotion: VendorPromotion) => void) => [
     header: "Created",
     enableSorting: true,
     sortLabel: "Created",
-    sortAscLabel: "Oldest first",
-    sortDescLabel: "Newest first",
+    sortAscLabel: "Ascending",
+    sortDescLabel: "Descending",
     cell: ({ row }) =>
       new Date(row.original.created_at).toLocaleDateString(undefined, {
         year: "numeric",
         month: "short",
         day: "numeric",
       }),
+  }),
+  columnHelper.accessor("updated_at", {
+    id: "updated_at",
+    header: "Updated",
+    enableSorting: true,
+    sortLabel: "Updated",
+    sortAscLabel: "Ascending",
+    sortDescLabel: "Descending",
+    cell: ({ row }) =>
+      row.original.updated_at ? (
+        new Date(row.original.updated_at).toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      ) : (
+        <PlaceholderCell />
+      ),
   }),
   columnHelper.action({
     actions: [
@@ -189,35 +217,51 @@ export const PromotionsTable = () => {
       ? (Object.values(typeFilter).flat() as string[])
       : undefined
 
-  const createdFilter =
-    typeof filtering.created_at === "string"
-      ? filtering.created_at
-      : Array.isArray(filtering.created_at)
-        ? (filtering.created_at[0] as string)
-        : undefined
-
-  const created_at_gte = (() => {
-    if (!createdFilter || createdFilter === "all") return undefined
+  const resolveDateFilter = (val: any): string | undefined => {
+    if (!val || val === "all") return undefined
+    if (typeof val === "object") {
+      if (val.$gte) return typeof val.$gte === "string" ? val.$gte : new Date(val.$gte).toISOString()
+      const flat = Object.values(val).flat()
+      val = flat[0]
+    }
+    if (Array.isArray(val)) val = val[0]
+    if (typeof val !== "string" || val === "all") return undefined
     const now = new Date()
-    if (createdFilter === "7d") {
+    if (val === "7d") {
       now.setDate(now.getDate() - 7)
       return now.toISOString()
     }
-    if (createdFilter === "30d") {
+    if (val === "30d") {
       now.setDate(now.getDate() - 30)
       return now.toISOString()
     }
-    if (createdFilter === "90d") {
+    if (val === "90d") {
       now.setDate(now.getDate() - 90)
       return now.toISOString()
     }
+    if (!isNaN(Date.parse(val))) {
+      return new Date(val).toISOString()
+    }
     return undefined
-  })()
+  }
+
+  const created_at_gte = resolveDateFilter(filtering.created_at)
+  const updated_at_gte = resolveDateFilter(filtering.updated_at)
 
   const order = sorting ? (sorting.desc ? "-" : "") + sorting.id : undefined
 
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-promotions", limit, offset, search, status, type, created_at_gte, order],
+    queryKey: [
+      "vendor-promotions",
+      limit,
+      offset,
+      search,
+      status,
+      type,
+      created_at_gte,
+      updated_at_gte,
+      order,
+    ],
     queryFn: () =>
       listVendorPromotions({
         limit,
@@ -226,6 +270,7 @@ export const PromotionsTable = () => {
         status: status?.length ? status : undefined,
         type: type?.length ? type : undefined,
         created_at_gte,
+        updated_at_gte,
         order,
       }),
     placeholderData: (previous) => previous,

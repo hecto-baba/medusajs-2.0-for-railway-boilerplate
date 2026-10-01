@@ -17,6 +17,7 @@ const addressToFormData = (
   "billing_address.first_name": address?.first_name || "",
   "billing_address.last_name": address?.last_name || "",
   "billing_address.address_1": address?.address_1 || "",
+  "billing_address.address_2": address?.address_2 || "",
   "billing_address.company": address?.company || "",
   "billing_address.postal_code": address?.postal_code || "",
   "billing_address.city": address?.city || "",
@@ -74,6 +75,14 @@ const BillingAddress = ({ cart }: { cart: HttpTypes.StoreCart | null }) => {
           onChange={handleChange}
           required
           data-testid="billing-address-input"
+        />
+        <Input
+          label="Apartment, suite, etc."
+          name="billing_address.address_2"
+          autoComplete="address-line2"
+          value={formData["billing_address.address_2"]}
+          onChange={handleChange}
+          data-testid="billing-address-2-input"
         />
         <Input
           label="Company"

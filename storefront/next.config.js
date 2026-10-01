@@ -1,3 +1,4 @@
+const path = require("path")
 const checkEnvVariables = require("./check-env-variables")
 
 checkEnvVariables()
@@ -40,6 +41,7 @@ const remotePattern = (value) => {
  * @type {import('next').NextConfig}
  */
 const nextConfig = {
+  outputFileTracingRoot: path.resolve(__dirname, ".."),
   reactStrictMode: true,
   eslint: {
     ignoreDuringBuilds: true,

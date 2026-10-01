@@ -11,6 +11,17 @@ export const GetVendorProductOptionsSchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   q: z.string().optional(),
   product_id: z.string().optional(),
+  is_exclusive: z.preprocess((val) => {
+    if (typeof val === "string") {
+      if (val === "true") return true
+      if (val === "false") return false
+    }
+    return val
+  }, z.boolean().optional()),
+  created_at: z.any().optional(),
+  updated_at: z.any().optional(),
+  created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
   order: z.string().optional(),
 })
 
@@ -45,8 +56,18 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, product_id, order } =
-    req.validatedQuery as unknown as z.infer<typeof GetVendorProductOptionsSchema>
+  const {
+    limit,
+    offset,
+    q,
+    product_id,
+    is_exclusive,
+    created_at,
+    updated_at,
+    created_at_gte,
+    updated_at_gte,
+    order,
+  } = req.validatedQuery as unknown as z.infer<typeof GetVendorProductOptionsSchema>
 
   // Get vendor's own options and products
   const {
@@ -81,11 +102,46 @@ export const GET = async (
     return
   }
 
+  const parseDateField = (raw: any, gteFallback?: string) => {
+    if (gteFallback) return { $gte: gteFallback }
+    if (!raw) return undefined
+    if (typeof raw === "string") return raw
+    if (typeof raw === "object") {
+      const result: Record<string, any> = {}
+      for (const [k, v] of Object.entries(raw)) {
+        if (v) result[k] = v
+      }
+      return Object.keys(result).length ? result : undefined
+    }
+    return undefined
+  }
+
+  const filters: Record<string, any> = {
+    id: allOptionIds,
+    ...(q ? { title: { $ilike: `%${q}%` } } : {}),
+    ...(product_id ? { product_id } : {}),
+  }
+
+  if (is_exclusive !== undefined) {
+    filters.is_exclusive = is_exclusive
+  }
+
+  const createdFilter = parseDateField(created_at, created_at_gte)
+  if (createdFilter) {
+    filters.created_at = createdFilter
+  }
+
+  const updatedFilter = parseDateField(updated_at, updated_at_gte)
+  if (updatedFilter) {
+    filters.updated_at = updatedFilter
+  }
+
   const { data: options, metadata } = await query.graph({
     entity: "product_option",
     fields: [
       "id",
       "title",
+      "is_exclusive",
       "product_id",
       "values.*",
       "product.id",
@@ -93,11 +149,7 @@ export const GET = async (
       "created_at",
       "updated_at",
     ],
-    filters: {
-      id: allOptionIds,
-      ...(q ? { title: { $ilike: `%${q}%` } } : {}),
-      ...(product_id ? { product_id } : {}),
-    },
+    filters,
     pagination: {
       skip: offset,
       take: limit,

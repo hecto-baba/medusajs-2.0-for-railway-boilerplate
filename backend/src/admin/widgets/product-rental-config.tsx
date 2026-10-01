@@ -14,8 +14,7 @@ import {
   usePrompt,
 } from "@medusajs/ui"
 import { useQuery, useMutation } from "@tanstack/react-query"
-import { sdk } from "../lib/sdk"
-import { DetailWidgetProps, AdminProduct } from "@medusajs/framework/types"
+import type { DetailWidgetProps, AdminProduct } from "@medusajs/framework/types"
 import { useEffect, useState } from "react"
 
 type RentalUnit = "hour" | "day" | "week" | "month" | "custom"

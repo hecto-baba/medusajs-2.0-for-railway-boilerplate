@@ -61,17 +61,24 @@ export const DraftOrderModal = ({
   // Shipping Address
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
+  const [company, setCompany] = useState("")
   const [address1, setAddress1] = useState("")
+  const [address2, setAddress2] = useState("")
   const [city, setCity] = useState("")
+  const [province, setProvince] = useState("")
   const [postalCode, setPostalCode] = useState("")
   const [countryCode, setCountryCode] = useState("us")
+  const [shippingPhone, setShippingPhone] = useState("")
 
   // Billing Address
   const [sameAsShipping, setSameAsShipping] = useState(true)
   const [bFirstName, setBFirstName] = useState("")
   const [bLastName, setBLastName] = useState("")
+  const [bCompany, setBCompany] = useState("")
   const [bAddress1, setBAddress1] = useState("")
+  const [bAddress2, setBAddress2] = useState("")
   const [bCity, setBCity] = useState("")
+  const [bProvince, setBProvince] = useState("")
   const [bPostalCode, setBPostalCode] = useState("")
   const [bCountryCode, setBCountryCode] = useState("us")
   const [bPhone, setBPhone] = useState("")
@@ -272,11 +279,14 @@ export const DraftOrderModal = ({
     const shippingAddress = {
       first_name: firstName.trim() || undefined,
       last_name: lastName.trim() || undefined,
-      phone: phone.trim() || undefined,
+      company: company.trim() || undefined,
       address_1: address1.trim() || undefined,
+      address_2: address2.trim() || undefined,
       city: city.trim() || undefined,
+      province: province.trim() || undefined,
       postal_code: postalCode.trim() || undefined,
       country_code: countryCode.toLowerCase(),
+      phone: shippingPhone.trim() || undefined,
     }
 
     const billingAddress = sameAsShipping
@@ -284,9 +294,12 @@ export const DraftOrderModal = ({
       : {
           first_name: bFirstName.trim() || undefined,
           last_name: bLastName.trim() || undefined,
+          company: bCompany.trim() || undefined,
           phone: bPhone.trim() || undefined,
           address_1: bAddress1.trim() || undefined,
+          address_2: bAddress2.trim() || undefined,
           city: bCity.trim() || undefined,
+          province: bProvince.trim() || undefined,
           postal_code: bPostalCode.trim() || undefined,
           country_code: bCountryCode.toLowerCase(),
         }
@@ -719,12 +732,45 @@ export const DraftOrderModal = ({
 
               <div className="col-span-1 md:col-span-2 flex flex-col gap-y-2">
                 <Label size="small" weight="plus">
-                  Address Line 1
+                  Company
                 </Label>
                 <Input
-                  placeholder="123 Main Street, Suite 100"
+                  placeholder="Acme Inc. (optional)"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                />
+              </div>
+
+              <div className="col-span-1 md:col-span-2 flex flex-col gap-y-2">
+                <Label size="small" weight="plus">
+                  Address
+                </Label>
+                <Input
+                  placeholder="123 Main Street"
                   value={address1}
                   onChange={(e) => setAddress1(e.target.value)}
+                />
+              </div>
+
+              <div className="col-span-1 md:col-span-2 flex flex-col gap-y-2">
+                <Label size="small" weight="plus">
+                  Apartment, Suite, etc.
+                </Label>
+                <Input
+                  placeholder="Suite 100, Floor 2 (optional)"
+                  value={address2}
+                  onChange={(e) => setAddress2(e.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-col gap-y-2">
+                <Label size="small" weight="plus">
+                  Postal Code
+                </Label>
+                <Input
+                  placeholder="10001"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
                 />
               </div>
 
@@ -741,24 +787,35 @@ export const DraftOrderModal = ({
 
               <div className="flex flex-col gap-y-2">
                 <Label size="small" weight="plus">
-                  Postal / ZIP Code
+                  Province / State
                 </Label>
                 <Input
-                  placeholder="10001"
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
+                  placeholder="NY (optional)"
+                  value={province}
+                  onChange={(e) => setProvince(e.target.value)}
                 />
               </div>
 
               <div className="flex flex-col gap-y-2">
                 <Label size="small" weight="plus">
-                  Country Code (2 letters)
+                  Country
                 </Label>
                 <Input
                   placeholder="us"
                   maxLength={2}
                   value={countryCode}
                   onChange={(e) => setCountryCode(e.target.value.toLowerCase())}
+                />
+              </div>
+
+              <div className="flex flex-col gap-y-2">
+                <Label size="small" weight="plus">
+                  Phone
+                </Label>
+                <Input
+                  placeholder="+1 (555) 000-0000"
+                  value={shippingPhone}
+                  onChange={(e) => setShippingPhone(e.target.value)}
                 />
               </div>
             </div>
@@ -784,7 +841,7 @@ export const DraftOrderModal = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                 <div className="flex flex-col gap-y-2">
                   <Label size="small" weight="plus">
-                    Billing First Name
+                    First Name
                   </Label>
                   <Input
                     placeholder="Jane"
@@ -795,7 +852,7 @@ export const DraftOrderModal = ({
 
                 <div className="flex flex-col gap-y-2">
                   <Label size="small" weight="plus">
-                    Billing Last Name
+                    Last Name
                   </Label>
                   <Input
                     placeholder="Doe"
@@ -806,12 +863,45 @@ export const DraftOrderModal = ({
 
                 <div className="col-span-1 md:col-span-2 flex flex-col gap-y-2">
                   <Label size="small" weight="plus">
-                    Billing Address Line 1
+                    Company
+                  </Label>
+                  <Input
+                    placeholder="Acme Inc. (optional)"
+                    value={bCompany}
+                    onChange={(e) => setBCompany(e.target.value)}
+                  />
+                </div>
+
+                <div className="col-span-1 md:col-span-2 flex flex-col gap-y-2">
+                  <Label size="small" weight="plus">
+                    Address
                   </Label>
                   <Input
                     placeholder="456 Corporate Ave"
                     value={bAddress1}
                     onChange={(e) => setBAddress1(e.target.value)}
+                  />
+                </div>
+
+                <div className="col-span-1 md:col-span-2 flex flex-col gap-y-2">
+                  <Label size="small" weight="plus">
+                    Apartment, Suite, etc.
+                  </Label>
+                  <Input
+                    placeholder="Suite 200 (optional)"
+                    value={bAddress2}
+                    onChange={(e) => setBAddress2(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-y-2">
+                  <Label size="small" weight="plus">
+                    Postal Code
+                  </Label>
+                  <Input
+                    placeholder="94105"
+                    value={bPostalCode}
+                    onChange={(e) => setBPostalCode(e.target.value)}
                   />
                 </div>
 
@@ -828,18 +918,18 @@ export const DraftOrderModal = ({
 
                 <div className="flex flex-col gap-y-2">
                   <Label size="small" weight="plus">
-                    Postal / ZIP Code
+                    Province / State
                   </Label>
                   <Input
-                    placeholder="94105"
-                    value={bPostalCode}
-                    onChange={(e) => setBPostalCode(e.target.value)}
+                    placeholder="CA (optional)"
+                    value={bProvince}
+                    onChange={(e) => setBProvince(e.target.value)}
                   />
                 </div>
 
                 <div className="flex flex-col gap-y-2">
                   <Label size="small" weight="plus">
-                    Country Code (2 letters)
+                    Country
                   </Label>
                   <Input
                     placeholder="us"

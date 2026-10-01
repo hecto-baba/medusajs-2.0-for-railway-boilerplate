@@ -103,10 +103,12 @@ export async function addToCart({
   variantId,
   quantity,
   countryCode,
+  metadata,
 }: {
   variantId: string
   quantity: number
   countryCode: string
+  metadata?: Record<string, any>
 }) {
   if (!variantId) {
     throw new Error("Missing variant ID when adding to cart")
@@ -117,12 +119,57 @@ export async function addToCart({
     throw new Error("Error retrieving or creating cart")
   }
 
+  // 1. Single-Restaurant & Separation Cart Validation
+  const existingRestaurantId = (cart.metadata?.restaurant_id as string) || undefined
+  const hasRestaurantItems = (cart.items || []).some((item) => !!item.metadata?.restaurant_id)
+  const hasRetailItems = (cart.items || []).some((item) => !item.metadata?.restaurant_id)
+
+  if (metadata?.restaurant_id) {
+    // Attempting to add a restaurant food dish
+    if (hasRetailItems) {
+      throw new Error(
+        "CONFLICT_RETAIL_EXISTS: Your cart contains standard store products. Food delivery orders cannot be combined with standard retail merchandise."
+      )
+    }
+
+    if (existingRestaurantId && existingRestaurantId !== metadata.restaurant_id) {
+      throw new Error(
+        `CONFLICT_RESTAURANT_EXISTS: Your cart already contains items from ${
+          cart.metadata?.restaurant_name || "another restaurant"
+        }. Orders can only be placed from one restaurant at a time.`
+      )
+    }
+
+    if (!existingRestaurantId) {
+      await sdk.store.cart.update(
+        cart.id,
+        {
+          metadata: {
+            ...cart.metadata,
+            restaurant_id: metadata.restaurant_id,
+            restaurant_name: metadata.restaurant_name || "Restaurant",
+          },
+        },
+        {},
+        await getAuthHeaders()
+      )
+    }
+  } else {
+    // Attempting to add a standard store product
+    if (hasRestaurantItems || existingRestaurantId) {
+      throw new Error(
+        "CONFLICT_FOOD_EXISTS: Your cart contains food items from a restaurant. Standard retail products cannot be combined with restaurant food delivery orders."
+      )
+    }
+  }
+
   await sdk.store.cart
     .createLineItem(
       cart.id,
       {
         variant_id: variantId,
         quantity,
+        metadata,
       },
       {},
       await getAuthHeaders()
@@ -173,6 +220,54 @@ export async function deleteLineItem(lineId: string) {
       await revalidateCacheTag("carts")
     })
     .catch(medusaError)
+}
+
+export async function clearCart() {
+  const cart = await retrieveCart()
+  if (!cart) return
+
+  if (cart.items && cart.items.length > 0) {
+    for (const item of cart.items) {
+      try {
+        await sdk.store.cart.deleteLineItem(cart.id, item.id, {}, await getAuthHeaders())
+      } catch {}
+    }
+  }
+
+  await sdk.store.cart.update(
+    cart.id,
+    {
+      metadata: {
+        ...cart.metadata,
+        restaurant_id: null,
+        restaurant_name: null,
+      },
+    },
+    {},
+    await getAuthHeaders()
+  )
+
+  await revalidateCacheTag("carts")
+}
+
+export async function clearCartAndAdd({
+  variantId,
+  quantity,
+  countryCode,
+  metadata,
+}: {
+  variantId: string
+  quantity: number
+  countryCode: string
+  metadata?: Record<string, any>
+}) {
+  await clearCart()
+  return await addToCart({
+    variantId,
+    quantity,
+    countryCode,
+    metadata,
+  })
 }
 
 export async function enrichLineItems(
@@ -366,7 +461,7 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
         first_name: formData.get("shipping_address.first_name"),
         last_name: formData.get("shipping_address.last_name"),
         address_1: formData.get("shipping_address.address_1"),
-        address_2: "",
+        address_2: (formData.get("shipping_address.address_2") as string) || "",
         company: formData.get("shipping_address.company"),
         postal_code: formData.get("shipping_address.postal_code"),
         city: formData.get("shipping_address.city"),
@@ -385,7 +480,7 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
         first_name: formData.get("billing_address.first_name"),
         last_name: formData.get("billing_address.last_name"),
         address_1: formData.get("billing_address.address_1"),
-        address_2: "",
+        address_2: (formData.get("billing_address.address_2") as string) || "",
         company: formData.get("billing_address.company"),
         postal_code: formData.get("billing_address.postal_code"),
         city: formData.get("billing_address.city"),
@@ -408,7 +503,7 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
           first_name: formData.get("billing_address.first_name"),
           last_name: formData.get("billing_address.last_name"),
           address_1: formData.get("billing_address.address_1"),
-          address_2: "",
+          address_2: (formData.get("billing_address.address_2") as string) || "",
           company: formData.get("billing_address.company"),
           postal_code: formData.get("billing_address.postal_code"),
           city: formData.get("billing_address.city"),
@@ -458,6 +553,12 @@ export async function placeOrder() {
     (item) => !!item.metadata?.seat_number && !!item.metadata?.show_date
   )
 
+  const hasDigitalItems = (cart?.items ?? []).some(
+    (item: any) =>
+      !!item.variant?.digital_product ||
+      item.metadata?.is_digital === true
+  )
+
   const completeCart = hasTicketItems
     ? sdk.client.fetch<{ type: string; order: HttpTypes.StoreOrder }>(
         `/store/carts/${cartId}/complete-tickets`,
@@ -468,7 +569,12 @@ export async function placeOrder() {
           `/store/rentals/${cartId}`,
           { method: "POST", headers: { ...(await getAuthHeaders()) } }
         )
-      : sdk.store.cart.complete(cartId, {}, await getAuthHeaders())
+      : hasDigitalItems
+        ? sdk.client.fetch<{ type: string; order: HttpTypes.StoreOrder }>(
+            `/store/carts/${cartId}/complete-digital`,
+            { method: "POST", headers: { ...(await getAuthHeaders()) } }
+          )
+        : sdk.store.cart.complete(cartId, {}, await getAuthHeaders())
 
   const cartRes = await completeCart
     .then(async (cartRes: any) => {
@@ -490,8 +596,38 @@ export async function placeOrder() {
       cartRes.order.billing_address?.country_code ??
       cart?.region?.countries?.[0]?.iso_2
     )?.toLowerCase()
+
+    // Step 13: Order Delivery Creation on Checkout
+    const restaurantId =
+      (cart?.metadata?.restaurant_id as string) ||
+      (cart?.items ?? []).find((item: any) => item.metadata?.restaurant_id)?.metadata?.restaurant_id
+
+    let deliveryId: string | null = null
+    if (restaurantId) {
+      try {
+        const deliveryRes: any = await sdk.client.fetch(`/store/deliveries`, {
+          method: "POST",
+          body: {
+            cart_id: cartId,
+            restaurant_id: restaurantId,
+          },
+          headers: { ...(await getAuthHeaders()) },
+        })
+        if (deliveryRes?.delivery?.id) {
+          deliveryId = deliveryRes.delivery.id
+        }
+      } catch (err) {
+        console.error("Failed to create order delivery workflow:", err)
+      }
+    }
+
     await removeCartId()
-    redirect(`/${countryCode}/order/confirmed/${cartRes?.order.id}`)
+
+    if (deliveryId) {
+      redirect(`/${countryCode}/deliveries/${deliveryId}`)
+    } else {
+      redirect(`/${countryCode}/order/confirmed/${cartRes?.order.id}`)
+    }
   }
 
   return cartRes.cart

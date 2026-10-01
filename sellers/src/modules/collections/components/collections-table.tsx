@@ -8,7 +8,10 @@ import {
 import {
   Button,
   createDataTableColumnHelper,
+  createDataTableFilterHelper,
   DataTable,
+  DataTableDateComparisonOperator,
+  DataTableFilteringState,
   DataTablePaginationState,
   DataTableSortingState,
   Heading,
@@ -18,7 +21,12 @@ import {
   usePrompt,
 } from "@medusajs/ui"
 import { Eye, PencilSquare, Plus, Trash, SquaresPlus } from "@medusajs/icons"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
@@ -27,6 +35,62 @@ import { CollectionDrawer } from "./forms/collection-drawer"
 import { CollectionProductsModal } from "./forms/collection-products-modal"
 
 const columnHelper = createDataTableColumnHelper<VendorCollection>()
+const filterHelper = createDataTableFilterHelper<VendorCollection>()
+
+const resolveDateFilter = (val: any): string | undefined => {
+  if (!val || val === "all") return undefined
+  if (typeof val === "object") {
+    if (val.$gte) return typeof val.$gte === "string" ? val.$gte : new Date(val.$gte).toISOString()
+    const flat = Object.values(val).flat()
+    val = flat[0]
+  }
+  if (Array.isArray(val)) val = val[0]
+  if (typeof val !== "string" || val === "all") return undefined
+  const now = new Date()
+  if (val === "7d") {
+    now.setDate(now.getDate() - 7)
+    return now.toISOString()
+  }
+  if (val === "30d") {
+    now.setDate(now.getDate() - 30)
+    return now.toISOString()
+  }
+  if (val === "90d") {
+    now.setDate(now.getDate() - 90)
+    return now.toISOString()
+  }
+  if (!isNaN(Date.parse(val))) {
+    return new Date(val).toISOString()
+  }
+  return undefined
+}
+
+const dateFilterOptions = [
+  {
+    label: "Today",
+    value: {
+      $gte: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+    },
+  },
+  {
+    label: "Last 7 days",
+    value: {
+      $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  },
+  {
+    label: "Last 30 days",
+    value: {
+      $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  },
+  {
+    label: "Last 90 days",
+    value: {
+      $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  },
+]
 
 export const CollectionsTable = () => {
   const router = useRouter()
@@ -34,7 +98,13 @@ export const CollectionsTable = () => {
   const prompt = usePrompt()
 
   const [search, setSearch] = useState("")
+  const [filtering, setFiltering] = useState<DataTableFilteringState>({})
   const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [columnVisibility, setColumnVisibility] = useState<
+    Record<string, boolean>
+  >({
+    updated_at: false,
+  })
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -54,18 +124,24 @@ export const CollectionsTable = () => {
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
+  const created_at_gte = resolveDateFilter(filtering.created_at)
+  const updated_at_gte = resolveDateFilter(filtering.updated_at)
+
   const { data, isLoading } = useQuery({
     queryKey: [
       "vendor-collections",
-      { limit, offset, q: search, order },
+      { limit, offset, q: search, order, created_at_gte, updated_at_gte },
     ],
     queryFn: () =>
       listVendorCollections({
         limit,
         offset,
         q: search || undefined,
+        created_at_gte,
+        updated_at_gte,
         order,
       }),
+    placeholderData: keepPreviousData,
   })
 
   const collections = data?.collections ?? []
@@ -96,11 +172,30 @@ export const CollectionsTable = () => {
     }
   }
 
+  const filters = useMemo(
+    () => [
+      filterHelper.accessor("created_at", {
+        type: "date",
+        label: "Created",
+        options: dateFilterOptions,
+      }),
+      filterHelper.accessor("updated_at", {
+        type: "date",
+        label: "Updated",
+        options: dateFilterOptions,
+      }),
+    ],
+    []
+  )
+
   const columns = useMemo(
     () => [
       columnHelper.accessor("title", {
         header: "Title",
         enableSorting: true,
+        sortLabel: "Title",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           const col = row.original
           return (
@@ -125,6 +220,9 @@ export const CollectionsTable = () => {
       columnHelper.accessor("handle", {
         header: "Handle",
         enableSorting: true,
+        sortLabel: "Handle",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ getValue }) => (
           <Text size="small" className="text-ui-fg-subtle font-mono">
             {getValue()}
@@ -145,6 +243,29 @@ export const CollectionsTable = () => {
       columnHelper.accessor("created_at", {
         header: "Created",
         enableSorting: true,
+        sortLabel: "Created",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ getValue }) => {
+          const date = getValue()
+          if (!date) return <PlaceholderCell />
+          return (
+            <Text size="small" className="text-ui-fg-subtle">
+              {new Date(date).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </Text>
+          )
+        },
+      }),
+      columnHelper.accessor("updated_at", {
+        header: "Updated",
+        enableSorting: true,
+        sortLabel: "Updated",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ getValue }) => {
           const date = getValue()
           if (!date) return <PlaceholderCell />
@@ -208,6 +329,14 @@ export const CollectionsTable = () => {
   const table = useDataTable({
     data: collections,
     columns,
+    filters,
+    filtering: {
+      state: filtering,
+      onFilteringChange: (val) => {
+        setFiltering(val)
+        setPagination((p) => ({ ...p, pageIndex: 0 }))
+      },
+    },
     rowCount: count,
     getRowId: (row) => row.id,
     isLoading,
@@ -221,7 +350,14 @@ export const CollectionsTable = () => {
     },
     search: {
       state: search,
-      onSearchChange: setSearch,
+      onSearchChange: (value) => {
+        setSearch(value)
+        setPagination((state) => ({ ...state, pageIndex: 0 }))
+      },
+    },
+    columnVisibility: {
+      state: columnVisibility,
+      onColumnVisibilityChange: setColumnVisibility,
     },
   })
 
@@ -243,7 +379,12 @@ export const CollectionsTable = () => {
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between">
           <DataTable.Search placeholder="Search collections..." />
+          <div className="flex items-center gap-x-2">
+            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTable.SortingMenu tooltip="Sort" />
+          </div>
         </DataTable.Toolbar>
+        <DataTable.FilterBar />
 
         <DataTable.Table />
 

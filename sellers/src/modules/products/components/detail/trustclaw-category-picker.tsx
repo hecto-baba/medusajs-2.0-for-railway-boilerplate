@@ -24,7 +24,7 @@ import {
   XMark,
 } from "@medusajs/icons"
 import { useQuery } from "@tanstack/react-query"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 interface Props {
   /** Called with the category ID and name once the seller selects a category */
@@ -84,17 +84,25 @@ export function TrustClawCategoryPicker({
     staleTime: 10 * 60 * 1000,
   })
 
-  // 1. Resolve vendor's effective segment code
-  const effectiveVendorSegmentCode =
-    propSegmentCode ||
-    onboarding?.segment?.code ||
-    segments.find(
-      (s) =>
-        s.id === onboarding?.segmentId ||
-        s.code === onboarding?.segmentId ||
-        (onboarding?.segment?.name &&
-          s.name?.toLowerCase() === onboarding.segment.name.toLowerCase())
-    )?.code
+  const safeSegments = Array.isArray(segments) ? segments : []
+
+  // 1. Resolve vendor's effective segment code — memoized so .find() doesn't
+  //    return a new reference on every render and trigger infinite useEffect loops.
+  const effectiveVendorSegmentCode = useMemo(() => {
+    return (
+      propSegmentCode ||
+      onboarding?.segment?.code ||
+      safeSegments.find(
+        (s) =>
+          s.id === onboarding?.segmentId ||
+          s.code === onboarding?.segmentId ||
+          (onboarding?.segment?.name &&
+            s.name?.toLowerCase() === onboarding.segment.name.toLowerCase())
+      )?.code ||
+      undefined
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propSegmentCode, onboarding?.segment?.code, onboarding?.segment?.name, onboarding?.segmentId, segments])
 
   const isVendorScoped = Boolean(effectiveVendorSegmentCode)
 
@@ -104,18 +112,21 @@ export function TrustClawCategoryPicker({
   )
   const [breadcrumb, setBreadcrumb] = useState<TrustClawCategory[]>([])
 
-  // Auto-synchronize locked segment once onboarding loads
+  // Auto-synchronize locked segment once onboarding resolves.
+  // NOTE: selectedSegmentCode is intentionally NOT in deps — adding it would
+  // cause an infinite loop (effect sets it → triggers itself again).
   useEffect(() => {
     if (effectiveVendorSegmentCode && selectedSegmentCode !== effectiveVendorSegmentCode) {
       setSelectedSegmentCode(effectiveVendorSegmentCode)
     }
-  }, [effectiveVendorSegmentCode, selectedSegmentCode])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveVendorSegmentCode])
 
   // ── Browse Drilldown Query ──
   const currentParentId =
     breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].id : undefined
 
-  const { data: categories = [], isLoading: categoriesLoading } = useQuery({
+  const { data: rawCategories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: [
       "tc-categories-browse",
       selectedSegmentCode,
@@ -130,8 +141,10 @@ export function TrustClawCategoryPicker({
     staleTime: 5 * 60 * 1000,
   })
 
+  const categories = Array.isArray(rawCategories) ? rawCategories : []
+
   const currentSegment =
-    segments.find((s) => s.code === selectedSegmentCode) ||
+    safeSegments.find((s) => s.code === selectedSegmentCode) ||
     (onboarding?.segment?.code === selectedSegmentCode ? onboarding.segment : null)
 
   // ── Handlers ──
@@ -301,18 +314,20 @@ export function TrustClawCategoryPicker({
                 </Select.Trigger>
                 <Select.Content>
                   <Select.Item value={NONE}>— Select segment —</Select.Item>
-                  {segments.map((seg) => (
-                    <Select.Item key={seg.id} value={seg.code}>
-                      {seg.name} ({seg.orderType || "BUY"})
-                    </Select.Item>
-                  ))}
+                  {safeSegments
+                    .filter((seg) => Boolean(seg?.code))
+                    .map((seg) => (
+                      <Select.Item key={seg.id} value={String(seg.code)}>
+                        {seg.name} ({seg.orderType || "BUY"})
+                      </Select.Item>
+                    ))}
                 </Select.Content>
               </Select>
             </div>
           )}
 
           {/* ── Step 2: Category Hierarchy Navigation ── */}
-          {selectedSegmentCode && (
+          {selectedSegmentCode ? (
             <div className="flex flex-col gap-2 pt-1 border-t border-ui-border-base">
               {/* Breadcrumb path navigation bar */}
               <div className="flex items-center justify-between gap-2 py-1">
@@ -421,6 +436,14 @@ export function TrustClawCategoryPicker({
                   ))
                 )}
               </div>
+            </div>
+          ) : !isVendorScoped && (
+            /* Shown when the segment selector is present but nothing selected yet */
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-ui-border-base bg-ui-bg-subtle p-6 text-center pt-2 border-t border-ui-border-base">
+              <Folder className="h-8 w-8 text-ui-fg-disabled" />
+              <Text size="small" className="text-ui-fg-subtle">
+                Select an industry segment above to browse available product categories.
+              </Text>
             </div>
           )}
         </div>

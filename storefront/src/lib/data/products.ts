@@ -4,7 +4,7 @@ import { cache } from "react"
 import { getRegion } from "./regions"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import { sortProducts } from "@lib/util/sort-products"
-import { getCacheDirectives } from "./cookies"
+import { getCacheDirectives, getAuthHeaders } from "./cookies"
 
 // See the note in regions.ts for why these are client.fetch calls rather than
 // the sdk.store.* helpers.
@@ -21,7 +21,7 @@ export const getProductsById = cache(async function ({
       query: {
         id: ids,
         region_id: regionId,
-        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*",
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,*variants.digital_product",
       },
       ...(await getCacheDirectives("products")),
     })
@@ -38,7 +38,7 @@ export const getProductByHandle = cache(async function (
       query: {
         handle,
         region_id: regionId,
-        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*",
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,*variants.digital_product",
       },
       ...(await getCacheDirectives("products")),
     })
@@ -76,7 +76,7 @@ export const getProductsList = cache(async function ({
         limit,
         offset,
         region_id: region.id,
-        fields: "*variants.calculated_price",
+        fields: "*variants.calculated_price,*variants.digital_product",
         ...queryParams,
       },
       ...(await getCacheDirectives("products")),
@@ -104,11 +104,13 @@ export const getProductsListWithSort = cache(async function ({
   queryParams,
   sortBy = "created_at",
   countryCode,
+  digitalFilter,
 }: {
   page?: number
   queryParams?: HttpTypes.StoreProductListParams
   sortBy?: SortOptions
   countryCode: string
+  digitalFilter?: "only" | "exclude"
 }): Promise<{
   response: { products: HttpTypes.StoreProduct[]; count: number }
   nextPage: number | null
@@ -127,20 +129,33 @@ export const getProductsListWithSort = cache(async function ({
     countryCode,
   })
 
-  const sortedProducts = sortProducts(products, sortBy)
+  let filteredProducts = products
+  if (digitalFilter === "only") {
+    filteredProducts = products.filter((p: any) =>
+      p.variants?.some((v: any) => !!v.digital_product)
+    )
+  } else if (digitalFilter === "exclude") {
+    filteredProducts = products.filter(
+      (p: any) => !p.variants?.some((v: any) => !!v.digital_product)
+    )
+  }
+
+  const sortedProducts = sortProducts(filteredProducts, sortBy)
 
   const pageParam = (page - 1) * limit
+  const filteredCount = filteredProducts.length
 
-  const nextPage = count > pageParam + limit ? pageParam + limit : null
+  const nextPage = filteredCount > pageParam + limit ? pageParam + limit : null
 
   const paginatedProducts = sortedProducts.slice(pageParam, pageParam + limit)
 
   return {
     response: {
       products: paginatedProducts,
-      count,
+      count: filteredCount,
     },
     nextPage,
     queryParams,
   }
 })
+

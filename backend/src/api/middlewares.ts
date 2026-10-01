@@ -2,8 +2,9 @@ import {
   authenticate,
   defineMiddlewares,
   validateAndTransformBody,
-  validateAndTransformQuery
+  validateAndTransformQuery,
 } from "@medusajs/framework/http";
+import * as httpFramework from "@medusajs/framework/http";
 import { createFindParams } from "@medusajs/medusa/api/utils/validators";
 import { PostRentalConfigBodySchema } from "./admin/products/[id]/rental-config/route";
 import { PostEoiConfigBodySchema } from "./admin/products/[id]/eoi-config/validators";
@@ -31,6 +32,27 @@ import { PostAdminAppointmentSlotsSchema } from "./admin/providers/[id]/slots/ro
 import { PostVenueBodySchema } from "./admin/venues/route";
 import { PostTicketProductBodySchema } from "./admin/ticket-products/route";
 import { GetTicketProductSeatsSchema } from "./store/ticket-products/[id]/seats/route";
+import deliveriesMiddlewares from "./deliveries/[id]/middlewares";
+import multer from "multer";
+import { createDigitalProductsSchema } from "./admin/digital-products/validators";
+
+// Safe fallback for allowFields if running Medusa Framework versions < 2.21.0
+const allowFields = (httpFramework as any).allowFields || function (...fields: string[]) {
+  return (req: any, res: any, next: any) => {
+    req.allowed = req.allowed ?? [];
+    req.allowed.push(...fields.flat());
+    next();
+  };
+};
+
+import { z } from "@medusajs/framework/zod";
+
+const upload = multer({ storage: multer.memoryStorage() });
+const GetDigitalProductsSchema = createFindParams().merge(
+  z.object({
+    product_id: z.string().optional(),
+  })
+);
 import { PostVendorCreateSchema } from "./vendors/route";
 import { GetVendorProductsSchema } from "./vendors/products/route";
 import { GetVendorOrdersSchema } from "./vendors/orders/route";
@@ -113,7 +135,16 @@ import {
   CreateVendorStockLocationSchema,
 } from "./vendors/stock-locations/route";
 import { UpdateVendorStockLocationSchema } from "./vendors/stock-locations/[id]/route";
-import { CreateVendorShippingProfileSchema } from "./vendors/shipping-profiles/route";
+import {
+  CreateVendorShippingProfileSchema,
+  GetVendorShippingProfilesSchema,
+} from "./vendors/shipping-profiles/route";
+import { UpdateVendorShippingProfileSchema } from "./vendors/shipping-profiles/[id]/route";
+import {
+  CreateVendorShippingOptionTypeSchema,
+  GetVendorShippingOptionTypesSchema,
+} from "./vendors/shipping-option-types/route";
+import { UpdateVendorShippingOptionTypeSchema } from "./vendors/shipping-option-types/[id]/route";
 import {
   GetVendorSalesChannelsSchema,
   CreateVendorSalesChannelSchema,
@@ -139,6 +170,8 @@ import {
 } from "./vendors/tax-regions/route";
 import { UpdateVendorTaxRateSchema } from "./vendors/tax-regions/[id]/route";
 import { UpdateVendorProductTagSchema } from "./vendors/product-tags/[id]/route";
+import { PostVendorCurrencySchema } from "./vendors/currencies/route";
+import { PatchVendorCurrencySchema } from "./vendors/currencies/[code]/route";
 import {
   GetVendorApiKeysSchema,
   CreateVendorApiKeySchema,
@@ -182,7 +215,6 @@ import {
   AdminCreateCampaign,
   AdminUpdateCampaign
 } from "@medusajs/medusa/api/admin/campaigns/validators";
-import multer from "multer";
 import {
   GetTransactionTypesSchema,
   PostTransactionTypeSchema
@@ -533,6 +565,106 @@ export default defineMiddlewares({
         validateAndTransformQuery(GetTicketProductSeatsSchema, {})
       ]
     },
+    {
+      methods: ["POST"],
+      matcher: "/users",
+      middlewares: [
+        authenticate(["driver", "restaurant"], "bearer", {
+          allowUnregistered: true,
+        }),
+      ],
+    },
+    {
+      methods: ["POST", "DELETE"],
+      matcher: "/restaurants/:id/**",
+      middlewares: [
+        authenticate(["restaurant", "user"], "bearer"),
+      ],
+    },
+    {
+      matcher: "/admin/digital-products",
+      method: "GET",
+      middlewares: [
+        validateAndTransformQuery(
+          GetDigitalProductsSchema,
+          {
+            defaults: [
+              "id",
+              "name",
+              "created_at",
+              "updated_at",
+              "deleted_at",
+              "medias.*",
+              "product_variant.*",
+              "product_variant.product.*",
+              "product_variant.prices.*",
+            ],
+            isList: true,
+          }
+        ),
+      ],
+    },
+    {
+      matcher: "/admin/digital-products",
+      method: "POST",
+      middlewares: [
+        validateAndTransformBody(createDigitalProductsSchema),
+      ],
+    },
+    {
+      matcher: "/admin/digital-products/upload/:type",
+      method: "POST",
+      middlewares: [
+        upload.array("files"),
+      ],
+    },
+    {
+      matcher: "/store/products",
+      middlewares: [allowFields("variants.digital_product")],
+    },
+    {
+      matcher: "/store/customers/me/**",
+      middlewares: [
+        authenticate("customer", ["bearer", "session"]),
+      ],
+    },
+    {
+      matcher: "/store/quotes",
+      middlewares: [
+        authenticate("customer", ["bearer", "session"], {
+          allowUnauthenticated: true,
+        }),
+      ],
+    },
+    {
+      matcher: "/store/quotes/**",
+      middlewares: [
+        authenticate("customer", ["bearer", "session"], {
+          allowUnauthenticated: true,
+        }),
+      ],
+    },
+    {
+      matcher: "/store/approvals",
+      middlewares: [
+        authenticate("customer", ["bearer", "session"]),
+      ],
+    },
+    {
+      matcher: "/store/approvals/**",
+      middlewares: [
+        authenticate("customer", ["bearer", "session"]),
+      ],
+    },
+    {
+      matcher: "/store/orders/:id",
+      middlewares: [
+        authenticate("customer", ["bearer", "session"], {
+          allowUnauthenticated: true,
+        }),
+      ],
+    },
+    ...deliveriesMiddlewares.routes!,
     // allowUnregistered admits the JWT handed out by
     // /auth/vendor/emailpass/register, which has an auth identity but no vendor
     // admin behind it yet. The route itself rejects tokens that already carry an
@@ -1194,6 +1326,7 @@ export default defineMiddlewares({
       matcher: "/vendors/collections",
       methods: ["GET"],
       middlewares: [
+        authenticate("vendor", ["session", "bearer"]),
         validateAndTransformQuery(GetVendorCollectionsSchema, {})
       ]
     },
@@ -1201,6 +1334,7 @@ export default defineMiddlewares({
       matcher: "/vendors/collections",
       methods: ["POST"],
       middlewares: [
+        authenticate("vendor", ["session", "bearer"]),
         validateAndTransformBody(CreateVendorCollectionSchema)
       ]
     },
@@ -1208,7 +1342,15 @@ export default defineMiddlewares({
       matcher: "/vendors/collections/:id",
       methods: ["POST"],
       middlewares: [
+        authenticate("vendor", ["session", "bearer"]),
         validateAndTransformBody(UpdateVendorCollectionSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/collections/:id",
+      methods: ["GET", "DELETE"],
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
       ]
     },
     {
@@ -1221,6 +1363,7 @@ export default defineMiddlewares({
       matcher: "/vendors/collections/:id/products",
       methods: ["POST"],
       middlewares: [
+        authenticate("vendor", ["session", "bearer"]),
         validateAndTransformBody(ManageCollectionProductsSchema)
       ]
     },
@@ -1368,9 +1511,44 @@ export default defineMiddlewares({
     },
     {
       matcher: "/vendors/shipping-profiles",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorShippingProfilesSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/shipping-profiles",
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(CreateVendorShippingProfileSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/shipping-profiles/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorShippingProfileSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/shipping-option-types",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorShippingOptionTypesSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/shipping-option-types",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorShippingOptionTypeSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/shipping-option-types/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorShippingOptionTypeSchema)
       ]
     },
     {
@@ -1528,6 +1706,26 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(UpdateVendorTaxRateSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/currencies*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
+      matcher: "/vendors/currencies",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorCurrencySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/currencies/:code",
+      methods: ["PATCH"],
+      middlewares: [
+        validateAndTransformBody(PatchVendorCurrencySchema)
       ]
     },
     {

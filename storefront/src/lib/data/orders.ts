@@ -10,35 +10,46 @@ import { getAuthHeaders, getCacheDirectives } from "./cookies"
 // the sdk.store.* helpers. As in customer.ts, the old calls mixed the cache tag
 // in with the authorization header, so only the auth half ever took effect.
 export const retrieveOrder = cache(async function (id: string) {
+  const headers = await getAuthHeaders()
   return sdk.client
     .fetch<HttpTypes.StoreOrderResponse>(`/store/orders/${id}`, {
       method: "GET",
       query: { fields: "*payment_collections.payments" },
-      headers: { ...(await getAuthHeaders()) },
+      headers,
       ...(await getCacheDirectives("orders")),
     })
     .then(({ order }) => order)
-    .catch((err) => medusaError(err))
+    .catch((err) => {
+      if (err?.status === 401 || err?.status === 404) {
+        return null
+      }
+      return medusaError(err)
+    })
 })
 
 export const listOrders = cache(async function (
   limit: number = 10,
   offset: number = 0
 ) {
+  const headers = await getAuthHeaders()
+  if (!(headers as any)?.authorization) {
+    return null
+  }
+
   return sdk.client
     .fetch<HttpTypes.StoreOrderListResponse>("/store/orders", {
       method: "GET",
       query: { limit, offset },
-      headers: { ...(await getAuthHeaders()) },
+      headers,
       ...(await getCacheDirectives("orders")),
     })
     .then(({ orders }) => orders)
     .catch((err) => {
-      // A 401 here means the auth cookie was not available in this render
+      // A 401 or 404 here means the auth cookie was not available in this render
       // pass (e.g. immediately after login before the cookie is committed,
       // or a stale cached render). Return null so the dashboard still
       // renders rather than crashing the page.
-      if (err && typeof err.status === "number" && err.status === 401) {
+      if (err && (err.status === 401 || err.status === 404)) {
         return null
       }
       return medusaError(err)

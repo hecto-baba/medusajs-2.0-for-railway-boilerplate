@@ -1,0 +1,7 @@
+import { createStep } from "@medusajs/framework/workflows-sdk"
+
+export const awaitStartPreparationStepId = "await-start-preparation-step"
+export const awaitStartPreparationStep = createStep(
+  { name: awaitStartPreparationStepId, async: true, timeout: 60 * 15, maxRetries: 2 },
+  async () => {}
+)

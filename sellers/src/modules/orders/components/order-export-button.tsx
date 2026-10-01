@@ -11,6 +11,10 @@ type OrderExportButtonProps = {
   status?: string
   paymentStatus?: string
   fulfillmentStatus?: string
+  regionId?: string
+  salesChannelId?: string
+  createdAtGte?: string
+  updatedAtGte?: string
   order?: string
 }
 
@@ -20,6 +24,10 @@ export const OrderExportButton = ({
   status,
   paymentStatus,
   fulfillmentStatus,
+  regionId,
+  salesChannelId,
+  createdAtGte,
+  updatedAtGte,
   order,
 }: OrderExportButtonProps) => {
   const [isExporting, setIsExporting] = useState(false)
@@ -27,7 +35,7 @@ export const OrderExportButton = ({
   const handleExport = async () => {
     setIsExporting(true)
     try {
-      // Fetch up to 500 matching orders for export
+      // Fetch up to 100 matching orders for export
       const res = await listVendorOrders({
         limit: 100,
         offset: 0,
@@ -36,6 +44,10 @@ export const OrderExportButton = ({
         status: status !== "all" ? status : undefined,
         payment_status: paymentStatus !== "all" ? paymentStatus : undefined,
         fulfillment_status: fulfillmentStatus !== "all" ? fulfillmentStatus : undefined,
+        region_id: regionId,
+        sales_channel_id: salesChannelId,
+        created_at_gte: createdAtGte,
+        updated_at_gte: updatedAtGte,
       })
 
       const ordersToExport = res.orders?.length ? res.orders : currentOrders ?? []

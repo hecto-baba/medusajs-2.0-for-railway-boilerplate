@@ -11,7 +11,9 @@ export const GetVendorProductTypesSchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   q: z.string().optional(),
   order: z.string().optional(),
+  status: z.string().optional(),
   created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
 })
 
 export const CreateVendorProductTypeSchema = z.object({
@@ -38,9 +40,8 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, order, created_at_gte } = req.validatedQuery as unknown as z.infer<
-    typeof GetVendorProductTypesSchema
-  >
+  const { limit, offset, q, order, status, created_at_gte, updated_at_gte } =
+    req.validatedQuery as unknown as z.infer<typeof GetVendorProductTypesSchema>
 
   const filters: Record<string, any> = {}
   if (q) {
@@ -48,6 +49,13 @@ export const GET = async (
   }
   if (created_at_gte) {
     filters.created_at = { $gte: new Date(created_at_gte) }
+  }
+  if (updated_at_gte) {
+    filters.updated_at = { $gte: new Date(updated_at_gte) }
+  }
+  if (status && status !== "all") {
+    // If status filter is passed (active/inactive), map accordingly
+    filters.metadata = { status }
   }
 
   let orderConfig: Record<string, "ASC" | "DESC"> = { created_at: "ASC" }

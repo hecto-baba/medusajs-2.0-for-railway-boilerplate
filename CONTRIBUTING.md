@@ -1,7 +1,7 @@
 # Contributing
 
-Thanks for looking. This template has been deployed a few thousand times, so
-small fixes here reach a lot of stores.
+> [!IMPORTANT]
+> **Team Git Workflow**: Before starting any feature or bug fix, read our [Git Workflow & Contribution Guide](docs/GIT_WORKFLOW.md) for branch rules, PR requirements, and review guidelines. Direct pushes to `main` and `dev` are strictly blocked.
 
 ## Where to ask what
 

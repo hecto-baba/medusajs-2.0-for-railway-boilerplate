@@ -13,7 +13,10 @@ export const GetVendorDraftOrdersSchema = z.object({
   q: z.string().optional(),
   order: z.string().optional(),
   created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
   currency_code: z.string().optional(),
+  sales_channel_id: z.string().optional(),
+  region_id: z.string().optional(),
 })
 
 export const CreateVendorDraftOrderSchema = z.object({
@@ -119,7 +122,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, order, created_at_gte, currency_code } =
+  const { limit, offset, q, order, created_at_gte, updated_at_gte, currency_code, sales_channel_id, region_id } =
     req.validatedQuery as unknown as z.infer<typeof GetVendorDraftOrdersSchema>
 
   const {
@@ -199,11 +202,33 @@ export const GET = async (
     )
   }
 
+  // Filter by updated_at_gte
+  if (updated_at_gte) {
+    const gteTime = new Date(updated_at_gte).getTime()
+    filtered = filtered.filter(
+      (o: any) => new Date(o.updated_at || o.created_at).getTime() >= gteTime
+    )
+  }
+
   // Filter by currency_code
   if (currency_code && currency_code !== "all") {
     filtered = filtered.filter(
       (o: any) =>
         o.currency_code?.toLowerCase() === currency_code.toLowerCase()
+    )
+  }
+
+  // Filter by sales_channel_id
+  if (sales_channel_id) {
+    filtered = filtered.filter(
+      (o: any) => o.sales_channel_id === sales_channel_id
+    )
+  }
+
+  // Filter by region_id
+  if (region_id) {
+    filtered = filtered.filter(
+      (o: any) => o.region_id === region_id
     )
   }
 

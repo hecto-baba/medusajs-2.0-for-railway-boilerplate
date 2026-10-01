@@ -1,12 +1,13 @@
-import { ApiKeysTable } from "@modules/settings"
-import { Metadata } from "next"
+import { redirect } from "next/navigation"
 
-export const metadata: Metadata = { title: "API Key Management" }
+type ApiKeysPageProps = {
+  searchParams?: Promise<{ tab?: string }>
+}
 
-export default function ApiKeysPage() {
-  return (
-    <div className="flex flex-col gap-y-3 p-6">
-      <ApiKeysTable />
-    </div>
-  )
+export default async function ApiKeysPage({ searchParams }: ApiKeysPageProps) {
+  const params = await searchParams
+  if (params?.tab === "secret") {
+    redirect("/settings/secret-api-keys")
+  }
+  redirect("/settings/publishable-api-keys")
 }

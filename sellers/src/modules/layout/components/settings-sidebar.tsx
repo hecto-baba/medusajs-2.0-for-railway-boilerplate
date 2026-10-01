@@ -35,8 +35,8 @@ const SETTINGS_SECTIONS = [
   {
     heading: "Developer",
     items: [
-      { href: "/settings/api-keys?tab=publishable", label: "Publishable API Keys" },
-      { href: "/settings/api-keys?tab=secret", label: "Secret API Keys" },
+      { href: "/settings/publishable-api-keys", label: "Publishable API Keys" },
+      { href: "/settings/secret-api-keys", label: "Secret API Keys" },
       { href: "/settings/workflows", label: "Workflows" },
     ],
   },
@@ -66,6 +66,20 @@ export const SettingsSidebar = ({ email, name }: SettingsSidebarProps) => {
         pathname === "/settings/users" ||
         pathname.startsWith("/settings/team/") ||
         pathname.startsWith("/settings/users/")
+      )
+    }
+
+    if (href === "/settings/publishable-api-keys") {
+      return (
+        pathname === "/settings/publishable-api-keys" ||
+        pathname.startsWith("/settings/publishable-api-keys/")
+      )
+    }
+
+    if (href === "/settings/secret-api-keys") {
+      return (
+        pathname === "/settings/secret-api-keys" ||
+        pathname.startsWith("/settings/secret-api-keys/")
       )
     }
 

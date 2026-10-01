@@ -53,6 +53,20 @@ export default async function Nav() {
               >
                 Store
               </LocalizedClientLink>
+              <LocalizedClientLink
+                className="hover:text-ui-fg-base"
+                href="/digital-products"
+                data-testid="nav-digital-products-link"
+              >
+                Digital Products
+              </LocalizedClientLink>
+              <LocalizedClientLink
+                className="hover:text-ui-fg-base"
+                href="/restaurants"
+                data-testid="nav-restaurants-link"
+              >
+                Restaurants
+              </LocalizedClientLink>
               {isSearchEnabled() && (
                 <LocalizedClientLink
                   className="hover:text-ui-fg-base"
@@ -90,4 +104,3 @@ export default async function Nav() {
     </div>
   )
 }
-

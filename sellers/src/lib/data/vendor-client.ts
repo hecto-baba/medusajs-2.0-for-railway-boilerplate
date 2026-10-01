@@ -89,6 +89,7 @@ export type VendorOrder = {
   display_id: number
   status: string
   created_at: string
+  updated_at?: string
   email: string | null
   currency_code: string
   total: number
@@ -128,7 +129,7 @@ export type ListResponse<T> = {
 
 const request = async <T>(
   path: string,
-  params: Record<string, string | number | string[] | undefined> = {}
+  params: Record<string, string | number | boolean | string[] | undefined> = {}
 ) => {
   const search = new URLSearchParams()
 
@@ -150,6 +151,7 @@ const request = async <T>(
 
   const res = await fetch(`/api/vendors/${path}?${search.toString()}`, {
     headers: { accept: "application/json" },
+    credentials: "same-origin",
   })
 
   if (!res.ok) {
@@ -170,6 +172,7 @@ export const listVendorProducts = (params: {
   tag_id?: string | string[]
   sales_channel_id?: string | string[]
   created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ products: VendorProduct[] }>>(
@@ -239,6 +242,10 @@ export const listVendorOrders = (params: {
   status?: string
   payment_status?: string
   fulfillment_status?: string
+  region_id?: string
+  sales_channel_id?: string
+  created_at_gte?: string
+  updated_at_gte?: string
 }) =>
   request<ListResponse<{ orders: VendorOrder[] }>>(
     "orders",
@@ -250,12 +257,13 @@ export const getVendorOrder = (orderId: string) =>
 
 const mutate = async <T>(
   path: string,
-  method: "POST" | "DELETE",
+  method: "POST" | "PATCH" | "DELETE",
   body?: unknown
 ) => {
   const res = await fetch(`/api/vendors/${path}`, {
     method,
     headers: { "content-type": "application/json", accept: "application/json" },
+    credentials: "same-origin",
     ...(body ? { body: JSON.stringify(body) } : {}),
   })
 
@@ -510,7 +518,19 @@ export type VendorTaxonomy = {
   sales_channels: { id: string; name: string }[]
   shipping_profiles: { id: string; name: string; type: string }[]
   currencies: { code: string; is_default: boolean }[]
-  stock_locations: { id: string; name: string }[]
+  stock_locations: {
+    id: string
+    name: string
+    address?: {
+      id?: string
+      city?: string | null
+      country_code?: string | null
+      address_1?: string | null
+      address_2?: string | null
+      postal_code?: string | null
+      province?: string | null
+    } | null
+  }[]
 }
 
 /**
@@ -558,9 +578,9 @@ export type TrustClawCategory = {
  * Proxied through Medusa so the API key stays server-side.
  */
 export const getTrustClawSegments = () =>
-  request<{ segments: TrustClawSegment[] }>("taxonomy/segments", {}).then(
-    (r) => r.segments
-  )
+  request<{ segments: TrustClawSegment[] }>("taxonomy/segments", {})
+    .then((r) => (Array.isArray(r?.segments) ? r.segments : []))
+    .catch(() => [] as TrustClawSegment[])
 
 export type TrustClawCategoryQueryParams = {
   segmentCode?: string
@@ -610,7 +630,9 @@ export const getTrustClawCategories = (
   return request<{ categories: TrustClawCategory[] }>(
     "taxonomy/tc-categories",
     params
-  ).then((r) => r.categories)
+  )
+    .then((r) => (Array.isArray(r?.categories) ? r.categories : []))
+    .catch(() => [] as TrustClawCategory[])
 }
 
 export type TrustClawVendorType = {
@@ -774,6 +796,7 @@ export type VendorMe = {
     name: string
     handle: string
     logo: string | null
+    metadata?: Record<string, any> | null
   }
 }
 
@@ -791,6 +814,7 @@ export const updateVendorMe = async (body: {
   last_name?: string | null
   name?: string
   logo?: string | null
+  metadata?: Record<string, any> | null
 }) => {
   const res = await fetch("/api/vendors/me", {
     method: "PATCH",
@@ -893,14 +917,22 @@ export const listVendorInventoryItems = (params: {
   limit: number
   offset: number
   q?: string
-  sku?: string[]
+  sku?: string | string[]
   origin_country?: string
-  location_id?: string
+  location_id?: string | string[]
+  material?: string | string[]
+  mid_code?: string
+  hs_code?: string
+  height?: number
+  width?: number
+  length?: number
+  weight?: number
+  requires_shipping?: boolean | string
   order?: string
 }) =>
   request<ListResponse<{ inventory_items: VendorInventoryItem[] }>>(
     "inventory-items",
-    params
+    params as Record<string, string | number | boolean | string[] | undefined>
   )
 
 export const getVendorInventoryItem = async (id: string) => {
@@ -1141,6 +1173,7 @@ export const listVendorPromotions = (params: {
   status?: string[]
   type?: string[]
   created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) => request<ListResponse<{ promotions: VendorPromotion[] }>>("promotions", params)
 
@@ -1310,7 +1343,9 @@ export const listVendorCustomers = (params: {
   offset: number
   q?: string
   has_account?: boolean | string
+  groups?: string | string[]
   created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) => {
   const queryParams: Record<string, string | number | string[] | undefined> = {
@@ -1321,7 +1356,9 @@ export const listVendorCustomers = (params: {
       typeof params.has_account === "boolean"
         ? String(params.has_account)
         : params.has_account,
+    groups: params.groups,
     created_at_gte: params.created_at_gte,
+    updated_at_gte: params.updated_at_gte,
     order: params.order,
   }
   return request<ListResponse<{ customers: VendorCustomer[] }>>(
@@ -1838,6 +1875,10 @@ export const listVendorCollections = (params: {
   limit: number
   offset: number
   q?: string
+  created_at?: any
+  updated_at?: any
+  created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ collections: VendorCollection[] }>>(
@@ -1985,6 +2026,7 @@ export type VendorProductOptionItem = {
   id: string
   title: string
   product_id?: string | null
+  is_exclusive?: boolean | null
   product?: {
     id: string
     title: string
@@ -2000,11 +2042,16 @@ export const listVendorProductOptions = (params: {
   offset: number
   q?: string
   product_id?: string
+  is_exclusive?: boolean | string
+  created_at?: any
+  updated_at?: any
+  created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ product_options: VendorProductOptionItem[] }>>(
     "product-options",
-    params as Record<string, string | number | undefined>
+    params as Record<string, string | number | boolean | undefined>
   )
 
 export const getVendorProductOption = async (id: string) => {
@@ -2085,7 +2132,10 @@ export const listVendorDraftOrders = (params: {
   q?: string
   order?: string
   created_at_gte?: string
+  updated_at_gte?: string
   currency_code?: string
+  sales_channel_id?: string
+  region_id?: string
 }) =>
   request<ListResponse<{ draft_orders: VendorDraftOrder[] }>>(
     "draft-orders",
@@ -2226,8 +2276,8 @@ export type VendorStockLocation = {
 }
 
 export const listVendorStockLocations = (params: {
-  limit: number
-  offset: number
+  limit?: number
+  offset?: number
   q?: string
 }) =>
   request<ListResponse<{ stock_locations: VendorStockLocation[] }>>(
@@ -2299,10 +2349,19 @@ export type VendorShippingProfile = {
   updated_at?: string
 }
 
-export const listVendorShippingProfiles = () =>
-  request<{ shipping_profiles: VendorShippingProfile[] }>(
+export const listVendorShippingProfiles = (params?: {
+  limit?: number
+  offset?: number
+  q?: string
+  name?: string
+  type?: string
+  created_at_gte?: string
+  updated_at_gte?: string
+  order?: string
+}) =>
+  request<{ shipping_profiles: VendorShippingProfile[]; count?: number }>(
     "shipping-profiles",
-    {}
+    params || {}
   )
 
 export const createVendorShippingProfile = (body: {
@@ -2314,6 +2373,82 @@ export const createVendorShippingProfile = (body: {
     "shipping-profiles",
     "POST",
     body
+  )
+
+export const deleteVendorShippingProfile = (id: string) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(
+    `shipping-profiles/${id}`,
+    "DELETE"
+  )
+
+/* ---------------------------------------------------- shipping option types */
+
+export type VendorShippingOptionType = {
+  id: string
+  label: string
+  code: string
+  description?: string | null
+  created_at: string
+  updated_at?: string
+}
+
+export const listVendorShippingOptionTypes = (params?: {
+  limit?: number
+  offset?: number
+  q?: string
+  label?: string
+  code?: string
+  created_at_gte?: string
+  updated_at_gte?: string
+  order?: string
+}) =>
+  request<{ shipping_option_types: VendorShippingOptionType[]; count?: number }>(
+    "shipping-option-types",
+    (params || {}) as Record<string, string | number | undefined>
+  )
+
+export const getVendorShippingOptionType = async (id: string) => {
+  const res = await fetch(`/api/vendors/shipping-option-types/${id}`, {
+    headers: { accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? `Request failed with ${res.status}`)
+  }
+
+  return (await res.json()) as { shipping_option_type: VendorShippingOptionType }
+}
+
+export const createVendorShippingOptionType = (body: {
+  label: string
+  code: string
+  description?: string
+}) =>
+  mutate<{ shipping_option_type: VendorShippingOptionType }>(
+    "shipping-option-types",
+    "POST",
+    body
+  )
+
+export const updateVendorShippingOptionType = (
+  id: string,
+  body: {
+    label?: string
+    code?: string
+    description?: string
+  }
+) =>
+  mutate<{ shipping_option_type: VendorShippingOptionType }>(
+    `shipping-option-types/${id}`,
+    "POST",
+    body
+  )
+
+export const deleteVendorShippingOptionType = (id: string) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(
+    `shipping-option-types/${id}`,
+    "DELETE"
   )
 
 /* --------------------------------------------------------- sales channels */
@@ -2336,7 +2471,9 @@ export const listVendorSalesChannels = (params: {
   offset: number
   q?: string
   order?: string
-  status?: "all" | "enabled" | "disabled"
+  status?: string
+  created_at_gte?: string
+  updated_at_gte?: string
 }) =>
   request<ListResponse<{ sales_channels: VendorSalesChannel[] }>>(
     "sales-channels",
@@ -2417,7 +2554,9 @@ export const listVendorProductTypes = (params: {
   offset: number
   q?: string
   order?: string
+  status?: string
   created_at_gte?: string
+  updated_at_gte?: string
 }) =>
   request<ListResponse<{ product_types: VendorProductTypeItem[] }>>(
     "product-types",
@@ -2516,6 +2655,10 @@ export const listVendorApiKeys = (params: {
   offset: number
   type?: "publishable" | "secret"
   q?: string
+  order?: string
+  created_at_gte?: string
+  updated_at_gte?: string
+  revoked_at?: string
 }) =>
   request<ListResponse<{ api_keys: VendorApiKey[] }>>(
     "api-keys",
@@ -2969,5 +3112,38 @@ export const getVendorWorkflowExecution = (id: string) =>
   request<{ workflow_execution: VendorWorkflowExecution }>(
     `workflow-executions/${id}`,
     {}
+  )
+
+/* ---------------------------------------------------------------- currencies */
+
+export type VendorCurrency = {
+  code: string
+  name: string
+  symbol: string
+  is_default: boolean
+  is_tax_inclusive: boolean
+}
+
+export const listVendorCurrencies = () =>
+  request<{ currencies: VendorCurrency[] }>("currencies", {})
+
+export const addVendorCurrency = (body: {
+  code: string
+  is_default?: boolean
+  is_tax_inclusive?: boolean
+}) => mutate<{ currency: VendorCurrency }>("currencies", "POST", body)
+
+export const updateVendorCurrency = (
+  code: string,
+  body: {
+    is_default?: boolean
+    is_tax_inclusive?: boolean
+  }
+) => mutate<{ currency: VendorCurrency }>(`currencies/${code}`, "PATCH", body)
+
+export const deleteVendorCurrency = (code: string) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(
+    `currencies/${code}`,
+    "DELETE"
   )
 

@@ -164,9 +164,4 @@ const VenuesPage = () => {
   )
 }
 
-export const config = defineRouteConfig({
-  label: "Venues",
-  icon: Buildings,
-})
-
 export default VenuesPage

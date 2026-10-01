@@ -108,7 +108,7 @@ export const useGlobalShortcuts = (): Shortcut[] => {
         to: "/settings",
       },
       {
-        keys: { Mac: ["G", ",", "M"] },
+        keys: { Mac: ["G", ",", "N"] },
         label: "Profile",
         type: "settingShortcut",
         to: "/settings/profile",
@@ -120,7 +120,7 @@ export const useGlobalShortcuts = (): Shortcut[] => {
         to: "/settings/locations",
       },
       {
-        keys: { Mac: ["G", ",", "R"] },
+        keys: { Mac: ["G", ",", "M"] },
         label: "Return Reasons",
         type: "settingShortcut",
         to: "/settings/return-reasons",
@@ -132,6 +132,54 @@ export const useGlobalShortcuts = (): Shortcut[] => {
         to: "/settings/refund-reasons",
       },
       {
+        keys: { Mac: ["G", ",", "P"] },
+        label: "Product Types",
+        type: "settingShortcut",
+        to: "/settings/product-types",
+      },
+      {
+        keys: { Mac: ["G", ",", "J"] },
+        label: "Publishable API Keys",
+        type: "settingShortcut",
+        to: "/settings/publishable-api-keys",
+      },
+      {
+        keys: { Mac: ["G", ",", "R"] },
+        label: "Regions",
+        type: "settingShortcut",
+        to: "/settings/regions",
+      },
+      {
+        keys: { Mac: ["G", ",", "A"] },
+        label: "Sales Channels",
+        type: "settingShortcut",
+        to: "/settings/sales-channels",
+      },
+      {
+        keys: { Mac: ["G", ",", "K"] },
+        label: "Secret API Keys",
+        type: "settingShortcut",
+        to: "/settings/secret-api-keys",
+      },
+      {
+        keys: { Mac: ["G", ",", "S"] },
+        label: "Store",
+        type: "settingShortcut",
+        to: "/settings/store",
+      },
+      {
+        keys: { Mac: ["G", ",", "T"] },
+        label: "Tax Regions",
+        type: "settingShortcut",
+        to: "/settings/tax-regions",
+      },
+      {
+        keys: { Mac: ["G", ",", "U"] },
+        label: "Users",
+        type: "settingShortcut",
+        to: "/settings/users",
+      },
+      {
         keys: { Mac: ["G", ",", "W"] },
         label: "Workflows",
         type: "settingShortcut",
@@ -141,7 +189,7 @@ export const useGlobalShortcuts = (): Shortcut[] => {
       // Commands
       {
         keys: { Mac: ["B", "Y", "E"] },
-        label: "Log out",
+        label: "Logout",
         type: "commandShortcut",
         callback: handleLogout,
       },
