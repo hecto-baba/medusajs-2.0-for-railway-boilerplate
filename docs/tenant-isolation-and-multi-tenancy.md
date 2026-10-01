@@ -1,6 +1,6 @@
 # Tenant Isolation and Multi-Tenancy Plan
 
-Status: Phases 0 and 1 complete; Phase 2 code complete, verification and rollout pending (see section 11). Branch: `feature/tenant-isolation` (off `feature/marketplace`).
+Status: Phases 0 and 1 complete; Phases 2 and 3 code complete and automatically tested (32/32 spec files); browser checks, QA rollout, ledger screens and owner decisions pending (see sections 11.5 and 12.8). Branch: `feature/tenant-isolation` (off `feature/marketplace`).
 Scope: the seller (vendor) API `backend/src/api/vendors/**`, the seller panel `sellers/`, and bringing the missing admin features to sellers.
 Out of scope: Vendor Transactions (stays admin-only), drivers, and the admin API / store routes (see "What this plan does not cover").
 
@@ -541,3 +541,34 @@ Also tested (`complete-all-features.spec.ts`, `complete-all-bookings.spec.ts`, `
 - `GET /store/orders/:id` and the new `/seller-orders` take an order id with no customer check (the existing route already worked this way, for guest confirmation pages).
 - Ledger amounts are decimal floats in the order currency.
 - A child order that cannot be cancelled (already fulfilled) when its parent is cancelled is logged and left for a person.
+
+### 12.8 Pending in Phase 3 (checklist)
+
+Phase 3 is code complete and passes its automated tests (32 of 32 spec files, 12 unit tests, typechecks clean). It is **not closed**. This is what remains. It is not testing only: item A is work still to be built.
+
+**A. Code still to be written**
+- [ ] Admin screen for the payout ledger: list entries by seller and status, mark paid (with a bank reference) or void. Today only the API exists (`GET /admin/vendor-payouts`, `POST /admin/vendor-payouts/:id`).
+- [ ] Seller screen for earnings: entries and totals by status. Today only `GET /vendors/payouts` exists.
+- [ ] Restaurant delivery orders: the delivery module's second order is marked `delivery_order` but is still unpaid and linked to no seller. Planned for Phase 5 (restaurants), listed here so it is not lost.
+
+**B. Testing still to be done**
+- [ ] Run the storefront checkout in a browser with a two-seller cart, then the confirmation page and the account order page ("Shipped by" block).
+- [ ] Check the buyer confirmation email with a real email provider (the test setup has none; the handler is unchanged and sends once, from the parent).
+- [ ] Test the seller order list on split orders when free-text search is combined with a payment-status filter (the in-memory path).
+- [ ] Run a real two-seller purchase on QA, including a rental or a ticket.
+- [ ] Re-run the full suite after any change from A.
+
+**C. Rollout (needs owner action)**
+- [ ] `medusa db:migrate`: creates `vendor_order_split` (20261001140000) and adds the missing `quote.metadata` column (20261001150000, idempotent).
+- [ ] Deploy the storefront together with the backend: it now calls `POST /store/carts/:id/complete-all`.
+- [ ] Orders placed before the release are not split; they keep the Phase 1 handling (`is_mixed` flag and note).
+- [ ] The Phase 2 items in 11.5 (QA login, backfill, decisions) still apply.
+
+**D. Decisions for the owner**
+- [ ] Accept keeping payment, emails, tickets, rentals and bookings on the PARENT order, with sellers reaching them through their child order. The original gate wording was "land on the right child".
+- [ ] Ledger amounts are stored as decimal numbers in the order currency. Say so if whole minor units are wanted instead.
+- [ ] `GET /store/orders/:id` and `/seller-orders` take an order id with no customer check (the existing route already did, for guest confirmation pages). Decide whether to require the buyer's session.
+
+**E. Left for Phase 4 on purpose**
+- Refunds and returns against a child order (the ledger entry is only voided on cancel today).
+- Seller fulfilment, shipment and delivery from the seller panel (the rental activation on shipment is already wired and tested).
