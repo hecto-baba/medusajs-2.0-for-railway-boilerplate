@@ -30,14 +30,14 @@ const REVIEWED_SAFE: Record<string, string> = {
     "reads and writes only the calling vendor's own metadata.currencies key",
   "team/invites/[id]/route.ts":
     "SQL is constrained to metadata->>'vendor_id' of the calling vendor",
+  "products/import/[transaction_id]/confirm/route.ts":
+    "legacy alias: a re-export of imports/[transaction_id]/confirm, which checks the import belongs to the seller",
   "categories/[id]/route.ts":
     "shared taxonomy by design; its write handlers are 403 stubs",
 }
 
 const BACKLOG: string[] = [
   "layouts/[zone]/configuration/route.ts",
-  "products/import/[transaction_id]/confirm/route.ts",
-  "products/imports/[transaction_id]/confirm/route.ts",
   "tax-regions/[id]/route.ts",
   "workflow-executions/[id]/route.ts",
 ]

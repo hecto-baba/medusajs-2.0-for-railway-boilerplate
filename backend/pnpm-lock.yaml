@@ -75,6 +75,9 @@ importers:
       '@tanstack/react-query':
         specifier: 5.64.2
         version: 5.64.2(react@18.3.1)
+      csv-parse:
+        specifier: 5.6.0
+        version: 5.6.0
       json-2-csv:
         specifier: ^5.6.0
         version: 5.6.0
