@@ -1,6 +1,7 @@
 import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { MedusaError } from "@medusajs/framework/utils"
 import { getVisibleIds, ScopedEntity } from "./platform-scope"
+import { assertCategoriesAssignable } from "./category-scope"
 
 /**
  * A product body may reference a type and tags by id. A seller may only point at
@@ -18,8 +19,15 @@ export const PRODUCT_TAGS: ScopedEntity = {
   entity: "product_tag",
 }
 
+export const PRODUCT_COLLECTIONS: ScopedEntity = {
+  linkField: "product_collections",
+  entity: "product_collection",
+}
+
 type ProductReferenceBody = {
   type_id?: string | null
+  collection_id?: string | null
+  categories?: Array<{ id?: string } | string> | null
   tags?: Array<{ id?: string } | string> | null
 } | null | undefined
 
@@ -32,10 +40,21 @@ export const assertVendorCanUseProductReferences = async (
 ): Promise<void> => {
   const typeIds = new Set<string>()
   const tagIds = new Set<string>()
+  const collectionIds = new Set<string>()
+  const categoryIds = new Set<string>()
 
   for (const body of bodies) {
     if (body?.type_id) {
       typeIds.add(body.type_id)
+    }
+    if (body?.collection_id) {
+      collectionIds.add(body.collection_id)
+    }
+    for (const category of body?.categories ?? []) {
+      const id = tagIdOf(category)
+      if (id) {
+        categoryIds.add(id)
+      }
     }
     for (const tag of body?.tags ?? []) {
       const id = tagIdOf(tag)
@@ -54,6 +73,18 @@ export const assertVendorCanUseProductReferences = async (
       }
     }
   }
+
+  if (collectionIds.size) {
+    const { owned, platform } = await getVisibleIds(req, PRODUCT_COLLECTIONS)
+    const visible = new Set([...owned, ...platform])
+    for (const id of collectionIds) {
+      if (!visible.has(id)) {
+        throw new MedusaError(MedusaError.Types.NOT_FOUND, "Collection not found.")
+      }
+    }
+  }
+
+  await assertCategoriesAssignable(req, Array.from(categoryIds))
 
   if (tagIds.size) {
     const { owned, platform } = await getVisibleIds(req, PRODUCT_TAGS)

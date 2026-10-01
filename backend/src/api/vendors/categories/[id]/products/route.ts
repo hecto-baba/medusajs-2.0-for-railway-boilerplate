@@ -5,6 +5,7 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { batchLinkProductsToCategoryWorkflow } from "@medusajs/medusa/core-flows"
+import { assertCategoriesAssignable } from "../../../shared/category-scope"
 
 export const ManageCategoryProductsSchema = z.object({
   add: z.array(z.string()).optional(),
@@ -17,6 +18,8 @@ export const POST = async (
 ) => {
   const categoryId = req.params.id
   const { add = [], remove = [] } = req.validatedBody
+
+  await assertCategoriesAssignable(req, [categoryId])
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   // Verify vendor ownership of the products being added/removed

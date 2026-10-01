@@ -88,6 +88,7 @@ export const GET = async (
       "updated_at",
     ],
     filters: {
+      is_internal: false,
       ...(q ? { name: { $ilike: `%${q}%` } } : {}),
       ...(parent_category_id !== undefined ? { parent_category_id } : {}),
     },
@@ -108,8 +109,10 @@ export const GET = async (
     const matchingProducts = (cat.products || []).filter((p: any) =>
       vendorProductIds.has(p.id)
     )
+    // Drop the raw product list: it held every seller's product ids.
+    const { products: _allProducts, ...rest } = cat
     return {
-      ...cat,
+      ...rest,
       products_count: matchingProducts.length,
       is_vendor_owned: vendorCategoryIds.has(cat.id),
     }
