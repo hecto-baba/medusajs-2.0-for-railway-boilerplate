@@ -5,6 +5,12 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { createVendorSalesChannelWorkflow } from "../../../workflows/create-vendor-sales-channel"
+import { getVisibleIds, ScopedEntity } from "../shared/platform-scope"
+
+const SALES_CHANNELS: ScopedEntity = {
+  linkField: "sales_channels",
+  entity: "sales_channel",
+}
 
 export const GetVendorSalesChannelsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -68,7 +74,17 @@ export const GET = async (
     }
   }
 
-  const filters: Record<string, any> = {}
+  // Own channels plus shared platform channels. Never another seller's.
+  const { owned, platform } = await getVisibleIds(req, SALES_CHANNELS)
+  const visibleIds = [...owned, ...platform]
+
+  // An empty id list means "no constraint" downstream, so answer directly.
+  if (!visibleIds.length) {
+    res.json({ sales_channels: [], count: 0, limit, offset })
+    return
+  }
+
+  const filters: Record<string, any> = { id: visibleIds }
   if (q) {
     filters.$or = [
       { name: { $ilike: `%${q}%` } },

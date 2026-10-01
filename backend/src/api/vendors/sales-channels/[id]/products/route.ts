@@ -5,6 +5,12 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { linkProductsToSalesChannelWorkflow } from "@medusajs/medusa/core-flows"
+import { assertVendorCanSee, ScopedEntity } from "../../../shared/platform-scope"
+
+const SALES_CHANNELS: ScopedEntity = {
+  linkField: "sales_channels",
+  entity: "sales_channel",
+}
 
 export const ManageSalesChannelProductsSchema = z.object({
   add: z.array(z.string()).optional(),
@@ -17,6 +23,10 @@ export const POST = async (
 ) => {
   const channelId = req.params.id
   const { add = [], remove = [] } = req.validatedBody
+
+  // The seller may place their own products in their own channel or a shared
+  // platform channel, never in another seller's.
+  await assertVendorCanSee(req, SALES_CHANNELS, channelId, "Sales channel not found.")
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   const {
