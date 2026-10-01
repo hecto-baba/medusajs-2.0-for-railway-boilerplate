@@ -21,7 +21,7 @@ export const getProductsById = cache(async function ({
       query: {
         id: ids,
         region_id: regionId,
-        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,*variants.digital_product",
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,+variants.digital_product",
       },
       ...(await getCacheDirectives("products")),
     })
@@ -38,7 +38,7 @@ export const getProductByHandle = cache(async function (
       query: {
         handle,
         region_id: regionId,
-        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,*variants.digital_product",
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,+variants.digital_product",
       },
       ...(await getCacheDirectives("products")),
     })
@@ -76,7 +76,7 @@ export const getProductsList = cache(async function ({
         limit,
         offset,
         region_id: region.id,
-        fields: "*variants.calculated_price,*variants.digital_product",
+        fields: "*variants.calculated_price,+variants.digital_product",
         ...queryParams,
       },
       ...(await getCacheDirectives("products")),
