@@ -1,31 +1,29 @@
 import { medusaIntegrationTestRunner } from "@medusajs/test-utils"
+import { Modules } from "@medusajs/framework/utils"
 import { call, createTestVendor, TestVendor } from "../helpers/vendors"
 
-// The runner creates and migrates a throwaway database before the first test;
-// over a remote server that alone can take minutes.
+// The runner creates and migrates a throwaway database before the first test.
 jest.setTimeout(15 * 60 * 1000)
 
 /**
  * Phase 1, step 3 of docs/tenant-isolation-and-multi-tenancy.md.
  *
- * A seller who types another seller's stock location id by hand must get 404
- * on read, update and delete, and must never see it in a list.
- *
- * STATUS: written against the current routes, which are KNOWN UNSAFE
- * (stock-locations/[id] has no ownership check and the list falls back to every
- * location). These tests are expected to FAIL until the Phase 1 step 3 fix, and
- * they need a Postgres server (see DB_* variables in
- * node_modules/@medusajs/test-utils/dist/database.js). Not yet run.
+ * A seller sees and uses their OWN locations plus shared PLATFORM locations
+ * (linked to no seller). They can edit and delete only their own. Another
+ * seller's location answers 404 on read, update and delete and is never listed.
  */
 medusaIntegrationTestRunner({
   inApp: true,
-  testSuite: ({ api }) => {
+  testSuite: ({ api, getContainer }) => {
     describe("seller isolation: stock locations", () => {
       let sellerA: TestVendor
       let sellerB: TestVendor
       let sellerWithNothing: TestVendor
       let locationA: string
       let locationB: string
+      let platformLocation: string
+
+      const stockLocationModule = () => getContainer().resolve(Modules.STOCK_LOCATION) as any
 
       const newLocation = (name: string) => ({
         name,
@@ -41,6 +39,10 @@ medusaIntegrationTestRunner({
         const b = await api.post("/vendors/stock-locations", newLocation("B warehouse"), sellerB.headers)
         locationA = a.data.stock_location.id
         locationB = b.data.stock_location.id
+
+        // A location that belongs to no seller.
+        const platform = await stockLocationModule().createStockLocations({ name: "Platform warehouse" })
+        platformLocation = platform.id
       })
 
       it("a seller can read, update and delete their own location", async () => {
@@ -51,6 +53,10 @@ medusaIntegrationTestRunner({
           api.post(`/vendors/stock-locations/${locationA}`, { name: "A warehouse renamed" }, sellerA.headers)
         )
         expect(update.status).toBe(200)
+
+        const extra = await call(api.post("/vendors/stock-locations", newLocation("A throwaway"), sellerA.headers))
+        const del = await call(api.delete(`/vendors/stock-locations/${extra.data.stock_location.id}`, sellerA.headers))
+        expect(del.status).toBe(200)
       })
 
       it("another seller gets 404 reading it", async () => {
@@ -76,17 +82,48 @@ medusaIntegrationTestRunner({
         expect(owner.status).toBe(200)
       })
 
-      it("a list shows only the seller's own locations", async () => {
+      it("a list shows the seller's own and platform locations, never another seller's", async () => {
         const res = await call(api.get("/vendors/stock-locations", sellerA.headers))
         const ids = (res.data.stock_locations ?? []).map((l: any) => l.id)
         expect(ids).toContain(locationA)
+        expect(ids).toContain(platformLocation)
         expect(ids).not.toContain(locationB)
       })
 
-      it("a seller with no locations sees an empty list, not the whole store", async () => {
+      it("a seller with no locations sees only platform locations, not other sellers'", async () => {
         const res = await call(api.get("/vendors/stock-locations", sellerWithNothing.headers))
         expect(res.status).toBe(200)
-        expect(res.data.stock_locations).toEqual([])
+        const ids = (res.data.stock_locations ?? []).map((l: any) => l.id)
+        expect(ids).toEqual([platformLocation])
+      })
+
+      it("a platform location is readable but cannot be edited or deleted by a seller", async () => {
+        const read = await call(api.get(`/vendors/stock-locations/${platformLocation}`, sellerA.headers))
+        expect(read.status).toBe(200)
+
+        const update = await call(
+          api.post(`/vendors/stock-locations/${platformLocation}`, { name: "hijacked" }, sellerA.headers)
+        )
+        expect(update.status).toBe(404)
+
+        const del = await call(api.delete(`/vendors/stock-locations/${platformLocation}`, sellerA.headers))
+        expect(del.status).toBe(404)
+
+        const stored = await stockLocationModule().retrieveStockLocation(platformLocation)
+        expect(stored.name).toBe("Platform warehouse")
+      })
+
+      it("the taxonomy lookup lists the same visible locations only", async () => {
+        const res = await call(api.get("/vendors/taxonomy", sellerA.headers))
+        expect(res.status).toBe(200)
+        const ids = (res.data.stock_locations ?? []).map((l: any) => l.id)
+        expect(ids).toContain(locationA)
+        expect(ids).not.toContain(locationB)
+
+        // The old fallback leaked every location to a seller that owned none.
+        const empty = await call(api.get("/vendors/taxonomy", sellerWithNothing.headers))
+        const emptyIds = (empty.data.stock_locations ?? []).map((l: any) => l.id)
+        expect(emptyIds).toEqual([platformLocation])
       })
     })
   },

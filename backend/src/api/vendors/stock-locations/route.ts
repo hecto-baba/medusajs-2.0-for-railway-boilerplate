@@ -5,6 +5,7 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { createVendorStockLocationWorkflow } from "../../../workflows/create-vendor-stock-location"
+import { getVisibleStockLocations } from "../shared/stock-location-scope"
 
 export const GetVendorStockLocationsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -52,44 +53,13 @@ export const GET = async (
     typeof GetVendorStockLocationsSchema
   >
 
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id", "vendor.stock_locations.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  // Own locations plus shared platform locations. Never another seller's.
+  const { owned, platform } = await getVisibleStockLocations(req)
+  const visibleIds = [...owned, ...platform]
 
-  const vendorLocationIds = (vendorAdmin?.vendor?.stock_locations || [])
-    .map((l: any) => l?.id)
-    .filter(Boolean)
-
-  if (!vendorLocationIds.length) {
-    // If no vendor-specific locations exist yet, retrieve the store's default stock locations
-    const { data: allLocations, metadata } = await query.graph({
-      entity: "stock_location",
-      fields: [
-        "id",
-        "name",
-        "metadata",
-        "created_at",
-        "updated_at",
-        "address.*",
-        "fulfillment_sets.*",
-        "fulfillment_providers.*",
-      ],
-      filters: {
-        ...(q ? { name: { $ilike: `%${q}%` } } : {}),
-      },
-      pagination: { skip: offset, take: limit, order: { created_at: "ASC" } },
-    })
-
-    res.json({
-      stock_locations: allLocations,
-      count: metadata?.count ?? allLocations.length,
-      limit,
-      offset,
-    })
+  // An empty id list means "no constraint" downstream, so answer directly.
+  if (!visibleIds.length) {
+    res.json({ stock_locations: [], count: 0, limit, offset })
     return
   }
 
@@ -106,7 +76,7 @@ export const GET = async (
       "fulfillment_providers.*",
     ],
     filters: {
-      id: vendorLocationIds,
+      id: visibleIds,
       ...(q ? { name: { $ilike: `%${q}%` } } : {}),
     },
     pagination: {

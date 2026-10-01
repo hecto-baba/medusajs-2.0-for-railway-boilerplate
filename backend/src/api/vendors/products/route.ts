@@ -56,11 +56,22 @@ import {
   updateInventoryLevelsWorkflow,
 } from "@medusajs/medusa/core-flows"
 import { ensureVariantInventoryItem, getVendorId } from "./helpers"
+import {
+  assertVendorCanUseStockLocation,
+  getVisibleStockLocations,
+} from "../shared/stock-location-scope"
 
 export const POST = async (
   req: AuthenticatedMedusaRequest<HttpTypes.AdminCreateProduct>,
   res: MedusaResponse
 ) => {
+  const rawBody = ((req as any).body || {}) as any
+
+  // Reject another seller's stock location BEFORE anything is created.
+  if (rawBody.stock_location_id) {
+    await assertVendorCanUseStockLocation(req, rawBody.stock_location_id)
+  }
+
   const { result } = await createVendorProductWorkflow(req.scope).run({
     input: {
       vendor_admin_id: req.auth_context.actor_id,
@@ -68,7 +79,6 @@ export const POST = async (
     },
   })
 
-  const rawBody = ((req as any).body || {}) as any
   const variantsInput = rawBody.variants || (req.validatedBody as any)?.variants || []
 
   // Provision inventory items, remote links, and stocked inventory levels if requested
@@ -77,25 +87,13 @@ export const POST = async (
       const vendorId = await getVendorId(req)
       const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
-      // Resolve target stock location: request explicit override -> vendor's primary location -> store default location
+      // Resolve target stock location: explicit override (already validated
+      // above) -> the seller's own first location -> a shared platform location.
+      // Never another seller's location.
       let stockLocationId: string | undefined = rawBody.stock_location_id
       if (!stockLocationId) {
-        const {
-          data: [vendorAdmin],
-        } = await query.graph({
-          entity: "vendor_admin",
-          fields: ["vendor.id", "vendor.stock_locations.id"],
-          filters: { id: [req.auth_context.actor_id] },
-        })
-        stockLocationId = vendorAdmin?.vendor?.stock_locations?.[0]?.id
-      }
-
-      if (!stockLocationId) {
-        const { data: defaultLocations } = await query.graph({
-          entity: "stock_location",
-          fields: ["id"],
-        })
-        stockLocationId = defaultLocations?.[0]?.id
+        const { owned, platform } = await getVisibleStockLocations(req)
+        stockLocationId = owned[0] ?? platform[0]
       }
 
       for (let i = 0; i < result.product.variants.length; i++) {

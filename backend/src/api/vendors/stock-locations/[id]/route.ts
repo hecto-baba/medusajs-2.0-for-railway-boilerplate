@@ -8,6 +8,10 @@ import {
   updateStockLocationsWorkflow,
   deleteStockLocationsWorkflow,
 } from "@medusajs/medusa/core-flows"
+import {
+  assertVendorCanUseStockLocation,
+  assertVendorOwnsStockLocation,
+} from "../../shared/stock-location-scope"
 
 export const UpdateVendorStockLocationSchema = z.object({
   name: z.string().optional(),
@@ -32,6 +36,8 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const locationId = req.params.id
+
+  await assertVendorCanUseStockLocation(req, locationId)
 
   const { data: locations } = await query.graph({
     entity: "stock_location",
@@ -65,6 +71,8 @@ export const POST = async (
 ) => {
   const locationId = req.params.id
 
+  await assertVendorOwnsStockLocation(req, locationId)
+
   const { result } = await updateStockLocationsWorkflow(req.scope).run({
     input: {
       selector: { id: locationId },
@@ -80,6 +88,8 @@ export const DELETE = async (
   res: MedusaResponse
 ) => {
   const locationId = req.params.id
+
+  await assertVendorOwnsStockLocation(req, locationId)
 
   await deleteStockLocationsWorkflow(req.scope).run({
     input: { ids: [locationId] },

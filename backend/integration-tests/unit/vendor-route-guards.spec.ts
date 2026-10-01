@@ -50,7 +50,6 @@ const BACKLOG: string[] = [
   "sales-channels/[id]/route.ts",
   "shipping-option-types/[id]/route.ts",
   "shipping-profiles/[id]/route.ts",
-  "stock-locations/[id]/route.ts",
   "tax-regions/[id]/route.ts",
   "workflow-executions/[id]/route.ts",
 ]
