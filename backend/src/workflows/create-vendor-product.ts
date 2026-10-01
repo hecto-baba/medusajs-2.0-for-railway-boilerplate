@@ -66,14 +66,24 @@ export const createVendorProductWorkflow = createWorkflow(
       filters: { id: input.vendor_admin_id },
     }).config({ name: "retrieve-vendor-admins" })
 
+    // Build all remote links in a single transform and create them in one step.
+    // createRemoteLinkStep is a named step ("create-remote-links") and Medusa's
+    // workflow SDK does not allow the same step name to appear more than once
+    // in a workflow — calling it twice would crash the server on startup.
     const linksToCreate = transform(
-      { createdProducts, vendorAdmins },
+      { createdProducts, vendorAdmins, shippingProfiles },
       (data) => {
         const vendorId = data.vendorAdmins?.[0]?.vendor?.id
         if (!vendorId) {
           throw new Error("Cannot link product: Authenticated vendor admin profile does not exist.")
         }
-        return data.createdProducts.map((product) => ({
+
+        const resolvedProfileId =
+          data.shippingProfiles?.find((sp: any) => sp.type === "default")?.id ||
+          data.shippingProfiles?.[0]?.id
+
+        // vendor ↔ product links
+        const vendorLinks = data.createdProducts.map((product) => ({
           [MARKETPLACE_MODULE]: {
             vendor_id: vendorId,
           },
@@ -81,6 +91,24 @@ export const createVendorProductWorkflow = createWorkflow(
             product_id: product.id,
           },
         }))
+
+        // product ↔ shipping_profile links
+        // Explicitly creating this link guarantees every vendor product has a
+        // shipping profile in the link table. Without it Medusa rejects the
+        // cart at checkout: "cart items require shipping profiles not satisfied
+        // by current shipping methods".
+        const shippingLinks = resolvedProfileId
+          ? data.createdProducts.map((product) => ({
+              [Modules.PRODUCT]: {
+                product_id: product.id,
+              },
+              [Modules.FULFILLMENT]: {
+                shipping_profile_id: resolvedProfileId,
+              },
+            }))
+          : []
+
+        return [...vendorLinks, ...shippingLinks]
       }
     )
 

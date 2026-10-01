@@ -128,7 +128,7 @@ export type ListResponse<T> = {
 
 const request = async <T>(
   path: string,
-  params: Record<string, string | number | string[] | undefined>
+  params: Record<string, string | number | string[] | undefined> = {}
 ) => {
   const search = new URLSearchParams()
 
@@ -165,8 +165,17 @@ export const listVendorProducts = (params: {
   offset: number
   q?: string
   status?: string[]
+  collection_id?: string | string[]
+  type_id?: string | string[]
+  tag_id?: string | string[]
+  sales_channel_id?: string | string[]
+  created_at_gte?: string
   order?: string
-}) => request<ListResponse<{ products: VendorProduct[] }>>("products", params)
+}) =>
+  request<ListResponse<{ products: VendorProduct[] }>>(
+    "products",
+    params as Record<string, string | number | string[] | undefined>
+  )
 
 /**
  * Starts a CSV export of the vendor's products.
@@ -182,13 +191,6 @@ export const exportVendorProducts = () =>
     {}
   )
 
-/**
- * Uploads a CSV and returns the stored file's key.
- *
- * Import is two steps on purpose, matching the admin: the file is uploaded and
- * parsed first so the vendor sees the create/update counts before anything is
- * written, and nothing is applied until confirmVendorProductImport runs.
- */
 export const uploadVendorImportFile = async (file: File) => {
   const form = new FormData()
   form.append("files", file)
@@ -229,8 +231,19 @@ export const confirmVendorProductImport = (transactionId: string) =>
     {}
   )
 
-export const listVendorOrders = (params: { limit: number; offset: number }) =>
-  request<ListResponse<{ orders: VendorOrder[] }>>("orders", params)
+export const listVendorOrders = (params: {
+  limit: number
+  offset: number
+  q?: string
+  order?: string
+  status?: string
+  payment_status?: string
+  fulfillment_status?: string
+}) =>
+  request<ListResponse<{ orders: VendorOrder[] }>>(
+    "orders",
+    params as Record<string, string | number | undefined>
+  )
 
 export const getVendorOrder = (orderId: string) =>
   request<{ order: VendorOrderDetail }>("orders/" + orderId, {})
@@ -508,6 +521,159 @@ export type VendorTaxonomy = {
  */
 export const getVendorTaxonomy = () => request<VendorTaxonomy>("taxonomy", {})
 
+/* --------------------------------------------------- TrustClaw taxonomy */
+
+export type TrustClawSegment = {
+  id: string
+  name: string
+  code: string
+  type: string
+  orderType?: string
+  description: string | null
+  sortOrder: number
+  isActive: boolean
+  categoryCount: number
+  vendorCategoryCount?: number
+}
+
+export type TrustClawCategory = {
+  id: string
+  name: string
+  code: string
+  description: string | null
+  level: number
+  path: string
+  parentId: string | null
+  hasChildren: boolean
+  childCount: number
+  sortOrder: number
+  segmentId: string
+  segment?: { id: string; name: string; code: string }
+  medusa_id?: string | null
+  children?: TrustClawCategory[]
+}
+
+/**
+ * Fetch all active TrustClaw business segments (e.g. Agriculture, Grocery).
+ * Proxied through Medusa so the API key stays server-side.
+ */
+export const getTrustClawSegments = () =>
+  request<{ segments: TrustClawSegment[] }>("taxonomy/segments", {}).then(
+    (r) => r.segments
+  )
+
+export type TrustClawCategoryQueryParams = {
+  segmentCode?: string
+  segmentId?: string
+  parentId?: string
+  level?: string
+  hasChildren?: string | boolean
+  vendorCategoryId?: string
+  pathPrefix?: string
+  search?: string
+  tree?: string | boolean
+  limit?: string | number
+}
+
+/**
+ * Fetch TrustClaw categories for a given segment or advanced filter criteria.
+ */
+export const getTrustClawCategories = (
+  paramsOrSegmentCode: TrustClawCategoryQueryParams | string,
+  parentId?: string
+) => {
+  const params: Record<string, string | number | undefined> =
+    typeof paramsOrSegmentCode === "string"
+      ? {
+          segmentCode: paramsOrSegmentCode,
+          ...(parentId !== undefined ? { parentId } : {}),
+        }
+      : {
+          segmentCode: paramsOrSegmentCode.segmentCode,
+          segmentId: paramsOrSegmentCode.segmentId,
+          parentId: paramsOrSegmentCode.parentId,
+          level: paramsOrSegmentCode.level,
+          hasChildren:
+            paramsOrSegmentCode.hasChildren !== undefined
+              ? String(paramsOrSegmentCode.hasChildren)
+              : undefined,
+          vendorCategoryId: paramsOrSegmentCode.vendorCategoryId,
+          pathPrefix: paramsOrSegmentCode.pathPrefix,
+          search: paramsOrSegmentCode.search,
+          tree:
+            paramsOrSegmentCode.tree !== undefined
+              ? String(paramsOrSegmentCode.tree)
+              : undefined,
+          limit: paramsOrSegmentCode.limit,
+        }
+
+  return request<{ categories: TrustClawCategory[] }>(
+    "taxonomy/tc-categories",
+    params
+  ).then((r) => r.categories)
+}
+
+export type TrustClawVendorType = {
+  id: string
+  name: string
+  code: string
+  description: string | null
+  sortOrder: number
+  isActive: boolean
+  vendorCategoryCount: number
+}
+
+export type TrustClawVendorCategory = {
+  id: string
+  name: string
+  code: string
+  description: string | null
+  level: number
+  path: string
+  parentId: string | null
+  hasChildren: boolean
+  childCount: number
+  sortOrder: number
+  onboardingMode: string
+  vendorTypeId: string
+  commissionPct: number
+  commissionFlat: number
+  isActive: boolean
+  segment?: { id: string; name: string; code: string }
+  vendorType?: { id: string; name: string; code: string }
+}
+
+/**
+ * Fetch vendor transaction types (ORDER, BOOKING, RENTAL, etc.).
+ */
+export const getTrustClawVendorTypes = (params: {
+  segmentCode?: string
+  segmentId?: string
+  search?: string
+} = {}) =>
+  request<{ vendor_types: TrustClawVendorType[] }>(
+    "taxonomy/vendor-types",
+    params
+  ).then((r) => r.vendor_types)
+
+/**
+ * Fetch vendor store classifications.
+ */
+export const getTrustClawVendorCategories = (params: {
+  segmentCode?: string
+  segmentId?: string
+  vendorTypeCode?: string
+  vendorTypeId?: string
+  status?: string
+  level?: string
+  parentId?: string
+  search?: string
+} = {}) =>
+  request<{ vendor_categories: TrustClawVendorCategory[] }>(
+    "taxonomy/vendor-categories",
+    { status: "ALL", ...params }
+  ).then((r) => r.vendor_categories)
+
 /* ---------------------------------------------------------- return reasons */
 
 export type VendorReturnReason = {
@@ -522,10 +688,12 @@ export type VendorReturnReason = {
 export const listVendorReturnReasons = (params: {
   limit: number
   offset: number
+  q?: string
+  order?: string
 }) =>
   request<ListResponse<{ return_reasons: VendorReturnReason[] }>>(
     "return-reasons",
-    params
+    params as Record<string, string | number | undefined>
   )
 
 export const createVendorReturnReason = (body: {
@@ -544,6 +712,9 @@ export const updateVendorReturnReason = (
     body
   )
 
+export const getVendorReturnReason = (id: string) =>
+  request<{ return_reason: VendorReturnReason }>(`return-reasons/${id}`)
+
 export const deleteVendorReturnReason = (id: string) =>
   mutate<{ id: string; deleted: boolean }>(`return-reasons/${id}`, "DELETE")
 
@@ -553,6 +724,7 @@ export type VendorRefundReason = {
   id: string
   label: string
   code: string
+  description?: string | null
   created_at: string
   updated_at: string
 }
@@ -560,11 +732,16 @@ export type VendorRefundReason = {
 export const listVendorRefundReasons = (params: {
   limit: number
   offset: number
+  q?: string
+  order?: string
 }) =>
   request<ListResponse<{ refund_reasons: VendorRefundReason[] }>>(
     "refund-reasons",
-    params
+    params as Record<string, string | number | undefined>
   )
+
+export const getVendorRefundReason = (id: string) =>
+  request<{ refund_reason: VendorRefundReason }>(`refund-reasons/${id}`)
 
 export const createVendorRefundReason = (body: {
   label: string
@@ -834,11 +1011,12 @@ export const listVendorReservations = (params: {
   q?: string
   inventory_item_id?: string | string[]
   location_id?: string | string[]
+  created_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ reservations: VendorReservation[] }>>(
     "reservations",
-    params
+    params as Record<string, string | number | string[] | undefined>
   )
 
 export const getVendorReservation = async (id: string) => {
@@ -923,7 +1101,7 @@ export const setVendorVariantImages = (
  */
 export type VendorPromotionRule = {
   id?: string
-  attribute: "product"
+  attribute: "product" | "customer_group_id" | "customer_group"
   operator: "eq" | "in"
   values: string[]
 }
@@ -961,6 +1139,8 @@ export const listVendorPromotions = (params: {
   offset: number
   q?: string
   status?: string[]
+  type?: string[]
+  created_at_gte?: string
   order?: string
 }) => request<ListResponse<{ promotions: VendorPromotion[] }>>("promotions", params)
 
@@ -989,7 +1169,7 @@ export const deleteVendorPromotion = (id: string) =>
   mutate<{ id: string; deleted: boolean }>(`promotions/${id}`, "DELETE")
 
 /**
- * Replaces a promotion's target_rules or buy_rules in one call.
+ * Replaces a promotion's rules, target_rules or buy_rules in one call.
  *
  * The envelope is add/remove/update rather than create/delete/update -
  * matching batchVendorOptions, and the shape Medusa's own batch rule
@@ -997,9 +1177,9 @@ export const deleteVendorPromotion = (id: string) =>
  */
 export const batchVendorPromotionRules = (
   promotionId: string,
-  ruleType: "target-rules" | "buy-rules",
+  ruleType: "rules" | "target-rules" | "buy-rules",
   body: {
-    create?: { attribute: "product"; operator: "eq" | "in"; values: string[] }[]
+    create?: { attribute: string; operator: "eq" | "in"; values: string[] }[]
     update?: { id: string; values?: string[] }[]
     delete?: string[]
   }
@@ -1016,6 +1196,7 @@ export type VendorCampaignBudget = {
   type: "usage" | "spend"
   limit?: number | null
   currency_code?: string | null
+  attribute?: "customer_id" | "customer_email" | null
 }
 
 export type VendorCampaign = {
@@ -1034,6 +1215,7 @@ export const listVendorCampaigns = (params: {
   limit: number
   offset: number
   q?: string
+  order?: string
 }) => request<ListResponse<{ campaigns: VendorCampaign[] }>>("campaigns", params)
 
 export const getVendorCampaign = async (id: string) => {
@@ -1128,6 +1310,7 @@ export const listVendorCustomers = (params: {
   offset: number
   q?: string
   has_account?: boolean | string
+  created_at_gte?: string
   order?: string
 }) => {
   const queryParams: Record<string, string | number | string[] | undefined> = {
@@ -1138,6 +1321,7 @@ export const listVendorCustomers = (params: {
       typeof params.has_account === "boolean"
         ? String(params.has_account)
         : params.has_account,
+    created_at_gte: params.created_at_gte,
     order: params.order,
   }
   return request<ListResponse<{ customers: VendorCustomer[] }>>(
@@ -1234,11 +1418,12 @@ export const listVendorCustomerGroups = (params: {
   limit: number
   offset: number
   q?: string
+  created_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ customer_groups: VendorCustomerGroup[] }>>(
     "customer-groups",
-    params
+    params as Record<string, string | number | string[] | undefined>
   )
 
 export const getVendorCustomerGroup = async (id: string) => {
@@ -1335,6 +1520,7 @@ export const listVendorPriceLists = (params: {
   q?: string
   status?: string | string[]
   type?: string | string[]
+  created_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ price_lists: VendorPriceList[] }>>(
@@ -1898,6 +2084,8 @@ export const listVendorDraftOrders = (params: {
   offset: number
   q?: string
   order?: string
+  created_at_gte?: string
+  currency_code?: string
 }) =>
   request<ListResponse<{ draft_orders: VendorDraftOrder[] }>>(
     "draft-orders",
@@ -1944,6 +2132,7 @@ export const listVendorTeam = (params: {
   limit: number
   offset: number
   q?: string
+  order?: string
 }) =>
   request<ListResponse<{ members: VendorTeamMember[] }>>(
     "team",
@@ -1980,6 +2169,35 @@ export const updateVendorMember = (
 export const deleteVendorMember = (id: string) =>
   mutate<{ id: string; object: "vendor_admin"; deleted: boolean }>(
     `team/${id}`,
+    "DELETE"
+  )
+
+export type VendorInvite = {
+  id: string
+  email: string
+  token: string
+  expires_at: string
+  created_at: string
+  first_name?: string | null
+  last_name?: string | null
+  status: "pending" | "expired"
+}
+
+export const listVendorInvites = () =>
+  request<{ invites: VendorInvite[] }>("team/invites", {})
+
+export const createVendorInvite = (body: {
+  email: string
+  first_name?: string
+  last_name?: string
+}) => mutate<{ invite: VendorInvite }>("team/invites", "POST", body)
+
+export const resendVendorInvite = (id: string) =>
+  mutate<{ invite: VendorInvite }>(`team/invites/${id}`, "POST", {})
+
+export const revokeVendorInvite = (id: string) =>
+  mutate<{ id: string; object: "invite"; deleted: boolean }>(
+    `team/invites/${id}`,
     "DELETE"
   )
 
@@ -2117,6 +2335,8 @@ export const listVendorSalesChannels = (params: {
   limit: number
   offset: number
   q?: string
+  order?: string
+  status?: "all" | "enabled" | "disabled"
 }) =>
   request<ListResponse<{ sales_channels: VendorSalesChannel[] }>>(
     "sales-channels",
@@ -2196,6 +2416,8 @@ export const listVendorProductTypes = (params: {
   limit: number
   offset: number
   q?: string
+  order?: string
+  created_at_gte?: string
 }) =>
   request<ListResponse<{ product_types: VendorProductTypeItem[] }>>(
     "product-types",
@@ -2333,8 +2555,58 @@ export type VendorRegion = {
   updated_at?: string
 }
 
-export const listVendorRegions = () =>
-  request<{ regions: VendorRegion[] }>("regions", {})
+export const listVendorRegions = (
+  params: {
+    q?: string
+    currency_code?: string
+    order?: string
+  } = {}
+) => request<{ regions: VendorRegion[] }>("regions", params)
+
+export const createVendorRegion = (body: {
+  name: string
+  currency_code: string
+  countries: string[]
+  payment_providers?: string[]
+}) => mutate<{ region: VendorRegion }>("regions", "POST", body)
+
+/* ----------------------------------------------------------- tax regions */
+
+export type VendorTaxRegion = {
+  id: string
+  country_code: string
+  province_code: string | null
+  provider_id: string
+  created_at: string
+  updated_at?: string
+  rate: string
+  raw_rate?: number | null
+  rate_name?: string
+  rate_code?: string
+}
+
+export const listVendorTaxRegions = (
+  params: { q?: string; order?: string } = {}
+) => request<{ tax_regions: VendorTaxRegion[] }>("tax-regions", params)
+
+export const createVendorTaxRegion = (body: {
+  country_code: string
+  rate?: number
+  name?: string
+  code?: string
+}) => mutate<{ tax_region: VendorTaxRegion }>("tax-regions", "POST", body)
+
+export const updateVendorTaxRate = (
+  id: string,
+  body: { rate: number; name?: string; code?: string }
+) =>
+  mutate<{ tax_region_id: string; rate: number }>(`tax-regions/${id}`, "POST", body)
+
+export const deleteVendorTaxRegion = (id: string) =>
+  mutate<{ id: string; object: "tax_region"; deleted: boolean }>(
+    `tax-regions/${id}`,
+    "DELETE"
+  )
 
 /* ---------------------------------------------------------- appointments */
 
@@ -2479,6 +2751,223 @@ export const searchVendor = (params: {
   entity?: string | string[]
 }) => request<VendorSearchResponse>("search", params)
 
+/* ------------------------------------------------------------- onboarding */
 
+export type VendorOnboardingStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "UNDER_REVIEW"
+  | "APPROVED"
+  | "REJECTED"
 
+export type VendorOnboardingStepName =
+  | "SEGMENT_SELECTION"
+  | "IDENTITY"
+  | "LOCATION"
+  | "OPERATIONS"
+  | "CONTACT"
+  | "KYC"
+  | "SHOWCASE"
+  | "REVIEW"
+  | "SUBMITTED"
+
+export type VendorOnboardingData = {
+  status: VendorOnboardingStatus
+  currentStep: VendorOnboardingStepName | string
+  completedSteps: (VendorOnboardingStepName | string)[]
+  vendorId?: string
+  segmentId?: string | null
+  vendorTypeId?: string | null
+  vendorCategoryId?: string | null
+  segment?: { id: string; name: string; code: string } | null
+  vendorType?: { id: string; name: string; code: string } | null
+  vendorCategory?: { id: string; name: string; code: string } | null
+  rejectionReason?: string | null
+  feedback?: string | null
+  submittedAt?: string | null
+  reviewedAt?: string | null
+  canEdit?: boolean
+}
+
+export type VendorQuestionFieldType =
+  | "TEXT"
+  | "TEXTAREA"
+  | "SELECT"
+  | "MULTI_SELECT"
+  | "RADIO"
+  | "FILE_UPLOAD"
+  | "NUMBER"
+  | "BOOLEAN"
+  | "DATE"
+  | "LOCATION_GEO"
+  | "ADDRESS"
+  | "EMAIL"
+  | "PHONE"
+  | "OPERATING_HOURS"
+  | "IMAGE"
+  | string
+
+export type VendorQuestionOption = {
+  label: string
+  value: string
+  description?: string
+}
+
+export type VendorQuestionField = {
+  id: string
+  name: string
+  key?: string
+  label: string
+  description?: string | null
+  helpText?: string | null
+  type: VendorQuestionFieldType
+  placeholder?: string | null
+  required: boolean
+  order?: number
+  options?: VendorQuestionOption[] | string
+  minCount?: number
+  maxCount?: number
+  validationRule?: string | null
+  dependsOn?: { field: string; value: string | boolean } | null
+  defaultValue?: unknown
+}
+
+export type VendorQuestionSet = {
+  id?: string
+  step: VendorOnboardingStepName | string
+  title: string
+  subtitle?: string | null
+  description?: string | null
+  version?: number
+  questions?: VendorQuestionField[]
+  fields: VendorQuestionField[]
+}
+
+export type SaveVendorOnboardingStepPayload = {
+  step: VendorOnboardingStepName | string
+  answers: Record<string, unknown>
+  segmentId?: string
+  vendorTypeId?: string
+  vendorCategoryId?: string
+  segment?: { id: string; name: string; code: string }
+  vendorType?: { id: string; name: string; code: string }
+  vendorCategory?: { id: string; name: string; code: string }
+}
+
+export type SaveVendorOnboardingStepResult = {
+  success: boolean
+  savedStep: string
+  nextStep?: string
+  completedSteps: string[]
+}
+
+export type SubmitVendorOnboardingResult = {
+  success: boolean
+  status: VendorOnboardingStatus
+  submittedAt: string
+}
+
+export type VendorOnboardingAnswersResponse = {
+  vendorId: string
+  status: VendorOnboardingStatus
+  segmentId?: string | null
+  vendorTypeId?: string | null
+  vendorCategoryId?: string | null
+  answers: Record<string, Record<string, unknown>>
+  completedSteps: string[]
+  rejectionReason?: string | null
+  feedback?: string | null
+}
+
+export const getVendorOnboardingStatus = () =>
+  request<{ onboarding: VendorOnboardingData }>("onboarding/status", {})
+
+export const getVendorOnboardingQuestions = (
+  params: {
+    vendorCategoryId?: string
+    step?: string
+    segmentId?: string
+    vendorTypeId?: string
+  } = {}
+) =>
+  request<{ questions: VendorQuestionSet[] }>("onboarding/questions", params)
+
+export const saveVendorOnboardingStep = (
+  payload: SaveVendorOnboardingStepPayload
+) =>
+  mutate<{ result: SaveVendorOnboardingStepResult }>(
+    "onboarding/save-step",
+    "POST",
+    payload
+  )
+
+export const submitVendorOnboarding = () =>
+  mutate<{ result: SubmitVendorOnboardingResult }>(
+    "onboarding/submit",
+    "POST",
+    {}
+  )
+
+export const getVendorOnboardingAnswers = () =>
+  request<{ answers: VendorOnboardingAnswersResponse }>(
+    "onboarding/answers",
+    {}
+  )
+
+export type VendorWorkflowStep = {
+  id: string
+  depth?: number
+  next?: string[]
+  uuid?: string
+  startedAt?: number
+  attempts?: number
+  failures?: number
+  invoke?: {
+    state: "done" | "failed" | "invoking" | "dormant" | "skipped" | string
+    status: string
+    output?: any
+  }
+  compensate?: {
+    state: string
+    status: string
+  }
+  definition?: {
+    name?: string
+    async?: boolean
+  }
+}
+
+export type VendorWorkflowExecution = {
+  id: string
+  workflow_id: string
+  transaction_id: string
+  state: "done" | "failed" | "invoking" | "reverted" | "waiting" | string
+  execution?: {
+    steps?: Record<string, VendorWorkflowStep>
+    hasFailedSteps?: boolean
+    startedAt?: number
+    [key: string]: any
+  } | null
+  context?: Record<string, any> | null
+  created_at: string
+  updated_at: string
+}
+
+export const listVendorWorkflowExecutions = (params: {
+  limit: number
+  offset: number
+  q?: string
+  workflow_id?: string
+  state?: string
+}) =>
+  request<ListResponse<{ workflow_executions: VendorWorkflowExecution[] }>>(
+    "workflow-executions",
+    params as Record<string, string | number | undefined>
+  )
+
+export const getVendorWorkflowExecution = (id: string) =>
+  request<{ workflow_execution: VendorWorkflowExecution }>(
+    `workflow-executions/${id}`,
+    {}
+  )
 

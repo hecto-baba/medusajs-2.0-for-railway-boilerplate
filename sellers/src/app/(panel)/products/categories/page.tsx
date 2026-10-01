@@ -1,11 +1,5 @@
-import { CategoriesTable } from "@modules/categories"
-import { Metadata } from "next"
-
-export const metadata: Metadata = {
-  title: "Categories | Seller Dashboard",
-  description: "Manage product taxonomy and categories",
-}
+import { redirect } from "next/navigation"
 
 export default function CategoriesPage() {
-  return <CategoriesTable />
+  redirect("/products")
 }

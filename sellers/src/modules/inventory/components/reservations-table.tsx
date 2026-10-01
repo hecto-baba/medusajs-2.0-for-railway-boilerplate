@@ -34,6 +34,17 @@ const columnHelper = createDataTableColumnHelper<VendorReservation>()
 const filterHelper = createDataTableFilterHelper<VendorReservation>()
 const commandHelper = createDataTableCommandHelper()
 
+const extractFilterVal = (val: any): string | undefined => {
+  if (!val) return undefined
+  if (typeof val === "string") return val
+  if (Array.isArray(val)) return val[0]
+  if (typeof val === "object") {
+    const flat = Object.values(val).flat()
+    return (flat[0] as string) || undefined
+  }
+  return undefined
+}
+
 export const ReservationsTable = () => {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -56,7 +67,13 @@ export const ReservationsTable = () => {
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
 
-  const locationFilter = filtering.location_id as string | undefined
+  const locationFilter = extractFilterVal(filtering.location_id)
+  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
+  const createdAtGte = useMemo(() => {
+    if (!dateFilterVal) return undefined
+    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [dateFilterVal])
 
   const order = sorting
     ? (sorting.desc ? "-" : "") + sorting.id
@@ -86,6 +103,16 @@ export const ReservationsTable = () => {
           value: loc.id,
         })),
       }),
+      filterHelper.custom({
+        id: "created_at_gte",
+        label: "Date Created",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      }),
     ],
     [taxonomy?.stock_locations]
   )
@@ -97,6 +124,7 @@ export const ReservationsTable = () => {
       offset,
       search,
       locationFilter,
+      createdAtGte,
       order,
     ],
     queryFn: () =>
@@ -105,6 +133,7 @@ export const ReservationsTable = () => {
         offset,
         q: search || undefined,
         location_id: locationFilter,
+        created_at_gte: createdAtGte,
         order,
       }),
     placeholderData: (previous) => previous,

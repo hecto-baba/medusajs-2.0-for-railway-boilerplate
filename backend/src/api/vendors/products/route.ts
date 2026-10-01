@@ -22,8 +22,39 @@ export const GetVendorProductsSchema = z.object({
     .transform((value) =>
       value === undefined ? undefined : Array.isArray(value) ? value : [value]
     ),
+  collection_id: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((val) =>
+      val === undefined ? undefined : Array.isArray(val) ? val : [val]
+    ),
+  type_id: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((val) =>
+      val === undefined ? undefined : Array.isArray(val) ? val : [val]
+    ),
+  tag_id: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((val) =>
+      val === undefined ? undefined : Array.isArray(val) ? val : [val]
+    ),
+  sales_channel_id: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((val) =>
+      val === undefined ? undefined : Array.isArray(val) ? val : [val]
+    ),
+  created_at_gte: z.string().optional(),
   order: z.string().optional(),
 })
+
+import {
+  createInventoryLevelsWorkflow,
+  updateInventoryLevelsWorkflow,
+} from "@medusajs/medusa/core-flows"
+import { ensureVariantInventoryItem, getVendorId } from "./helpers"
 
 export const POST = async (
   req: AuthenticatedMedusaRequest<HttpTypes.AdminCreateProduct>,
@@ -35,6 +66,112 @@ export const POST = async (
       product: req.validatedBody,
     },
   })
+
+  const rawBody = ((req as any).body || {}) as any
+  const variantsInput = rawBody.variants || (req.validatedBody as any)?.variants || []
+
+  // Provision inventory items, remote links, and stocked inventory levels if requested
+  if (result.product?.variants?.length) {
+    try {
+      const vendorId = await getVendorId(req)
+      const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+
+      // Resolve target stock location: request explicit override -> vendor's primary location -> store default location
+      let stockLocationId: string | undefined = rawBody.stock_location_id
+      if (!stockLocationId) {
+        const {
+          data: [vendorAdmin],
+        } = await query.graph({
+          entity: "vendor_admin",
+          fields: ["vendor.id", "vendor.stock_locations.id"],
+          filters: { id: [req.auth_context.actor_id] },
+        })
+        stockLocationId = vendorAdmin?.vendor?.stock_locations?.[0]?.id
+      }
+
+      if (!stockLocationId) {
+        const { data: defaultLocations } = await query.graph({
+          entity: "stock_location",
+          fields: ["id"],
+        })
+        stockLocationId = defaultLocations?.[0]?.id
+      }
+
+      for (let i = 0; i < result.product.variants.length; i++) {
+        const createdVariant = result.product.variants[i]
+        const inputVariant =
+          variantsInput[i] ||
+          variantsInput.find(
+            (v: any) =>
+              (v.sku && v.sku === createdVariant.sku) ||
+              (v.title && v.title === createdVariant.title)
+          ) ||
+          {}
+
+        const shouldManageInventory = inputVariant.manage_inventory ?? true
+        const inventoryQuantity =
+          typeof inputVariant.inventory_quantity === "number"
+            ? inputVariant.inventory_quantity
+            : typeof inputVariant.metadata?.inventory_quantity === "number"
+            ? inputVariant.metadata.inventory_quantity
+            : undefined
+
+        if (shouldManageInventory || inventoryQuantity !== undefined) {
+          const inventoryItemId = await ensureVariantInventoryItem(
+            req,
+            createdVariant.id,
+            vendorId
+          )
+
+          if (
+            stockLocationId &&
+            inventoryQuantity !== undefined &&
+            inventoryQuantity >= 0
+          ) {
+            const { data: existingLevels } = await query.graph({
+              entity: "inventory_level",
+              fields: ["id"],
+              filters: {
+                inventory_item_id: [inventoryItemId],
+                location_id: [stockLocationId],
+              },
+            })
+
+            if (existingLevels.length) {
+              await updateInventoryLevelsWorkflow(req.scope).run({
+                input: {
+                  updates: [
+                    {
+                      inventory_item_id: inventoryItemId,
+                      location_id: stockLocationId,
+                      stocked_quantity: inventoryQuantity,
+                    },
+                  ],
+                },
+              })
+            } else {
+              await createInventoryLevelsWorkflow(req.scope).run({
+                input: {
+                  inventory_levels: [
+                    {
+                      inventory_item_id: inventoryItemId,
+                      location_id: stockLocationId,
+                      stocked_quantity: inventoryQuantity,
+                    },
+                  ],
+                },
+              })
+            }
+          }
+        }
+      }
+    } catch (inventoryErr) {
+      console.error(
+        "[POST /vendors/products] Inventory auto-provisioning error:",
+        inventoryErr
+      )
+    }
+  }
 
   res.status(201).json({ product: result.product })
 }
@@ -57,9 +194,18 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, status, order } = req.validatedQuery as unknown as z.infer<
-    typeof GetVendorProductsSchema
-  >
+  const {
+    limit,
+    offset,
+    q,
+    status,
+    collection_id,
+    type_id,
+    tag_id,
+    sales_channel_id,
+    created_at_gte,
+    order,
+  } = req.validatedQuery as unknown as z.infer<typeof GetVendorProductsSchema>
 
   const {
     data: [vendorAdmin],
@@ -80,6 +226,21 @@ export const GET = async (
     return
   }
 
+  const filters: Record<string, any> = {
+    id: productIds,
+    ...(q ? { title: { $ilike: `%${q}%` } } : {}),
+    ...(status?.length ? { status } : {}),
+    ...(collection_id?.length ? { collection_id } : {}),
+    ...(type_id?.length ? { type_id } : {}),
+    ...(tag_id?.length ? { tags: { id: tag_id } } : {}),
+    ...(sales_channel_id?.length
+      ? { sales_channels: { id: sales_channel_id } }
+      : {}),
+    ...(created_at_gte
+      ? { created_at: { $gte: new Date(created_at_gte) } }
+      : {}),
+  }
+
   const { data: products, metadata } = await query.graph({
     entity: "product",
     fields: [
@@ -92,16 +253,17 @@ export const GET = async (
       "updated_at",
       "collection.id",
       "collection.title",
+      "type.id",
+      "type.value",
+      "tags.id",
+      "tags.value",
       "sales_channels.id",
       "sales_channels.name",
       "variants.id",
       "variants.title",
+      "variants.sku",
     ],
-    filters: {
-      id: productIds,
-      ...(q ? { title: { $ilike: `%${q}%` } } : {}),
-      ...(status?.length ? { status } : {}),
-    },
+    filters,
     pagination: {
       skip: offset,
       take: limit,

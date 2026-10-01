@@ -72,6 +72,24 @@ const filters = [
       { label: "Inactive", value: "inactive" },
     ],
   }),
+  filterHelper.accessor("type", {
+    label: "Type",
+    type: "multiselect",
+    options: [
+      { label: "Standard (Amount off)", value: "standard" },
+      { label: "Buy X, get Y", value: "buyget" },
+    ],
+  }),
+  filterHelper.accessor("created_at", {
+    label: "Date Created",
+    type: "radio",
+    options: [
+      { label: "All time", value: "all" },
+      { label: "Past 7 days", value: "7d" },
+      { label: "Past 30 days", value: "30d" },
+      { label: "Past 90 days", value: "90d" },
+    ],
+  }),
 ]
 
 const useColumns = (onDelete: (promotion: VendorPromotion) => void) => [
@@ -80,13 +98,17 @@ const useColumns = (onDelete: (promotion: VendorPromotion) => void) => [
     header: "Code",
     enableSorting: true,
     sortLabel: "Code",
-    sortAscLabel: "A-Z",
-    sortDescLabel: "Z-A",
-    cell: ({ row }) => <span className="truncate">{row.original.code}</span>,
+    sortAscLabel: "Code A-Z",
+    sortDescLabel: "Code Z-A",
+    cell: ({ row }) => <span className="truncate font-medium">{row.original.code}</span>,
   }),
-  columnHelper.display({
+  columnHelper.accessor("type", {
     id: "type",
     header: "Type",
+    enableSorting: true,
+    sortLabel: "Type",
+    sortAscLabel: "Type A-Z",
+    sortDescLabel: "Type Z-A",
     cell: ({ row }) =>
       row.original.type === "buyget" ? "Buy X, get Y" : "Amount off",
   }),
@@ -100,6 +122,8 @@ const useColumns = (onDelete: (promotion: VendorPromotion) => void) => [
     header: "Status",
     enableSorting: true,
     sortLabel: "Status",
+    sortAscLabel: "Status A-Z",
+    sortDescLabel: "Status Z-A",
     cell: ({ row }) => <PromotionStatusCell status={row.original.status} />,
   }),
   columnHelper.accessor("created_at", {
@@ -158,16 +182,50 @@ export const PromotionsTable = () => {
       ? (Object.values(statusFilter).flat() as string[])
       : undefined
 
+  const typeFilter = filtering.type
+  const type = Array.isArray(typeFilter)
+    ? (typeFilter as string[])
+    : typeFilter
+      ? (Object.values(typeFilter).flat() as string[])
+      : undefined
+
+  const createdFilter =
+    typeof filtering.created_at === "string"
+      ? filtering.created_at
+      : Array.isArray(filtering.created_at)
+        ? (filtering.created_at[0] as string)
+        : undefined
+
+  const created_at_gte = (() => {
+    if (!createdFilter || createdFilter === "all") return undefined
+    const now = new Date()
+    if (createdFilter === "7d") {
+      now.setDate(now.getDate() - 7)
+      return now.toISOString()
+    }
+    if (createdFilter === "30d") {
+      now.setDate(now.getDate() - 30)
+      return now.toISOString()
+    }
+    if (createdFilter === "90d") {
+      now.setDate(now.getDate() - 90)
+      return now.toISOString()
+    }
+    return undefined
+  })()
+
   const order = sorting ? (sorting.desc ? "-" : "") + sorting.id : undefined
 
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-promotions", limit, offset, search, status, order],
+    queryKey: ["vendor-promotions", limit, offset, search, status, type, created_at_gte, order],
     queryFn: () =>
       listVendorPromotions({
         limit,
         offset,
         q: search || undefined,
         status: status?.length ? status : undefined,
+        type: type?.length ? type : undefined,
+        created_at_gte,
         order,
       }),
     placeholderData: (previous) => previous,

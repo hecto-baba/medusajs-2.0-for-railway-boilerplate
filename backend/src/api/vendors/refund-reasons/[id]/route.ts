@@ -21,7 +21,7 @@ export const GET = async (
     data: [refund_reason],
   } = await query.graph({
     entity: "refund_reason",
-    fields: ["id", "label", "code", "created_at", "updated_at"],
+    fields: ["id", "label", "code", "description", "created_at", "updated_at"],
     filters: { id: [req.params.id] },
   })
 
@@ -44,7 +44,7 @@ export const POST = async (
     data: [refund_reason],
   } = await query.graph({
     entity: "refund_reason",
-    fields: ["id", "label", "code", "created_at", "updated_at"],
+    fields: ["id", "label", "code", "description", "created_at", "updated_at"],
     filters: { id: [req.params.id] },
   })
 

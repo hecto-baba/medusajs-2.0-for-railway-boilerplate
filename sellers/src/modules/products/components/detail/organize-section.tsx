@@ -5,6 +5,7 @@ import {
   updateVendorProduct,
   type VendorProduct,
 } from "@lib/data/vendor-client"
+import { TrustClawCategoryPicker } from "./trustclaw-category-picker"
 import {
   Badge,
   Button,
@@ -234,14 +235,31 @@ export const OrganizeSection = ({ product }: { product: VendorProduct }) => {
                   <Label size="small" weight="plus">
                     Categories
                   </Label>
-                  <Chips
-                    items={(taxonomy?.categories ?? []).map((category) => ({
-                      id: category.id,
-                      label: category.name,
-                    }))}
-                    selected={categoryIds}
-                    setSelected={setCategoryIds}
-                    empty="The store has no categories yet."
+                  {/* TrustClaw drill-down picker replaces the flat chip list.
+                   * The seller drills down Segment → L1 → ... → leaf.
+                   * On leaf selection the TrustClaw category id is resolved to
+                   * the corresponding Medusa product_category id (synced into
+                   * Medusa via metadata.trustclaw_id by the weekly sync job). */}
+                  <TrustClawCategoryPicker
+                    selectedMedusaCategoryId={categoryIds[0] ?? null}
+                    selectedCategoryName={product.categories?.[0]?.name ?? null}
+                    onSelectCategory={(categoryId, _name) => {
+                      if (!categoryId) {
+                        setCategoryIds([])
+                        return
+                      }
+                      // If the id is already a Medusa id (starts with pcat_ or found in taxonomy), use it
+                      if (categoryId.startsWith("pcat_")) {
+                        setCategoryIds([categoryId])
+                        return
+                      }
+                      const match = (taxonomy?.categories ?? []).find(
+                        (c: any) =>
+                          c.id === categoryId ||
+                          c.metadata?.trustclaw_id === categoryId
+                      )
+                      setCategoryIds([match ? match.id : categoryId])
+                    }}
                   />
                 </div>
 

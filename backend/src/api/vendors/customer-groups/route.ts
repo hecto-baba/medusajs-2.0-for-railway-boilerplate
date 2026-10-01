@@ -17,6 +17,7 @@ export const GetVendorCustomerGroupsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
   q: z.string().optional(),
+  created_at_gte: z.string().optional(),
   order: z.string().optional(),
 })
 
@@ -30,7 +31,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, order } = (
+  const { limit, offset, q, created_at_gte, order } = (
     req.validatedQuery ?? {}
   ) as z.infer<typeof GetVendorCustomerGroupsSchema>
 
@@ -48,6 +49,10 @@ export const GET = async (
 
   const filters: Record<string, any> = {
     id: ownedGroupIds,
+  }
+
+  if (created_at_gte) {
+    filters.created_at = { $gte: created_at_gte }
   }
 
   if (q && q.trim()) {

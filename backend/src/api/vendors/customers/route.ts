@@ -18,12 +18,9 @@ export const GetVendorCustomersSchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   q: z.string().optional(),
   has_account: z
-    .preprocess((val) => {
-      if (val === "true" || val === true) return true
-      if (val === "false" || val === false) return false
-      return undefined
-    }, z.boolean().optional())
+    .union([z.boolean(), z.string(), z.array(z.string())])
     .optional(),
+  created_at_gte: z.string().optional(),
   order: z.string().optional(),
 })
 
@@ -42,7 +39,7 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const vendorId = await getVendorId(req)
-  const { limit, offset, q, has_account, order } = (
+  const { limit, offset, q, has_account, created_at_gte, order } = (
     req.validatedQuery ?? {}
   ) as z.infer<typeof GetVendorCustomersSchema>
 
@@ -62,8 +59,17 @@ export const GET = async (
     id: ownedCustomerIds,
   }
 
-  if (typeof has_account === "boolean") {
-    filters.has_account = has_account
+  if (has_account !== undefined) {
+    const raw = Array.isArray(has_account) ? has_account[0] : has_account
+    if (raw === true || raw === "true") {
+      filters.has_account = true
+    } else if (raw === false || raw === "false") {
+      filters.has_account = false
+    }
+  }
+
+  if (created_at_gte) {
+    filters.created_at = { $gte: created_at_gte }
   }
 
   if (q && q.trim()) {

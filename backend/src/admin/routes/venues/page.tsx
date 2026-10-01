@@ -4,6 +4,7 @@ import {
   Badge,
   Container,
   Heading,
+  Input,
   Table,
   Text,
   Tooltip,
@@ -24,13 +25,18 @@ const PAGE_SIZE = 15
 
 const VenuesPage = () => {
   const [page, setPage] = useState(0)
+  const [search, setSearch] = useState("")
 
   const { data, isLoading, refetch } = useQuery<VenueListResponse>({
     queryFn: () =>
       sdk.client.fetch("/admin/venues", {
-        query: { limit: PAGE_SIZE, offset: page * PAGE_SIZE },
+        query: {
+          limit: PAGE_SIZE,
+          offset: page * PAGE_SIZE,
+          ...(search.trim() ? { q: search.trim() } : {}),
+        },
       }),
-    queryKey: [["venues", page]],
+    queryKey: [["venues", page, search]],
   })
 
   const venues = data?.venues ?? []
@@ -39,14 +45,28 @@ const VenuesPage = () => {
 
   return (
     <Container className="divide-y p-0">
-      <div className="flex items-center justify-between px-6 py-4">
+      <div className="flex items-center justify-between px-6 py-4 gap-4">
         <div>
           <Heading level="h2">Venues</Heading>
           <Text size="small" className="text-ui-fg-subtle">
             Places you sell tickets for, and the seating rows they hold
           </Text>
         </div>
-        <CreateVenueModal onCreated={refetch} />
+        <div className="flex items-center gap-2">
+          <div className="w-64">
+            <Input
+              size="small"
+              type="search"
+              placeholder="Search venues..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(0)
+              }}
+            />
+          </div>
+          <CreateVenueModal onCreated={refetch} />
+        </div>
       </div>
 
       {isLoading ? (
@@ -58,7 +78,9 @@ const VenuesPage = () => {
       ) : !venues.length ? (
         <div className="px-6 py-12 text-center">
           <Text size="small" className="text-ui-fg-subtle">
-            No venues yet. Create one to start selling tickets.
+            {search.trim()
+              ? `No venues matching "${search.trim()}".`
+              : "No venues yet. Create one to start selling tickets."}
           </Text>
         </div>
       ) : (

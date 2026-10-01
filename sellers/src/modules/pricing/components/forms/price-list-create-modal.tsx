@@ -2,6 +2,8 @@
 
 import {
   createVendorPriceList,
+  listVendorCollections,
+  listVendorProductTypes,
   listVendorProducts,
   listVendorRegions,
   type VendorProduct,
@@ -14,8 +16,11 @@ import {
   Button,
   Checkbox,
   createDataTableColumnHelper,
+  createDataTableFilterHelper,
   DataTable,
+  DataTableFilteringState,
   DataTablePaginationState,
+  DataTableSortingState,
   DatePicker,
   Divider,
   FocusModal,
@@ -39,6 +44,17 @@ import {
   PriceListCustomerGroupRuleForm,
   type CustomerGroupItem,
 } from "./price-list-customer-group-rule-form"
+
+const extractFilterVal = (val: any): string | undefined => {
+  if (!val) return undefined
+  if (typeof val === "string") return val
+  if (Array.isArray(val)) return val[0]
+  if (typeof val === "object") {
+    const flat = Object.values(val).flat()
+    return (flat[0] as string) || undefined
+  }
+  return undefined
+}
 
 type PriceListCreateModalProps = {
   open: boolean
@@ -99,6 +115,8 @@ export const PriceListCreateModal = ({
     pageIndex: 0,
     pageSize: 20,
   })
+  const [productFiltering, setProductFiltering] = useState<DataTableFilteringState>({})
+  const [productSorting, setProductSorting] = useState<DataTableSortingState | null>(null)
   const [selectedProducts, setSelectedProducts] = useState<VendorProduct[]>([])
 
   // Tab 3: Prices
@@ -128,17 +146,88 @@ export const PriceListCreateModal = ({
     }
   }, [availableCurrencies, selectedCurrency])
 
+  // Fetch collections & types for filter options
+  const { data: collectionsData } = useQuery({
+    queryKey: ["vendor-collections-filter"],
+    queryFn: () => listVendorCollections({ limit: 100, offset: 0 }),
+    enabled: open,
+  })
+  const { data: typesData } = useQuery({
+    queryKey: ["vendor-types-filter"],
+    queryFn: () => listVendorProductTypes({ limit: 100, offset: 0 }),
+    enabled: open,
+  })
+
+  // Extract filter parameters
+  const statusFilter = useMemo(() => {
+    const val = productFiltering["status"]
+    if (!val) return undefined
+    if (Array.isArray(val)) return val
+    if (typeof val === "object") {
+      const flat = Object.values(val).flat()
+      return flat.length ? (flat as string[]) : undefined
+    }
+    return typeof val === "string" ? [val] : undefined
+  }, [productFiltering])
+
+  const collectionFilter = useMemo(() => {
+    return extractFilterVal(productFiltering["collection_id"])
+  }, [productFiltering])
+
+  const typeFilter = useMemo(() => {
+    return extractFilterVal(productFiltering["type_id"])
+  }, [productFiltering])
+
+  const dateFilter = useMemo(() => {
+    const val = extractFilterVal(productFiltering["created_at_gte"])
+    if (!val) return undefined
+    const now = new Date()
+    if (val === "7d") {
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    }
+    if (val === "30d") {
+      return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    }
+    if (val === "90d") {
+      return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    }
+    return val
+  }, [productFiltering])
+
+  const productOrder = useMemo(() => {
+    if (!productSorting) return undefined
+    const prefix = productSorting.desc ? "-" : ""
+    return `${prefix}${productSorting.id}`
+  }, [productSorting])
+
   // Fetch products for tab 2
   const pLimit = productPagination.pageSize
   const pOffset = productPagination.pageIndex * pLimit
 
   const { data: productsData, isLoading: isLoadingProducts } = useQuery({
-    queryKey: ["vendor-products", { limit: pLimit, offset: pOffset, q: productSearch }],
+    queryKey: [
+      "vendor-products",
+      {
+        limit: pLimit,
+        offset: pOffset,
+        q: productSearch,
+        status: statusFilter,
+        collection_id: collectionFilter,
+        type_id: typeFilter,
+        created_at_gte: dateFilter,
+        order: productOrder,
+      },
+    ],
     queryFn: () =>
       listVendorProducts({
         limit: pLimit,
         offset: pOffset,
         q: productSearch || undefined,
+        status: statusFilter,
+        collection_id: collectionFilter,
+        type_id: typeFilter,
+        created_at_gte: dateFilter,
+        order: productOrder,
       }),
     enabled: open,
   })
@@ -158,6 +247,9 @@ export const PriceListCreateModal = ({
     setSelectedProducts([])
     setPricesState({})
     setIsCgModalOpen(false)
+    setProductFiltering({})
+    setProductSorting(null)
+    setProductSearch("")
   }
 
   // Handle product selection changes
@@ -194,6 +286,32 @@ export const PriceListCreateModal = ({
       })
     }
   }
+
+  // Synchronize variant prices for all selected products
+  useEffect(() => {
+    if (selectedProducts.length > 0) {
+      setPricesState((prev) => {
+        let changed = false
+        const next = { ...prev }
+        for (const prod of selectedProducts) {
+          for (const variant of prod.variants ?? []) {
+            if (!next[variant.id]) {
+              next[variant.id] = {
+                variant_id: variant.id,
+                variant_title: variant.title || "Default Variant",
+                product_id: prod.id,
+                product_title: prod.title,
+                currency_code: selectedCurrency,
+                amount: "",
+              }
+              changed = true
+            }
+          }
+        }
+        return changed ? next : prev
+      })
+    }
+  }, [selectedProducts, selectedCurrency])
 
   const handleSelectAllProducts = (checked: boolean) => {
     if (checked) {
@@ -238,6 +356,72 @@ export const PriceListCreateModal = ({
     products.some((p) => selectedProducts.some((s) => s.id === p.id)) &&
     !allPageProductsSelected
 
+  // Dynamic filter definitions
+  const productFilterHelper = useMemo(
+    () => createDataTableFilterHelper<VendorProduct>(),
+    []
+  )
+
+  const productFilters = useMemo(() => {
+    const list: any[] = [
+      productFilterHelper.accessor("status", {
+        label: "Status",
+        type: "multiselect",
+        options: [
+          { label: "Draft", value: "draft" },
+          { label: "Proposed", value: "proposed" },
+          { label: "Published", value: "published" },
+          { label: "Rejected", value: "rejected" },
+        ],
+      }),
+    ]
+
+    const collections = collectionsData?.collections ?? []
+    if (collections.length > 0) {
+      list.push(
+        productFilterHelper.custom({
+          id: "collection_id",
+          label: "Collection",
+          type: "select",
+          options: collections.map((c) => ({
+            label: c.title,
+            value: c.id,
+          })),
+        })
+      )
+    }
+
+    const types = typesData?.product_types ?? []
+    if (types.length > 0) {
+      list.push(
+        productFilterHelper.custom({
+          id: "type_id",
+          label: "Type",
+          type: "select",
+          options: types.map((t) => ({
+            label: t.value,
+            value: t.id,
+          })),
+        })
+      )
+    }
+
+    list.push(
+      productFilterHelper.custom({
+        id: "created_at_gte",
+        label: "Date Created",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      })
+    )
+
+    return list
+  }, [collectionsData, typesData, productFilterHelper])
+
   const productColumns = useMemo(
     () => [
       productColumnHelper.display({
@@ -266,9 +450,13 @@ export const PriceListCreateModal = ({
           )
         },
       }),
-      productColumnHelper.display({
-        id: "product",
+      productColumnHelper.accessor("title", {
+        id: "title",
         header: "Product",
+        enableSorting: true,
+        sortLabel: "Title",
+        sortAscLabel: "A-Z",
+        sortDescLabel: "Z-A",
         cell: ({ row }) => {
           const prod = row.original
           return (
@@ -289,7 +477,10 @@ export const PriceListCreateModal = ({
         },
       }),
       productColumnHelper.accessor("status", {
+        id: "status",
         header: "Status",
+        enableSorting: true,
+        sortLabel: "Status",
         cell: ({ getValue }) => {
           const status = getValue()
           return (
@@ -313,6 +504,20 @@ export const PriceListCreateModal = ({
           )
         },
       }),
+      productColumnHelper.accessor("created_at", {
+        id: "created_at",
+        header: "Created",
+        enableSorting: true,
+        sortLabel: "Created",
+        sortAscLabel: "Oldest first",
+        sortDescLabel: "Newest first",
+        cell: ({ getValue }) =>
+          new Date(getValue()).toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          }),
+      }),
     ],
     [selectedProducts, products, allPageProductsSelected, somePageProductsSelected]
   )
@@ -323,13 +528,29 @@ export const PriceListCreateModal = ({
     rowCount: productsCount,
     getRowId: (row) => row.id,
     isLoading: isLoadingProducts,
+    onRowClick: (_event, row) => toggleProduct(row),
     pagination: {
       state: productPagination,
       onPaginationChange: setProductPagination,
     },
     search: {
       state: productSearch,
-      onSearchChange: setProductSearch,
+      onSearchChange: (value) => {
+        setProductSearch(value)
+        setProductPagination((prev) => ({ ...prev, pageIndex: 0 }))
+      },
+    },
+    filters: productFilters,
+    filtering: {
+      state: productFiltering,
+      onFilteringChange: (filters) => {
+        setProductFiltering(filters)
+        setProductPagination((prev) => ({ ...prev, pageIndex: 0 }))
+      },
+    },
+    sorting: {
+      state: productSorting,
+      onSortingChange: setProductSorting,
     },
   })
 
@@ -363,17 +584,17 @@ export const PriceListCreateModal = ({
     }))
   }
 
-  const validateTab = (currentTab: Tab): boolean => {
-    if (currentTab === Tab.DETAIL) {
+  const validateTab = (targetTab: Tab): boolean => {
+    if (targetTab === Tab.DETAIL) {
       if (!title.trim()) {
         toast.error("Title is required")
         return false
       }
       return true
     }
-    if (currentTab === Tab.PRODUCT) {
+    if (targetTab === Tab.PRODUCT) {
       if (selectedProducts.length === 0) {
-        toast.error("Please select at least one product")
+        toast.error("Please select at least one product before configuring prices")
         return false
       }
       return true
@@ -388,9 +609,23 @@ export const PriceListCreateModal = ({
     const currentIndex = tabsOrder.indexOf(tab)
     const nextIndex = tabsOrder.indexOf(nextTab)
 
-    // If moving forward, validate current tab
+    // If moving forward, validate required fields
     if (nextIndex > currentIndex) {
-      if (!validateTab(tab)) return
+      if (!validateTab(Tab.DETAIL)) return
+
+      if (nextIndex >= tabsOrder.indexOf(Tab.PRICE)) {
+        if (!validateTab(Tab.PRODUCT)) {
+          if (tab !== Tab.PRODUCT) {
+            setTab(Tab.PRODUCT)
+            setTabState((prev) => ({
+              ...prev,
+              [Tab.DETAIL]: "completed",
+              [Tab.PRODUCT]: "in-progress",
+            }))
+          }
+          return
+        }
+      }
     }
 
     setTabState((prev) => ({
@@ -697,8 +932,31 @@ export const PriceListCreateModal = ({
             >
               <DataTable instance={productTable}>
                 <DataTable.Toolbar className="flex items-center justify-between">
-                  <DataTable.Search placeholder="Search products..." />
+                  <div className="flex items-center gap-x-2">
+                    <DataTable.Search placeholder="Search products..." />
+                    <DataTable.FilterMenu tooltip="Filter" />
+                    <DataTable.SortingMenu tooltip="Sort" />
+                  </div>
+                  {selectedProducts.length > 0 && (
+                    <div className="flex items-center gap-x-2">
+                      <Badge size="small" color="blue">
+                        {selectedProducts.length} selected
+                      </Badge>
+                      <Button
+                        size="small"
+                        variant="transparent"
+                        type="button"
+                        onClick={() => {
+                          setSelectedProducts([])
+                          setPricesState({})
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  )}
                 </DataTable.Toolbar>
+                <DataTable.FilterBar />
                 <DataTable.Table />
                 <DataTable.Pagination />
               </DataTable>
@@ -741,10 +999,18 @@ export const PriceListCreateModal = ({
                 </div>
 
                 {selectedProducts.length === 0 ? (
-                  <div className="border rounded-lg p-12 text-center bg-ui-bg-subtle">
+                  <div className="border rounded-lg p-12 text-center bg-ui-bg-subtle flex flex-col items-center gap-y-3">
                     <Text size="small" className="text-ui-fg-subtle">
-                      No products selected. Please go back to the Products tab and select products.
+                      No products selected. Please select products to configure their prices.
                     </Text>
+                    <Button
+                      size="small"
+                      variant="secondary"
+                      type="button"
+                      onClick={() => setTab(Tab.PRODUCT)}
+                    >
+                      Select Products
+                    </Button>
                   </div>
                 ) : (
                   <div className="border rounded-lg overflow-x-auto divide-y">
@@ -871,7 +1137,9 @@ export const PriceListCreateModal = ({
                 type="button"
                 onClick={handleNext}
               >
-                Continue
+                {tab === Tab.PRODUCT && selectedProducts.length > 0
+                  ? `Continue (${selectedProducts.length} selected)`
+                  : "Continue"}
               </Button>
             ) : (
               <Button

@@ -400,6 +400,21 @@ export const CampaignDetail = ({ id }: { id: string }) => {
                     </Text>
                   </div>
 
+                  {!isSpendBudget && (
+                    <div>
+                      <Text size="xsmall" className="text-ui-fg-subtle">
+                        Limit usage per
+                      </Text>
+                      <Text size="small" weight="plus" className="text-ui-fg-base mt-0.5">
+                        {budget?.attribute === "customer_id"
+                          ? "Per customer"
+                          : budget?.attribute === "customer_email"
+                            ? "Per email"
+                            : "Total uses (across all customers)"}
+                      </Text>
+                    </div>
+                  )}
+
                   {isSpendBudget && budget?.currency_code && (
                     <div>
                       <Text size="xsmall" className="text-ui-fg-subtle">

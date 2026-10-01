@@ -15,6 +15,7 @@ export type Vendor = {
   name: string
   handle: string
   logo: string | null
+  metadata?: Record<string, unknown> | null
 }
 
 export type VendorAdmin = {
@@ -95,10 +96,27 @@ export async function vendorSignup(
 
     registrationToken = token
   } catch (error) {
-    return toMessage(
-      error,
-      "Could not create that account. The email may already be registered."
-    )
+    // If the auth identity was created but vendor creation was interrupted previously,
+    // try logging in to claim/finish registration with the existing credentials.
+    try {
+      const loginToken = await sdk.auth.login("vendor", "emailpass", {
+        email,
+        password,
+      })
+      if (typeof loginToken === "string") {
+        registrationToken = loginToken
+      } else {
+        return toMessage(
+          error,
+          "Could not create that account. The email may already be registered."
+        )
+      }
+    } catch {
+      return toMessage(
+        error,
+        "Could not create that account. The email may already be registered."
+      )
+    }
   }
 
   try {
@@ -142,7 +160,7 @@ export async function vendorSignup(
     return "Your store was created. Please sign in to continue."
   }
 
-  redirect("/orders")
+  redirect("/onboarding")
 }
 
 export async function vendorLogin(
@@ -175,7 +193,7 @@ export async function vendorLogin(
     return toMessage(error, "Could not sign you in. Please try again.")
   }
 
-  redirect("/orders")
+  redirect("/dashboard")
 }
 
 export async function vendorLogout() {
@@ -283,6 +301,29 @@ export async function updateVendorStore(
 
   revalidatePath("/", "layout")
 
+  return { error: null, success: true }
+}
+
+/**
+ * Updates the signed-in vendor's custom metadata.
+ */
+export async function updateVendorMetadata(
+  metadata: Record<string, unknown> | null
+): Promise<{ error: string | null; success: boolean }> {
+  try {
+    await sdk.client.fetch("/vendors/me", {
+      method: "PATCH",
+      headers: { ...(await getVendorAuthHeaders()) },
+      body: { metadata },
+    })
+  } catch (error) {
+    return {
+      error: toMessage(error, "Could not save metadata. Please try again."),
+      success: false,
+    }
+  }
+
+  revalidatePath("/settings")
   return { error: null, success: true }
 }
 

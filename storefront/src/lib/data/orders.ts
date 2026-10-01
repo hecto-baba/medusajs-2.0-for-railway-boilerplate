@@ -33,5 +33,14 @@ export const listOrders = cache(async function (
       ...(await getCacheDirectives("orders")),
     })
     .then(({ orders }) => orders)
-    .catch((err) => medusaError(err))
+    .catch((err) => {
+      // A 401 here means the auth cookie was not available in this render
+      // pass (e.g. immediately after login before the cookie is committed,
+      // or a stale cached render). Return null so the dashboard still
+      // renders rather than crashing the page.
+      if (err && typeof err.status === "number" && err.status === 401) {
+        return null
+      }
+      return medusaError(err)
+    })
 })

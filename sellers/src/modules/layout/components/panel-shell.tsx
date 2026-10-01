@@ -3,7 +3,7 @@
 import { SidebarLeft } from "@medusajs/icons"
 import { IconButton, Text } from "@medusajs/ui"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { createContext, useContext, useEffect, useState } from "react"
 import { Sidebar } from "./sidebar"
 import { SettingsSidebar } from "./settings-sidebar"
@@ -18,6 +18,8 @@ import {
 } from "../layout-composer"
 import { Notifications } from "../notifications"
 import { SearchProvider } from "../search"
+import { useVendorOnboardingStatus } from "@modules/onboarding"
+import { ArrowRight, Clock, ExclamationCircle, Sparkles } from "@medusajs/icons"
 
 /**
  * Labels for the fixed segments of a path. Anything not listed - a product id,
@@ -34,6 +36,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   new: "Create",
   create: "Create",
   edit: "Edit",
+  onboarding: "Onboarding",
 }
 
 type Crumb = { label: string; href?: string }
@@ -148,8 +151,23 @@ export const PanelShell = ({
     })
   }
 
+  const router = useRouter()
   const pathname = usePathname()
-  const isSettings = pathname.startsWith("/settings")
+  const { data: onboarding, isLoading: isOnboardingLoading } = useVendorOnboardingStatus()
+
+  const isOnboarding = pathname === "/onboarding"
+  const isApproved = onboarding?.status === "APPROVED"
+  const isSettings = pathname.startsWith("/settings") && isApproved
+
+  // Gatekeeper: Non-approved vendors are restricted strictly to /onboarding
+  useEffect(() => {
+    if (!isOnboardingLoading && onboarding && !isApproved && !isOnboarding) {
+      router.replace("/onboarding")
+    }
+  }, [isOnboardingLoading, onboarding, isApproved, isOnboarding, router])
+
+  const showOnboardingBanner =
+    !isOnboarding && onboarding && onboarding.status !== "APPROVED"
 
   return (
     <SearchProvider>
@@ -194,7 +212,68 @@ export const PanelShell = ({
                   />
                 </div>
               </header>
-              <main className="flex-1 overflow-y-auto">{children}</main>
+
+              {/* Onboarding Gatekeeper Banner */}
+              {showOnboardingBanner && (
+                <div
+                  className={`px-4 py-2 flex items-center justify-between text-xs border-b shrink-0 ${
+                    onboarding.status === "REJECTED"
+                      ? "bg-ui-bg-error/10 border-ui-border-error/30 text-ui-fg-error"
+                      : onboarding.status === "SUBMITTED" ||
+                        onboarding.status === "UNDER_REVIEW"
+                      ? "bg-ui-bg-interactive/10 border-ui-border-interactive/30 text-ui-fg-interactive"
+                      : "bg-ui-bg-interactive/5 border-ui-border-interactive/20 text-ui-fg-base"
+                  }`}
+                >
+                  <div className="flex items-center gap-x-2 truncate">
+                    {onboarding.status === "REJECTED" ? (
+                      <ExclamationCircle className="h-4 w-4 shrink-0 text-ui-fg-error" />
+                    ) : onboarding.status === "SUBMITTED" ||
+                      onboarding.status === "UNDER_REVIEW" ? (
+                      <Clock className="h-4 w-4 shrink-0 text-ui-fg-interactive" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 shrink-0 text-ui-fg-interactive" />
+                    )}
+                    <span className="font-medium truncate">
+                      {onboarding.status === "REJECTED"
+                        ? "Action Required: Your merchant onboarding application requires revisions."
+                        : onboarding.status === "SUBMITTED" ||
+                          onboarding.status === "UNDER_REVIEW"
+                        ? "Application Under Review: Compliance verification is in progress. Dashboard unlocks upon approval."
+                        : "Complete Onboarding: Finish your store profile to submit for administrator approval."}
+                    </span>
+                  </div>
+                  <Link
+                    href="/onboarding"
+                    className="font-semibold underline shrink-0 hover:opacity-80 flex items-center gap-x-1 ml-4"
+                  >
+                    {onboarding.status === "REJECTED"
+                      ? "Review & Resubmit"
+                      : onboarding.status === "SUBMITTED" ||
+                        onboarding.status === "UNDER_REVIEW"
+                      ? "View Status"
+                      : "Complete Setup"}{" "}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              )}
+
+              <main className="flex-1 overflow-y-auto">
+                {isOnboardingLoading ? (
+                  <div className="flex flex-col items-center justify-center min-h-[60vh] gap-y-3">
+                    <div className="h-8 w-8 animate-spin rounded-full border-3 border-ui-border-interactive border-t-transparent" />
+                  </div>
+                ) : !isApproved && !isOnboarding ? (
+                  <div className="flex flex-col items-center justify-center min-h-[60vh] gap-y-4">
+                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-ui-border-interactive border-t-transparent" />
+                    <Text size="small" className="text-ui-fg-subtle">
+                      Redirecting to onboarding...
+                    </Text>
+                  </div>
+                ) : (
+                  children
+                )}
+              </main>
             </div>
           </div>
         </TitleContext.Provider>

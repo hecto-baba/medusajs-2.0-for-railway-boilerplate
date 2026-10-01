@@ -1,6 +1,6 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { ReceiptPercent } from "@medusajs/icons"
-import { Badge, Container, Heading, Table, Text } from "@medusajs/ui"
+import { Badge, Container, Heading, Input, Table, Text } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 import { Link } from "react-router-dom"
@@ -35,13 +35,18 @@ const formatRun = (dates: string[] = []) => {
 
 const TicketProductsPage = () => {
   const [page, setPage] = useState(0)
+  const [search, setSearch] = useState("")
 
   const { data, isLoading, refetch } = useQuery<TicketProductListResponse>({
     queryFn: () =>
       sdk.client.fetch("/admin/ticket-products", {
-        query: { limit: PAGE_SIZE, offset: page * PAGE_SIZE },
+        query: {
+          limit: PAGE_SIZE,
+          offset: page * PAGE_SIZE,
+          ...(search.trim() ? { q: search.trim() } : {}),
+        },
       }),
-    queryKey: [["ticket-products", page]],
+    queryKey: [["ticket-products", page, search]],
   })
 
   const ticketProducts = data?.ticket_products ?? []
@@ -50,14 +55,28 @@ const TicketProductsPage = () => {
 
   return (
     <Container className="divide-y p-0">
-      <div className="flex items-center justify-between px-6 py-4">
+      <div className="flex items-center justify-between px-6 py-4 gap-4">
         <div>
           <Heading level="h2">Shows</Heading>
           <Text size="small" className="text-ui-fg-subtle">
             Events sold as tickets, with a performance per date
           </Text>
         </div>
-        <CreateTicketProductModal onCreated={refetch} />
+        <div className="flex items-center gap-2">
+          <div className="w-64">
+            <Input
+              size="small"
+              type="search"
+              placeholder="Search shows..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(0)
+              }}
+            />
+          </div>
+          <CreateTicketProductModal onCreated={refetch} />
+        </div>
       </div>
 
       {isLoading ? (
@@ -69,7 +88,9 @@ const TicketProductsPage = () => {
       ) : !ticketProducts.length ? (
         <div className="px-6 py-12 text-center">
           <Text size="small" className="text-ui-fg-subtle">
-            No shows yet. Create a venue first, then add a show to it.
+            {search.trim()
+              ? `No shows matching "${search.trim()}".`
+              : "No shows yet. Create a venue first, then add a show to it."}
           </Text>
         </div>
       ) : (

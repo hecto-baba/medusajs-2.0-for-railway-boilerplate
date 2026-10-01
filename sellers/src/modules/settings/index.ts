@@ -3,6 +3,9 @@ export { ProfileGeneralSection } from "./components/profile-general-section"
 export { ProfileMfaSection } from "./components/profile-mfa-section"
 export { EditProfileForm } from "./components/edit-profile-form"
 export { StoreGeneralSection } from "./components/store-general-section"
+export { StoreCurrencySection } from "./components/store-currency-section"
+export { StoreMetadataSection } from "./components/store-metadata-section"
+export { StoreJsonDrawer } from "./components/store-json-drawer"
 export { EditStoreForm } from "./components/edit-store-form"
 export { ReturnReasonsTable } from "./components/return-reasons-table"
 export { ReturnReasonForm } from "./components/return-reason-form"
@@ -41,3 +44,6 @@ export { RegionsTable } from "./components/regions/regions-table"
 // API Keys
 export { ApiKeysTable } from "./components/api-keys/api-keys-table"
 export { ApiKeyCreateModal } from "./components/api-keys/api-key-create-modal"
+
+// Workflows
+export { WorkflowsTable, WorkflowDetailDrawer } from "./components/workflows"

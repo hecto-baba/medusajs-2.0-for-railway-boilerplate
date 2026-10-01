@@ -5,12 +5,14 @@ import {
   createVendorCampaign,
   createVendorPromotion,
   deleteVendorCampaign,
+  listVendorCustomerGroups,
   updateVendorPromotion,
   type VendorPromotion,
   type VendorPromotionRule,
 } from "@lib/data/vendor-client"
 import {
   Button,
+  Checkbox,
   Heading,
   Input,
   Label,
@@ -21,7 +23,7 @@ import {
   Text,
   toast,
 } from "@medusajs/ui"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { PromotionProductRules } from "./promotion-product-rules"
@@ -104,12 +106,9 @@ const TAB_ORDER: Tab[] = ["type", "details", "campaign"]
  * exactly, rather than the earlier single scrolling page.
  *
  * The one deliberate divergence from admin is the Products step folded into
- * Details: the admin's generic rule-builder (attribute dropdown, operator,
- * async value combobox resolved from three metadata endpoints) is replaced
- * with a fixed "product" picker, because "product" is the only rule
- * attribute a vendor is allowed to use at all (see
- * backend/src/api/vendors/promotions/helpers.ts) - there is nothing left to
- * choose except which of the vendor's own products.
+ * Details: target and buy rules stay a fixed "product" picker, because those
+ * rules may only name the vendor's own products. "Who can use this code?"
+ * is separate and writes a top-level customer_group_id eligibility rule.
  *
  * Editing does not re-run the Type step: application_method.target_type and
  * promotion.type cannot change after creation (the backend's UpdatePromotion
@@ -177,6 +176,29 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
     method?.apply_to_quantity?.toString() ?? "1"
   )
 
+  const initialCustomerGroupRule = promotion?.rules?.find(
+    (r) => r.attribute === "customer_group_id" || r.attribute === "customer_group"
+  )
+  const [eligibilityType, setEligibilityType] = useState<"all" | "groups">(
+    initialCustomerGroupRule && initialCustomerGroupRule.values?.length ? "groups" : "all"
+  )
+  const [selectedCustomerGroupIds, setSelectedCustomerGroupIds] = useState<string[]>(
+    initialCustomerGroupRule
+      ? Array.isArray(initialCustomerGroupRule.values)
+        ? (initialCustomerGroupRule.values as string[])
+        : [initialCustomerGroupRule.values as string]
+      : []
+  )
+  const [customerGroupRuleId] = useState<string | undefined>(
+    initialCustomerGroupRule?.id
+  )
+
+  const { data: customerGroupsData, isLoading: isLoadingCustomerGroups } = useQuery({
+    queryKey: ["vendor-customer-groups-picker"],
+    queryFn: () => listVendorCustomerGroups({ limit: 100, offset: 0 }),
+  })
+  const customerGroups = customerGroupsData?.customer_groups ?? []
+
   const [campaignChoice, setCampaignChoice] = useState<CampaignChoice>("none")
   const [existingCampaignId, setExistingCampaignId] = useState<string | null>(null)
   const [newCampaign, setNewCampaign] = useState<NewCampaignDraft>(
@@ -209,6 +231,8 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
     setBuyRuleId(undefined)
     setBuyMinQuantity("1")
     setApplyToQuantity("1")
+    setEligibilityType("all")
+    setSelectedCustomerGroupIds([])
   }
 
   const isFreeShipping = template.id === "free_shipping"
@@ -224,7 +248,7 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
       : undefined
 
   /**
-   * Applies target_rules/buy_rules changes through the dedicated batch
+   * Applies target_rules/buy_rules/rules changes through the dedicated batch
    * endpoints rather than through application_method on the update call:
    * AdminUpdateApplicationMethod is .strict() and does not accept
    * target_rules/buy_rules at all, so sending them there is rejected outright
@@ -233,6 +257,7 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
   const saveRules = async (promotionId: string) => {
     const targetIds = template.usesTargetProducts ? targetProductIds : []
     const buyIds = template.usesBuyProducts ? buyProductIds : []
+    const groupIds = eligibilityType === "groups" ? selectedCustomerGroupIds : []
 
     const targetBody = targetRuleId
       ? targetIds.length
@@ -257,6 +282,22 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
             ],
           }
         : null
+
+    const rulesBody = customerGroupRuleId
+      ? groupIds.length
+        ? { update: [{ id: customerGroupRuleId, values: groupIds }] }
+        : { delete: [customerGroupRuleId] }
+      : groupIds.length
+        ? {
+            create: [
+              { attribute: "customer_group_id", operator: "in" as const, values: groupIds },
+            ],
+          }
+        : null
+
+    if (rulesBody) {
+      await batchVendorPromotionRules(promotionId, "rules", rulesBody)
+    }
 
     if (targetBody) {
       await batchVendorPromotionRules(promotionId, "target-rules", targetBody)
@@ -290,6 +331,10 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
               ? promotionCurrencyCode ||
                 newCampaign.budget_currency_code.trim() ||
                 undefined
+              : undefined,
+          attribute:
+            newCampaign.budget_type === "usage"
+              ? newCampaign.budget_attribute || undefined
               : undefined,
         },
       })
@@ -354,6 +399,16 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
       }
 
       const campaign_id = await resolveCampaignId()
+      const eligibilityRules =
+        eligibilityType === "groups" && selectedCustomerGroupIds.length
+          ? [
+              {
+                attribute: "customer_group_id",
+                operator: "in" as const,
+                values: selectedCustomerGroupIds,
+              },
+            ]
+          : undefined
 
       try {
         return await createVendorPromotion({
@@ -363,6 +418,7 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
           is_automatic: isAutomatic,
           is_tax_inclusive: isTaxInclusive,
           application_method,
+          rules: eligibilityRules,
           limit: limit.trim() ? Number(limit) : undefined,
           campaign_id,
         })
@@ -421,6 +477,10 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
 
     if (isAutomatic && limit.trim()) {
       return "Automatic promotions cannot have a usage limit."
+    }
+
+    if (eligibilityType === "groups" && !selectedCustomerGroupIds.length) {
+      return "Select at least one customer group, or allow all customers."
     }
 
     return null
@@ -726,6 +786,74 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
                   disabled={isAutomatic}
                 />
               </Field>
+            </Card>
+
+            <Card
+              title="Who can use this code?"
+              description="Leave it open to everyone, or limit redemption to customer groups you own."
+            >
+              <RadioGroup
+                value={eligibilityType}
+                onValueChange={(value) => {
+                  const next = value as "all" | "groups"
+                  setEligibilityType(next)
+                  if (next === "all") {
+                    setSelectedCustomerGroupIds([])
+                  }
+                }}
+              >
+                <RadioGroup.ChoiceBox
+                  value="all"
+                  label="All customers"
+                  description="Anyone can redeem this code."
+                />
+                <RadioGroup.ChoiceBox
+                  value="groups"
+                  label="Specific customer groups"
+                  description="Only customers in the selected groups can redeem this code."
+                />
+              </RadioGroup>
+
+              {eligibilityType === "groups" && (
+                <div className="flex flex-col gap-y-2">
+                  {isLoadingCustomerGroups ? (
+                    <Text size="small" className="text-ui-fg-subtle">
+                      Loading customer groups…
+                    </Text>
+                  ) : customerGroups.length === 0 ? (
+                    <Text size="small" className="text-ui-fg-subtle">
+                      You don&apos;t have any customer groups yet. Create one
+                      under Customers, or allow all customers.
+                    </Text>
+                  ) : (
+                    customerGroups.map((group) => {
+                      const checked = selectedCustomerGroupIds.includes(group.id)
+                      return (
+                        <label
+                          key={group.id}
+                          className="flex cursor-pointer items-center gap-x-3 rounded-md border border-ui-border-base bg-ui-bg-subtle px-3 py-2"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(value) => {
+                              setSelectedCustomerGroupIds((current) =>
+                                value
+                                  ? current.includes(group.id)
+                                    ? current
+                                    : [...current, group.id]
+                                  : current.filter((id) => id !== group.id)
+                              )
+                            }}
+                          />
+                          <span className="txt-compact-small text-ui-fg-base">
+                            {group.name}
+                          </span>
+                        </label>
+                      )
+                    })
+                  )}
+                </div>
+              )}
             </Card>
 
             {(template.usesTargetProducts || template.usesBuyProducts) && (

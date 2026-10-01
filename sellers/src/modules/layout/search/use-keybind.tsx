@@ -131,6 +131,12 @@ export const useGlobalShortcuts = (): Shortcut[] => {
         type: "settingShortcut",
         to: "/settings/refund-reasons",
       },
+      {
+        keys: { Mac: ["G", ",", "W"] },
+        label: "Workflows",
+        type: "settingShortcut",
+        to: "/settings/workflows",
+      },
 
       // Commands
       {

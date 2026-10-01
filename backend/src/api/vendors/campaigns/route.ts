@@ -12,6 +12,7 @@ export const GetVendorCampaignsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
   q: z.string().optional(),
+  order: z.string().optional(),
 })
 
 export const POST = async (
@@ -43,7 +44,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q } = req.validatedQuery as unknown as z.infer<
+  const { limit, offset, q, order } = req.validatedQuery as unknown as z.infer<
     typeof GetVendorCampaignsSchema
   >
 
@@ -65,6 +66,11 @@ export const GET = async (
     return
   }
 
+  const desc = order?.startsWith("-") ?? false
+  const orderField = order ? (desc ? order.slice(1) : order) : undefined
+  const allowedOrder =
+    orderField === "name" || orderField === "created_at" ? orderField : undefined
+
   const { data: campaigns, metadata } = await query.graph({
     entity: "campaign",
     fields: VENDOR_CAMPAIGN_FIELDS,
@@ -75,7 +81,9 @@ export const GET = async (
     pagination: {
       skip: offset,
       take: limit,
-      order: { created_at: "DESC" },
+      order: allowedOrder
+        ? { [allowedOrder]: desc ? "DESC" : "ASC" }
+        : { created_at: "DESC" },
     },
   })
 

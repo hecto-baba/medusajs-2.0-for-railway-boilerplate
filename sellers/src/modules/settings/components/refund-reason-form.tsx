@@ -6,7 +6,7 @@ import {
   type VendorRefundReason,
 } from "@lib/data/vendor-client"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Button, Input, toast } from "@medusajs/ui"
+import { Button, Input, Textarea, toast } from "@medusajs/ui"
 import { Form, KeyboundForm, RouteDrawer, useRouteModal } from "@modules/common"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
@@ -15,6 +15,7 @@ import * as zod from "zod"
 const RefundReasonSchema = zod.object({
   label: zod.string().min(1, "Label is required."),
   code: zod.string().min(1, "Code is required."),
+  description: zod.string().optional(),
 })
 
 type RefundReasonFormProps = {
@@ -31,6 +32,7 @@ export const RefundReasonForm = ({ reason }: RefundReasonFormProps) => {
     defaultValues: {
       label: reason?.label ?? "",
       code: reason?.code ?? "",
+      description: reason?.description ?? "",
     },
     resolver: zodResolver(RefundReasonSchema),
   })
@@ -38,8 +40,16 @@ export const RefundReasonForm = ({ reason }: RefundReasonFormProps) => {
   const { mutateAsync, isPending } = useMutation({
     mutationFn: (values: zod.infer<typeof RefundReasonSchema>) =>
       isEdit
-        ? updateVendorRefundReason(reason!.id, values)
-        : createVendorRefundReason(values),
+        ? updateVendorRefundReason(reason!.id, {
+            label: values.label,
+            code: values.code,
+            description: values.description?.trim() || null,
+          })
+        : createVendorRefundReason({
+            label: values.label,
+            code: values.code,
+            description: values.description?.trim() || null,
+          }),
   })
 
   const handleSubmit = form.handleSubmit(async (values) => {
@@ -90,6 +100,20 @@ export const RefundReasonForm = ({ reason }: RefundReasonFormProps) => {
                   <Form.Label>Code</Form.Label>
                   <Form.Control>
                     <Input {...field} placeholder="refund" />
+                  </Form.Control>
+                  <Form.ErrorMessage />
+                </Form.Item>
+              )}
+            />
+
+            <Form.Field
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <Form.Item>
+                  <Form.Label optional>Description</Form.Label>
+                  <Form.Control>
+                    <Textarea {...field} placeholder="Reason description..." />
                   </Form.Control>
                   <Form.ErrorMessage />
                 </Form.Item>
