@@ -4,7 +4,8 @@ import { SidebarLeft } from "@medusajs/icons"
 import { IconButton, Text } from "@medusajs/ui"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import { getVendorCapabilities, isRouteAllowed } from "@lib/permissions/feature-access"
 import { Sidebar } from "./sidebar"
 import { SettingsSidebar } from "./settings-sidebar"
 import {
@@ -165,6 +166,21 @@ export const PanelShell = ({
       router.replace("/onboarding")
     }
   }, [isOnboardingLoading, onboarding, isApproved, isOnboarding, router])
+
+  // Capability gate: the flags decide which sidebar items show, but typing a URL
+  // such as /venues used to open the page anyway. An approved seller whose
+  // capabilities do not include a route is sent back to the orders list.
+  const capabilities = useMemo(() => getVendorCapabilities(onboarding), [onboarding])
+
+  useEffect(() => {
+    if (isOnboardingLoading || !onboarding || !isApproved) {
+      return
+    }
+
+    if (!isRouteAllowed(pathname, capabilities)) {
+      router.replace("/orders")
+    }
+  }, [isOnboardingLoading, onboarding, isApproved, pathname, capabilities, router])
 
   const showOnboardingBanner =
     !isOnboarding && onboarding && onboarding.status !== "APPROVED"
