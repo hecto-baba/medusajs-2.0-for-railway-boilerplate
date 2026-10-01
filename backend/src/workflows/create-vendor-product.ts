@@ -12,6 +12,7 @@ import {
 } from "@medusajs/medusa/core-flows"
 import { Modules, ProductStatus } from "@medusajs/framework/utils"
 import { MARKETPLACE_MODULE } from "../modules/marketplace"
+import { syncVendorTaxRulesStep } from "./steps/sync-vendor-tax-rules"
 
 export type CreateVendorProductWorkflowInput = {
   vendor_admin_id: string
@@ -150,6 +151,13 @@ export const createVendorProductWorkflow = createWorkflow(
     )
 
     createRemoteLinkStep(linksToCreate)
+
+    // The seller's tax rates must cover the new product.
+    syncVendorTaxRulesStep(
+      transform({ vendorAdmins }, (data) => ({
+        vendor_id: data.vendorAdmins?.[0]?.vendor?.id as string,
+      }))
+    )
 
     const { data: products } = useQueryGraphStep({
       entity: "product",

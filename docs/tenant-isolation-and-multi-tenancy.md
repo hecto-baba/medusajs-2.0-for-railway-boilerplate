@@ -1,6 +1,6 @@
 # Tenant Isolation and Multi-Tenancy Plan
 
-Status: Phases 0 and 1 complete; Phase 2 next. Branch: `feature/tenant-isolation` (off `feature/marketplace`).
+Status: Phases 0 and 1 complete; Phase 2 in progress (steps 1 to 4 done, see section 11). Branch: `feature/tenant-isolation` (off `feature/marketplace`).
 Scope: the seller (vendor) API `backend/src/api/vendors/**`, the seller panel `sellers/`, and bringing the missing admin features to sellers.
 Out of scope: Vendor Transactions (stays admin-only), drivers, and the admin API / store routes (see "What this plan does not cover").
 
@@ -92,7 +92,7 @@ Regions, country tax regions, shared taxonomy (category and collection lists), p
 | D1 | Customer visibility: a seller can read customers who ordered from them, with limited fields; writes only for customers the seller created. Stricter marketplace norm (customer visible only through an order to fulfil, no directory/search) can be adopted later | **Decided: keep as is** |
 | D2 | Seller payouts: Stripe Connect or a platform-held payout ledger | **Open** (needed before Phase 3 step 5) |
 | D3 | Is the database in `backend/.env` a development database? | **Open** (needed before Phase 0 step 1 testing) |
-| D4 | Seller tax is done with a seller-owned rate model and a custom tax provider (country tax regions stay platform-owned because of the unique-per-country index) | Proposed; verify the 2.19 custom tax provider API first |
+| D4 | Seller tax: a seller-owned **native Medusa tax rate** with product and shipping-option rules, not a custom provider (country tax regions stay platform-owned because of the unique-per-country index) | **Decided (Phase 2.4)**: the 2.19 provider interface gets only the item and the rates, with no way to look up a seller, so a provider cannot do it cleanly; native rate rules can |
 | D5 | Orders are split into a parent order (holds the payment) plus one child order per seller, per Medusa's marketplace recipe | Proposed |
 | D6 | Regions stay platform-owned and read-only for sellers (a cart picks one region per country) | Proposed |
 
@@ -367,3 +367,29 @@ The route guard ratchet backlog went from 24 unguarded by-id routes to 1 (an ine
 - `pnpm run test:integration`: starts a local embedded Postgres, runs every HTTP spec in its own process (one long-lived process runs out of memory after about fifteen), prints a summary, and removes the database.
 - `pnpm run test:integration -- <path>`: one spec.
 - Runner behaviour worth knowing: data created inside a test is rolled back after it (only `beforeAll` data persists), setup in a second describe block is lost, and an import left waiting for confirmation blocks teardown, so tests must abandon what they start.
+
+## 11. Phase 2 progress
+
+Each step: test first, then the fix, one commit, listed below with its test file (under `backend/integration-tests/http/phase2/`).
+
+| Step | Done | What it does | Test |
+|---|---|---|---|
+| 1 | yes | A new seller location gets a shipping fulfilment set, a service zone for its country, the manual provider link and the default sales channel link | stock-location-provisioning (4) |
+| 2 | yes | `/vendors/shipping-options` list, create, read, update, delete. Ownership by chain seller -> location -> set -> zone -> option (no new link). Only the seller's own profile, own-or-platform option type, provider linked to the location, flat price, fixed storefront rules | shipping-options (8) |
+| 3 | yes | Checkout per seller: `GET /store/carts/:id/seller-shipping-options` returns one group per shipping profile with only the options that ship those items; an `addShippingMethodToCart` hook refuses an option that ships nothing in the cart; the storefront shows one choice per seller | cart-shipping (3) |
+| 4 | yes | Seller tax: `/vendors/tax-rates` (own rates only), a new vendor <-> tax rate link, and rules that keep each rate attached to the seller's products and shipping options | seller-tax (5) |
+| 5 | no | Backfill of existing records |  |
+| 6 | no | Seller panel screens for shipping options and tax, nav links |  |
+
+### 11.1 Findings from Phase 2
+
+- Medusa keeps ONE shipping method per shipping profile (adding a method removes the cart's methods for the same profile) and does not filter the option list by the items in the cart. That is the real cause of the storefront "keeps the last choice" behaviour. The fix is structural: each seller ships under their own profile, so two sellers never collide.
+- The 2.19 tax provider receives only the item (id, product id, type, quantity, price) and the rates found for it. It has no way to find the seller, so seller tax is done with native rate rules (D4 above).
+- A tax rate requires a `code`; the seller route defaults it to the name.
+- A seller location's fulfilment set stays behind when the location is deleted (the link is removed, the set is not), as in Medusa admin.
+
+### 11.2 What this means for existing data (to be handled by step 5)
+
+- Existing seller products usually sit on a shared platform profile, so they form one group at checkout served by platform options. A seller's own shipping options are only offered for products on the seller's own profile, so step 5 must move each seller's products onto an own profile (creating one when the seller has none).
+- Existing sellers have no fulfilment set on their location (step 1 only covers new locations), so step 5 must provision it.
+- Tax regions must have a platform default rate for seller rates to override.

@@ -152,6 +152,11 @@ import {
 } from "./vendors/shipping-options/route";
 import { UpdateVendorShippingOptionSchema } from "./vendors/shipping-options/[id]/route";
 import {
+  CreateVendorTaxRateSchema,
+  GetVendorTaxRatesSchema,
+} from "./vendors/tax-rates/route";
+import { UpdateVendorOwnTaxRateSchema } from "./vendors/tax-rates/[id]/route";
+import {
   GetVendorSalesChannelsSchema,
   CreateVendorSalesChannelSchema,
 } from "./vendors/sales-channels/route";
@@ -1561,6 +1566,27 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(UpdateVendorShippingOptionTypeSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/tax-rates",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorTaxRatesSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/tax-rates",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorTaxRateSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/tax-rates/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorOwnTaxRateSchema)
       ]
     },
     {

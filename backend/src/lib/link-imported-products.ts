@@ -1,6 +1,7 @@
 import type { MedusaContainer } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { MARKETPLACE_MODULE } from "../modules/marketplace"
+import { syncVendorTaxRules } from "./vendor-tax"
 
 /** An import that has not finished within this window no longer claims its handles. */
 const IMPORT_ACTIVE_MS = 24 * 60 * 60 * 1000
@@ -72,6 +73,9 @@ export const linkImportedProductToVendor = async (
     [MARKETPLACE_MODULE]: { vendor_id: owner.vendor_id },
     [Modules.PRODUCT]: { product_id: productId },
   })
+
+  // The seller's tax rates must cover the imported product.
+  await syncVendorTaxRules(container, owner.vendor_id)
 
   return owner.vendor_id
 }

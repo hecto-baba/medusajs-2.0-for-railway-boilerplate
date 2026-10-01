@@ -5,6 +5,8 @@ import type {
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { createShippingOptionsWorkflow } from "@medusajs/medusa/core-flows"
+import { syncVendorTaxRules } from "../../../lib/vendor-tax"
+import { getVendorId } from "../shared/vendor-scope"
 import {
   assertVendorOwnsServiceZone,
   getOwnedShippingScope,
@@ -99,6 +101,9 @@ export const POST = async (
       } as any,
     ],
   })
+
+  // The seller's tax rates must cover the new option (shipping is taxed too).
+  await syncVendorTaxRules(req.scope, await getVendorId(req))
 
   res.status(201).json({ shipping_option: await refetchShippingOption(req, result[0].id) })
 }
