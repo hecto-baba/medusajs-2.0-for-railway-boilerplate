@@ -97,6 +97,9 @@ export type VendorOrder = {
   sales_channel?: { name: string | null } | null
   payment_collections?: { status: string }[]
   fulfillments?: { id: string; delivered_at: string | null; shipped_at: string | null }[]
+  // True for an older order that holds other sellers' items too: only this
+  // seller's items are shown and whole-order figures are withheld.
+  is_mixed?: boolean
 }
 
 /** A single order's full detail, scoped to the vendor's own line items. */

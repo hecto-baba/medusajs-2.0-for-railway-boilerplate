@@ -35,7 +35,7 @@ const loadCartItems = async (container: MedusaContainer, cartId: string): Promis
 }
 
 /** product id -> the seller that owns it (products with no seller are absent). */
-const loadProductSellers = async (
+export const loadProductSellers = async (
   container: MedusaContainer,
   productIds: string[]
 ): Promise<Map<string, { id: string; name: string | null }>> => {

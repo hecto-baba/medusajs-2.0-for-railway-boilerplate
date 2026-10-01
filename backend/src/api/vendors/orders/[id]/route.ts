@@ -5,7 +5,7 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { getOrdersListWorkflow } from "@medusajs/medusa/core-flows"
 import { assertVendorOwns } from "../../shared/vendor-scope"
-import { scopeOrderToVendor } from "../helpers"
+import { decorateSplitChildren, scopeOrderToVendor } from "../helpers"
 
 /**
  * A single order, scoped to the calling vendor - the by-id counterpart to
@@ -47,6 +47,7 @@ export const GET = async (
         "created_at",
         "currency_code",
         "email",
+        "metadata",
         "total",
         "subtotal",
         "shipping_total",
@@ -92,5 +93,7 @@ export const GET = async (
     return
   }
 
-  res.json({ order: scoped })
+  const [decorated] = await decorateSplitChildren(req.scope, [scoped])
+
+  res.json({ order: decorated })
 }

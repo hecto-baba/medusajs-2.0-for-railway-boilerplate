@@ -25,6 +25,7 @@ export const getVendorCustomerIds = async (
       "vendor.id",
       "vendor.customers.id",
       "vendor.orders.customer_id",
+      "vendor.orders.metadata",
     ],
     filters: { id: [req.auth_context.actor_id] },
   })
@@ -43,9 +44,12 @@ export const getVendorCustomerIds = async (
     .filter((id): id is string => !!id) ?? []
 
   const orderCustomerIds = (
-    (vendorAdmin.vendor as any).orders as { customer_id?: string }[] | undefined
+    (vendorAdmin.vendor as any).orders as
+      | { customer_id?: string; metadata?: { buyer_customer_id?: string | null } }[]
+      | undefined
   )
-    ?.map((o) => o?.customer_id)
+    // A seller's child order keeps the buyer in metadata, not customer_id.
+    ?.map((o) => o?.customer_id ?? o?.metadata?.buyer_customer_id)
     .filter((id): id is string => !!id) ?? []
 
   return Array.from(new Set([...directIds, ...orderCustomerIds]))
@@ -183,20 +187,25 @@ export const refetchVendorCustomer = async (
   // Count orders placed by this customer for this vendor
   const { data: vendorOrders } = await query.graph({
     entity: "order",
-    fields: ["id", "total", "currency_code", "created_at"],
+    fields: ["id", "total", "currency_code", "created_at", "customer_id", "metadata"],
     filters: {
-      customer_id: [id],
       vendor: { id: [vendorId] },
     },
   }).catch(() => ({ data: [] }))
+
+  // The vendor's orders placed by THIS customer (a seller's child order keeps the
+  // buyer in metadata rather than customer_id).
+  const customerOrders = (vendorOrders as any[])
+    .filter((order) => order.customer_id === id || order.metadata?.buyer_customer_id === id)
+    .map(({ customer_id, metadata, ...rest }) => rest)
 
   const directIds = new Set(await getVendorDirectCustomerIds(req))
   const ownedGroupIds = new Set(await getVendorCustomerGroupIds(req))
 
   return {
     ...shapeCustomerForVendor(customer as any, directIds, ownedGroupIds),
-    orders_count: vendorOrders.length,
-    orders: vendorOrders,
+    orders_count: customerOrders.length,
+    orders: customerOrders,
   }
 }
 export const getVendorCustomerGroupIds = async (

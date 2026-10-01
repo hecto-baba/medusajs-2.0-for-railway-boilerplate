@@ -90,10 +90,10 @@ Regions, country tax regions, shared taxonomy (category and collection lists), p
 | # | Decision | Status |
 |---|---|---|
 | D1 | Customer visibility: a seller can read customers who ordered from them, with limited fields; writes only for customers the seller created. Stricter marketplace norm (customer visible only through an order to fulfil, no directory/search) can be adopted later | **Decided: keep as is** |
-| D2 | Seller payouts: Stripe Connect or a platform-held payout ledger | **Open** (needed before Phase 3 step 5) |
+| D2 | Seller payouts: Stripe Connect or a platform-held payout ledger | **Decided: platform-held ledger** (the platform collects the whole payment on the parent order, records what each seller is owed, and pays sellers itself; Stripe Connect can be added later and fed from the ledger) |
 | D3 | Is the database in `backend/.env` a development database? | **Open** (needed before Phase 0 step 1 testing) |
 | D4 | Seller tax: a seller-owned **native Medusa tax rate** with product and shipping-option rules, not a custom provider (country tax regions stay platform-owned because of the unique-per-country index) | **Decided (Phase 2.4)**: the 2.19 provider interface gets only the item and the rates, with no way to look up a seller, so a provider cannot do it cleanly; native rate rules can |
-| D5 | Orders are split into a parent order (holds the payment) plus one child order per seller, per Medusa's marketplace recipe | Proposed |
+| D5 | Orders are split into a parent order (holds the payment) plus one child order per seller | **Decided (Phase 3)**: done after placement by a subscriber rather than inside a custom complete-cart workflow, so every completion path is covered. See section 12 |
 | D6 | Regions stay platform-owned and read-only for sellers (a cart picks one region per country) | Proposed |
 
 ## 5. Rules for every step
@@ -447,3 +447,85 @@ Code for steps 1 to 6 is written and committed. These items remain before Phase 
 - A seller's shipping option must use the seller's own profile; two sellers on a shared profile would overwrite each other's choice (Medusa keeps one method per profile).
 - Shipping options are flat-price only; calculated pricing is not offered to sellers.
 - Admin-side screens and routes for these new resources were not changed or audited.
+
+## 12. Phase 3: order splitting and payments
+
+### 12.1 Design note (step 2)
+
+**Model.** The cart completes into ONE parent order. It holds the buyer's payment, shipping choices, tickets, rentals, emails: it is the order the buyer sees. For each seller whose products are in it, a CHILD order is created holding only that seller's items and the shipping methods that ship them. Rules:
+
+| Case | Result |
+|---|---|
+| All items belong to one seller | The parent is that seller's order and is linked to them. Nothing is split |
+| Items of several sellers, or a seller's items next to platform items | One child per seller, each linked to its seller. The parent is linked to no seller, so no seller can open the whole order |
+| No seller item at all | Nothing to do |
+
+**Why a subscriber, not a custom complete-cart workflow.** Every completion path (core, quote acceptance, draft order conversion) announces `order.placed`. One subscriber covers all of them; a custom workflow would cover only the paths that call it.
+
+**Linking parent and child.** A table `vendor_order_split` (marketplace module): parent order id, child order id, seller, currency, items, shipping, tax and total, payout status. It doubles as the payout ledger. A unique index on (parent, seller) makes the split idempotent: a re-run skips sellers that already have a child, so a failure half-way is repaired by running it again. A child also carries `metadata.split_child`, `parent_order_id`, `vendor_id` and `buyer_customer_id`; each copied line item carries `metadata.parent_line_item_id`.
+
+**Children have no customer id.** Medusa lists a customer's orders by `customer_id`, so a child with one would appear in the buyer's order history next to the order they paid for. The buyer is kept in metadata and the seller screens fill the customer from the shipping address (customer visibility rule D1 reads the metadata too).
+
+**Payment.** The parent keeps the single payment collection. A child has none; seller screens show only the parent's payment STATUS, never its amounts. Because the platform collects everything, Medusa's Stripe partial-capture gap does not apply.
+
+**Ledger (D2).** One row per child: items, shipping, tax and total in the order currency, status owed -> paid (admin, with a bank reference) or void. Cancelling a child voids its row; cancelling the parent cancels every child and voids their rows. Paid rows are final.
+
+**What stays on the parent.** Emails (one confirmation, from the parent), tickets, digital orders, appointments, rentals and expressions of interest are written against the parent order and its line items. The parent is the buyer's record, so those flows needed no change. Where a seller works from the child, lookups translate through `parent_line_item_id` (rentals).
+
+### 12.2 The nine steps
+
+| # | Step | Status |
+|---|---|---|
+| 1 | Decide payouts (D2) | Done: platform ledger |
+| 2 | Design note | Done (12.1) |
+| 3 | Split at checkout | Done: `lib/split-order.ts`, run by the `order.placed` subscriber; replaces the old link-vendor-order logic, which tried to link several sellers to one order and could not |
+| 4 | One completion path | Done in code: `complete-cart-marketplace` workflow and `POST /store/carts/:id/complete-all` run core completion once, then tickets, rentals, appointments, expressions of interest and digital products for whatever the cart holds. The storefront now calls only this. Old routes remain. **Tested end to end for the standard path only**, see 12.3 |
+| 5 | Payment and payouts | Done: ledger table, `GET /vendors/payouts` (own entries and totals), `GET /admin/vendor-payouts`, `POST /admin/vendor-payouts/:id` (mark paid or void). No admin screen yet |
+| 6 | Everything that assumed one order per cart | Done as listed in 12.4 |
+| 7 | Storefront | Done: `GET /store/orders/:id/seller-orders`; a "Shipped by" block on the confirmation page and the account order page |
+| 8 | Existing orders | Done: legacy shared orders keep the Phase 1 redaction and now carry `is_mixed`; the seller screen shows a note. Not rewritten |
+| 9 | Performance | Done: the seller order list filters, sorts and pages in the database and loads full order details only for the page. Free-text search, payment and fulfilment status and sorting by total still narrow in memory, over light rows |
+
+### 12.3 Tested and not tested
+
+Tested in `integration-tests/http/phase3/order-split.spec.ts` (a real two-seller cart completed with payment through `complete-all`):
+- one child per seller with only their items and shipping, parent linked to no seller
+- each seller sees their own child and never the other's; 404 on the parent
+- ledger rows add up to the parent order (items, shipping, tax, total)
+- re-running the split creates nothing
+- a one-seller order (placed through core completion) is not split
+- seller ledger scoping and totals; admin settlement; settled entries are final
+- cancelling the parent cancels the children and voids the ledger
+
+**Not tested in integration:** the ticket, rental, appointment, expressions-of-interest and digital blocks of `complete-cart-marketplace` (they reuse the existing steps unchanged; only the standard path is exercised), rental activation from a seller shipment, quote acceptance announcing the order, the storefront pages (typechecked only), the seller order list rewrite beyond the default page.
+
+### 12.4 Step 6 in detail
+
+| Item | Outcome |
+|---|---|
+| `link-vendor-order` subscriber and `order.placed` | Replaced by the splitter (one parent event; children are created through `order.created`, so nothing fires twice) |
+| Buyer confirmation email (`order-placed`) | Unchanged: sent once, from the parent, listing everything |
+| Tickets (`ticket-order-placed`) | Unchanged: tickets belong to the parent |
+| Digital orders | Unchanged: created and linked on the parent |
+| Rentals | Seller order screens and rental ownership now find rentals through the parent (`rentals/helpers.ts`, `orders/[id]/rentals`); shipment activation and cancellation map child line items to the parent's through `parent_line_item_id` |
+| EOI | Written against the parent; the seller EOI screens are Phase 5 |
+| `order-canceled` | Rewritten: cascades parent -> children, voids ledger entries, cancels rentals by either id scheme |
+| `shipment-created` | Maps child line items to the parent's for rental activation |
+| Company and approval flows | Operate on the cart and the parent order, which the buyer owns; unchanged by design |
+| Quotes | Accepting a quote now announces `order.placed` for the order, so the buyer is confirmed and the seller gets it; before, nothing was emitted |
+| Vendor draft-order conversion | Core already emits `order.placed`, so it now goes through the splitter |
+| Restaurant delivery | Its second order is now marked `delivery_order` in metadata. It still has no payment and is not linked to a seller; restaurant sellers get their deliveries in Phase 5 |
+
+### 12.5 Deploy notes
+
+- `medusa db:migrate` creates the `vendor_order_split` table (migration 20261001140000).
+- Orders placed BEFORE this release are not split; they keep the Phase 1 handling.
+- The storefront must be deployed together with the backend: it now calls `/store/carts/:id/complete-all`.
+
+### 12.6 Known gaps carried forward
+
+- No admin screen for the payout ledger (API only); no seller screen for earnings (API only).
+- Refunds and returns against a child order, and seller fulfilment, are Phase 4.
+- `GET /store/orders/:id` and the new `/seller-orders` take an order id with no customer check (the existing route already worked this way, for guest confirmation pages).
+- Ledger amounts are decimal floats in the order currency.
+- A child order that cannot be cancelled (already fulfilled) when its parent is cancelled is logged and left for a person.

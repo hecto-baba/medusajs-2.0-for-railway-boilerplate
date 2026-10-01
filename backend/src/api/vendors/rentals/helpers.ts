@@ -2,6 +2,8 @@ import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import { assertVendorOwns } from "../shared/vendor-scope"
 import { getVendorVariantIds } from "../price-lists/helpers"
+import { getOwnedIds, getVendorId } from "../shared/vendor-scope"
+import { vendorHasChildOf } from "../../../lib/split-order"
 
 /**
  * Confirms a rental id belongs to one of the calling vendor's orders.
@@ -36,7 +38,17 @@ export const assertVendorOwnsRental = async (
     throw new MedusaError(MedusaError.Types.NOT_FOUND, "Rental not found.")
   }
 
-  await assertVendorOwns(req, "orders", rental.order_id, "Rental not found.")
+  // A rental points at the order the cart completed into. For a multi-seller
+  // order that is the PARENT, which no seller is linked to; the seller owns it
+  // through their child order.
+  const ownedOrderIds = await getOwnedIds(req, "orders")
+  const owns =
+    ownedOrderIds.includes(rental.order_id) ||
+    (await vendorHasChildOf(req.scope, await getVendorId(req), rental.order_id))
+
+  if (!owns) {
+    throw new MedusaError(MedusaError.Types.NOT_FOUND, "Rental not found.")
+  }
 
   // An order can carry rentals of several sellers' products. Being linked to the
   // order is not enough: the rental's variant must belong to one of THIS

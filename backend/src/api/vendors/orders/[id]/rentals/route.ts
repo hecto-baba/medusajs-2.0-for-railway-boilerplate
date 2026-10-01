@@ -5,6 +5,7 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { assertVendorOwns } from "../../../shared/vendor-scope"
 import { getVendorVariantIds } from "../../../price-lists/helpers"
+import { getOrderFamilyIds } from "../../../../../lib/split-order"
 
 /**
  * Rentals booked on one of the vendor's orders.
@@ -51,7 +52,9 @@ export const GET = async (
       "product_variant.product.thumbnail",
     ],
     filters: {
-      order_id: id,
+      // Rentals were written on the order the cart completed into: for a seller
+      // child order that is its parent.
+      order_id: await getOrderFamilyIds(req.scope, id),
       variant_id: ownedVariantIds,
     },
   })

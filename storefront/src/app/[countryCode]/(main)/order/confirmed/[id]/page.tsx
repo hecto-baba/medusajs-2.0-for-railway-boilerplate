@@ -3,7 +3,7 @@ import { Metadata } from "next"
 import OrderCompletedTemplate from "@modules/order/templates/order-completed-template"
 import { notFound } from "next/navigation"
 import { enrichLineItems } from "@lib/data/cart"
-import { retrieveOrder } from "@lib/data/orders"
+import { retrieveOrder, retrieveSellerOrders } from "@lib/data/orders"
 import { HttpTypes } from "@medusajs/types"
 
 type Props = {
@@ -41,5 +41,7 @@ export default async function OrderConfirmedPage({ params }: Props) {
     return notFound()
   }
 
-  return <OrderCompletedTemplate order={order} />
+  const sellerOrders = await retrieveSellerOrders(id)
+
+  return <OrderCompletedTemplate order={order} sellerOrders={sellerOrders} />
 }

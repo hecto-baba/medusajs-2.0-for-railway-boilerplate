@@ -2,7 +2,7 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import OrderDetailsTemplate from "@modules/order/templates/order-details-template"
-import { retrieveOrder } from "@lib/data/orders"
+import { retrieveOrder, retrieveSellerOrders } from "@lib/data/orders"
 import { enrichLineItems } from "@lib/data/cart"
 import { HttpTypes } from "@medusajs/types"
 
@@ -47,5 +47,7 @@ export default async function OrderDetailPage({ params }: Props) {
     notFound()
   }
 
-  return <OrderDetailsTemplate order={order} />
+  const sellerOrders = await retrieveSellerOrders(id)
+
+  return <OrderDetailsTemplate order={order} sellerOrders={sellerOrders} />
 }

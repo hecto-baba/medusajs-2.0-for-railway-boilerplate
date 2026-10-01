@@ -83,6 +83,15 @@ export const OrderDetail = ({ id }: OrderDetailProps) => {
         </Link>
       </div>
 
+      {order.is_mixed && (
+        <Container className="p-4" data-testid="legacy-shared-order-note">
+          <Text size="small" className="text-ui-fg-subtle">
+            This is an older order that also contained other sellers' items. You see only your own
+            items; payment, shipping and the whole-order totals are not shown here.
+          </Text>
+        </Container>
+      )}
+
       <Container className="p-6">
         <div className="flex items-start justify-between">
           <div className="flex flex-col gap-y-2">

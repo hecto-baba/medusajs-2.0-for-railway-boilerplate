@@ -1,10 +1,11 @@
 import {
   confirmOrderEditRequestWorkflow,
+  emitEventStep,
   updateOrderWorkflow,
   useQueryGraphStep,
 } from "@medusajs/medusa/core-flows"
 import { OrderStatus } from "@medusajs/framework/utils"
-import { createWorkflow } from "@medusajs/framework/workflows-sdk"
+import { createWorkflow, transform } from "@medusajs/framework/workflows-sdk"
 import { validateQuoteCanAcceptStep } from "./steps/validate-quote-can-accept"
 import { QuoteStatus } from "../modules/quote/models/quote"
 import { updateQuotesStep } from "./steps/update-quotes"
@@ -53,5 +54,14 @@ export const customerAcceptQuoteWorkflow = createWorkflow(
         is_draft_order: false,
       },
     })
+
+    // An accepted quote becomes a real order but never went through cart
+    // completion, so nothing announced it: no buyer confirmation, and no seller
+    // ever got the order. Announce it like any placed order; the seller-order
+    // subscriber then links or splits it.
+    emitEventStep({
+      eventName: "order.placed",
+      data: transform({ quotes }, (data) => ({ id: data.quotes[0].draft_order_id })),
+    }).config({ name: "emit-order-placed-for-accepted-quote" })
   }
 )

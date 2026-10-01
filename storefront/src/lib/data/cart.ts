@@ -536,45 +536,15 @@ export async function placeOrder() {
 
   const cart = await retrieveCart()
 
-  // A cart holding rental items has to complete through the rental route.
-  // The standard complete endpoint creates the order but no rental records,
-  // which would leave the booked dates looking free to every later shopper
-  // and give the activation and cancellation handlers nothing to act on.
-  const hasRentalItems = (cart?.items ?? []).some(
-    (item) =>
-      !!item.metadata?.rental_start_date && !!item.metadata?.rental_end_date
+  // One completion endpoint for every cart. It completes the cart once and then
+  // records whatever it holds: tickets, rentals, appointments, expressions of
+  // interest and digital products. The storefront used to pick one of four
+  // endpoints from the cart's contents, so a mixed cart could only complete one
+  // kind of item.
+  const completeCart = sdk.client.fetch<{ type: string; order: HttpTypes.StoreOrder }>(
+    `/store/carts/${cartId}/complete-all`,
+    { method: "POST", headers: { ...(await getAuthHeaders()) } }
   )
-
-  // A cart holding tickets has to complete through the ticket route for the
-  // same reason: the standard endpoint creates the order but no ticket
-  // purchases, so the seats would still look free to the next shopper and the
-  // confirmation email would have no tickets to send.
-  const hasTicketItems = (cart?.items ?? []).some(
-    (item) => !!item.metadata?.seat_number && !!item.metadata?.show_date
-  )
-
-  const hasDigitalItems = (cart?.items ?? []).some(
-    (item: any) =>
-      !!item.variant?.digital_product ||
-      item.metadata?.is_digital === true
-  )
-
-  const completeCart = hasTicketItems
-    ? sdk.client.fetch<{ type: string; order: HttpTypes.StoreOrder }>(
-        `/store/carts/${cartId}/complete-tickets`,
-        { method: "POST", headers: { ...(await getAuthHeaders()) } }
-      )
-    : hasRentalItems
-      ? sdk.client.fetch<{ type: string; order: HttpTypes.StoreOrder }>(
-          `/store/rentals/${cartId}`,
-          { method: "POST", headers: { ...(await getAuthHeaders()) } }
-        )
-      : hasDigitalItems
-        ? sdk.client.fetch<{ type: string; order: HttpTypes.StoreOrder }>(
-            `/store/carts/${cartId}/complete-digital`,
-            { method: "POST", headers: { ...(await getAuthHeaders()) } }
-          )
-        : sdk.store.cart.complete(cartId, {}, await getAuthHeaders())
 
   const cartRes = await completeCart
     .then(async (cartRes: any) => {
