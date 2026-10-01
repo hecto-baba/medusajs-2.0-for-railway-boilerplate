@@ -38,8 +38,6 @@ const BACKLOG: string[] = [
   "categories/[id]/products/route.ts",
   "collections/[id]/products/route.ts",
   "collections/[id]/route.ts",
-  "draft-orders/[id]/convert/route.ts",
-  "draft-orders/[id]/route.ts",
   "layouts/[zone]/configuration/route.ts",
   "products/import/[transaction_id]/confirm/route.ts",
   "products/imports/[transaction_id]/confirm/route.ts",

@@ -6,6 +6,7 @@ import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { getOrdersListWorkflow } from "@medusajs/medusa/core-flows"
 import { createVendorDraftOrderWorkflow } from "../../../workflows/create-vendor-draft-order"
+import { assertVendorCanUseDraftOrderReferences } from "./helpers"
 
 export const GetVendorDraftOrdersSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -74,6 +75,9 @@ export const POST = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const input = req.validatedBody
+
+  // Every id in the body must be one this seller can use, before anything is created.
+  await assertVendorCanUseDraftOrderReferences(req, input)
 
   // Default region / currency / sales channel if missing
   let currencyCode = input.currency_code
