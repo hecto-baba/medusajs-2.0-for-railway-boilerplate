@@ -34,13 +34,14 @@ const REVIEWED_SAFE: Record<string, string> = {
     "legacy alias: a re-export of imports/[transaction_id]/confirm, which checks the import belongs to the seller",
   "workflow-executions/[id]/route.ts":
     "checks the execution was run for the seller (executionBelongsToSeller); covered by notifications-and-executions.spec.ts",
+  "tax-regions/[id]/route.ts":
+    "every handler refuses with 403: tax regions are platform-owned and read-only for sellers",
   "categories/[id]/route.ts":
     "shared taxonomy by design; its write handlers are 403 stubs",
 }
 
 const BACKLOG: string[] = [
   "layouts/[zone]/configuration/route.ts",
-  "tax-regions/[id]/route.ts",
 ]
 
 // Routes that query a whole entity table with no filter. Must only shrink.

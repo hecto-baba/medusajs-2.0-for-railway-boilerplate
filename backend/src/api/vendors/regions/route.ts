@@ -4,7 +4,7 @@ import type {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
-import { createRegionsWorkflow } from "@medusajs/medusa/core-flows"
+import { platformManaged } from "../shared/platform-managed"
 
 export const GetVendorRegionsSchema = z.object({
   q: z.string().optional(),
@@ -65,26 +65,7 @@ export const GET = async (
   res.json({ regions })
 }
 
-export const POST = async (
-  req: AuthenticatedMedusaRequest<z.infer<typeof CreateVendorRegionSchema>>,
-  res: MedusaResponse
-) => {
-  const { name, currency_code, countries, payment_providers } = req.validatedBody
-
-  const { result } = await createRegionsWorkflow(req.scope).run({
-    input: {
-      regions: [
-        {
-          name,
-          currency_code: currency_code.toLowerCase(),
-          countries,
-          payment_providers: payment_providers?.length
-            ? payment_providers
-            : ["pp_system_default"],
-        },
-      ],
-    },
-  })
-
-  res.status(201).json({ region: result[0] })
+export const POST = async () => {
+  // Regions are platform-owned (decision D6): sellers can read them, not change them.
+  throw platformManaged("Regions")
 }
