@@ -410,3 +410,40 @@ Each step: test first, then the fix, one commit, listed below with its test file
   3. The backfill has not run on any real database.
   4. Nothing is deployed to QA; `medusa db:migrate` is needed for the new vendor-tax-rate link table (and the Phase 1 tables).
 - Decisions needed from the owner: what to do with the unowned products, inventory items and customers the backfill reports; whether a seller with no shipping options of their own should fall back to platform options at checkout (today they see "no delivery options" unless their products stay on a platform profile).
+
+### 11.5 Pending in Phase 2 (checklist)
+
+Code for steps 1 to 6 is written and committed. These items remain before Phase 2 is closed.
+
+**A. Finish the gate (no outside access needed)**
+- [ ] Test: a two-seller cart completes into an order (needs a payment provider set up in the test). The gate reads "shows correct per-seller shipping choices and tax, and completes".
+- [ ] Re-run the full suite after that test is added.
+
+**B. Verification that needs a running environment**
+- [ ] Run the seller screens in a browser: Settings > Shipping Options and My Tax Rates (create, edit, delete), and the Categories link.
+- [ ] Run the storefront checkout in a browser with a two-seller cart (one choice per seller, Continue disabled until each is chosen, no-options message).
+- [ ] Check what a seller with no shipping options of their own sees at checkout.
+
+**C. Deploy to QA (needs owner action)**
+- [ ] Owner runs `railway login`; confirm which branch QA deploys from.
+- [ ] Push `feature/tenant-isolation` (owner confirms the push).
+- [ ] `medusa db:migrate` creates: `vendor_product_import` table, `vendor.metadata` column (idempotent), link tables vendor-shipping-profile, vendor-shipping-option-type, vendor-tax-rate. Confirm the tables exist.
+- [ ] Smoke test with a real seller account.
+
+**D. Backfill on real data (needs owner action)**
+- [ ] Database backup first.
+- [ ] Dry run `npx medusa exec ./src/scripts/phase2-backfill.ts`, read the counts.
+- [ ] Apply with `apply`, then run it again to confirm nothing is left.
+- [ ] Review the "needs attention" list.
+
+**E. Decisions for the owner**
+- [ ] Unowned records the backfill only reports (earlier live report: 46 products, 87 inventory items, 17 customers): platform-owned, or assign to a seller.
+- [ ] Should a seller with no shipping options of their own fall back to platform options at checkout? Today they see "no delivery options" unless their products stay on a shared platform profile.
+- [ ] The platform stock location and sales channel are still visible read-only to sellers; the plan said they would be retired from view in Phase 2. Retire them now or later?
+
+**F. Known limits to carry forward**
+- A deleted location leaves its fulfilment set behind (link removed, set kept), as in Medusa admin.
+- Seller tax covers products and shipping options, country regions only; province-level seller rates are not supported.
+- A seller's shipping option must use the seller's own profile; two sellers on a shared profile would overwrite each other's choice (Medusa keeps one method per profile).
+- Shipping options are flat-price only; calculated pricing is not offered to sellers.
+- Admin-side screens and routes for these new resources were not changed or audited.
