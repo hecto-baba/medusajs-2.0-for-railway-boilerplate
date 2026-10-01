@@ -2,7 +2,7 @@ import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { assertVendorCanSee, ScopedEntity } from "../shared/platform-scope"
-import { assertVendorCanUseShippingProfile } from "../shared/shipping-profile-scope"
+import { assertVendorOwns } from "../shared/vendor-scope"
 
 export const SHIPPING_OPTION_FIELDS = [
   "id",
@@ -75,13 +75,17 @@ export const GetVendorShippingOptionsSchema = z.object({
   stock_location_id: z.string().optional(),
 })
 
-/** Profile and type named in a body must be usable by the seller (own or platform). */
+/**
+ * The profile must be the seller's OWN, and the type one they may use (own or
+ * platform). Medusa keeps one shipping method per profile, so two sellers
+ * sharing a profile would overwrite each other's choice in a cart.
+ */
 export const assertShippingOptionReferences = async (
   req: AuthenticatedMedusaRequest,
   refs: { shipping_profile_id?: string; shipping_option_type_id?: string }
 ): Promise<void> => {
   if (refs.shipping_profile_id) {
-    await assertVendorCanUseShippingProfile(req, refs.shipping_profile_id)
+    await assertVendorOwns(req, "shipping_profiles", refs.shipping_profile_id, "Shipping profile not found.")
   }
   if (refs.shipping_option_type_id) {
     await assertVendorCanSee(
