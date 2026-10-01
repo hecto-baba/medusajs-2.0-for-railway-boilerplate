@@ -3,6 +3,7 @@ import type {
   MedusaResponse,
 } from "@medusajs/framework/http"
 import { getVendorId } from "../../shared/vendor-scope"
+import { assertOnboardingEditable } from "../helpers"
 import { onboardingStore } from "../../../../lib/onboarding-store"
 import { submitOnboarding } from "../../../../lib/trustclaw"
 
@@ -15,6 +16,7 @@ export const POST = async (
   res: MedusaResponse
 ) => {
   const vendorId = await getVendorId(req)
+  assertOnboardingEditable(vendorId)
 
   // 1. Mark as UNDER_REVIEW in local onboarding store
   const updatedRecord = onboardingStore.submit(vendorId)

@@ -1,6 +1,7 @@
 import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import { assertVendorOwns } from "../shared/vendor-scope"
+import { getVendorVariantIds } from "../price-lists/helpers"
 
 /**
  * Confirms a rental id belongs to one of the calling vendor's orders.
@@ -25,7 +26,7 @@ export const assertVendorOwnsRental = async (
 
   const { data: rentals } = await query.graph({
     entity: "rental",
-    fields: ["id", "order_id"],
+    fields: ["id", "order_id", "variant_id"],
     filters: { id: rentalId },
   })
 
@@ -36,4 +37,13 @@ export const assertVendorOwnsRental = async (
   }
 
   await assertVendorOwns(req, "orders", rental.order_id, "Rental not found.")
+
+  // An order can carry rentals of several sellers' products. Being linked to the
+  // order is not enough: the rental's variant must belong to one of THIS
+  // seller's products.
+  const ownedVariantIds = await getVendorVariantIds(req)
+
+  if (!ownedVariantIds.includes((rental as any).variant_id)) {
+    throw new MedusaError(MedusaError.Types.NOT_FOUND, "Rental not found.")
+  }
 }

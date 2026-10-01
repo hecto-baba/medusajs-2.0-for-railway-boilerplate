@@ -22,9 +22,11 @@ async function assertOwnRule(req: AuthenticatedMedusaRequest, ruleId: string) {
   const rule = await service.retrieveRecurringAvailability(ruleId)
 
   if (rule.provider_id !== provider.id) {
+    // 404, like a rule that does not exist: a distinct "not yours" answer would
+    // confirm that the id exists.
     throw new MedusaError(
-      MedusaError.Types.NOT_ALLOWED,
-      "This recurring availability rule does not belong to you."
+      MedusaError.Types.NOT_FOUND,
+      "Recurring availability rule not found."
     )
   }
 

@@ -4,6 +4,7 @@ import type {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { assertVendorOwns } from "../../../shared/vendor-scope"
+import { getVendorVariantIds } from "../../../price-lists/helpers"
 
 /**
  * Rentals booked on one of the vendor's orders.
@@ -27,6 +28,16 @@ export const GET = async (
   const { id } = req.params
   await assertVendorOwns(req, "orders", id, "Order not found.")
 
+  // Only the rentals of THIS seller's products: one order can carry rentals of
+  // several sellers' products. An empty id list means "no constraint" downstream,
+  // so answer directly.
+  const ownedVariantIds = await getVendorVariantIds(req)
+
+  if (!ownedVariantIds.length) {
+    res.json({ rentals: [] })
+    return
+  }
+
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   const { data: rentals } = await query.graph({
@@ -41,6 +52,7 @@ export const GET = async (
     ],
     filters: {
       order_id: id,
+      variant_id: ownedVariantIds,
     },
   })
 

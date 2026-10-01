@@ -7,6 +7,7 @@ import { z } from "@medusajs/framework/zod"
 import { APPOINTMENT_BOOKING_MODULE } from "../../../../../modules/appointment-booking"
 import type AppointmentBookingModuleService from "../../../../../modules/appointment-booking/service"
 import { createAppointmentSlotsWorkflow } from "../../../../../workflows/create-appointment-slots"
+import { assertOwnership, assertVariantBelongsToProduct } from "../../../products/helpers"
 
 export const PostVendorAppointmentSlotsSchema = z.object({
   service_product_id: z.string(),
@@ -35,6 +36,17 @@ export const POST = async (
     throw new MedusaError(
       MedusaError.Types.NOT_FOUND,
       "No provider profile found for the authenticated session."
+    )
+  }
+
+  // The service must be one of THIS seller's own products (and the variant one of its
+  // variants); otherwise slots could be created against another seller's product.
+  await assertOwnership(req, req.validatedBody.service_product_id)
+  if (req.validatedBody.service_variant_id) {
+    await assertVariantBelongsToProduct(
+      req,
+      req.validatedBody.service_product_id,
+      req.validatedBody.service_variant_id
     )
   }
 
