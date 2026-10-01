@@ -7,6 +7,7 @@ import { z } from "@medusajs/framework/zod"
 import { Pool } from "pg"
 import * as path from "path"
 import * as fs from "fs"
+import { executionOwnerPatterns } from "./scope"
 
 export const GetVendorWorkflowExecutionsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -41,6 +42,12 @@ export function getWorkflowPool(): Pool {
         dbUrl?.includes("sslmode=require") || process.env.NODE_ENV === "production"
           ? { rejectUnauthorized: false }
           : false,
+    })
+    // An idle client can be dropped (database restart, failover). Without a listener
+    // that is an unhandled 'error' event; pg discards the broken client and the next
+    // query opens a new one.
+    dbPool.on("error", (error) => {
+      console.error("[VendorWorkflowExecutions] idle database client error:", error.message)
     })
   }
   return dbPool
@@ -78,14 +85,23 @@ export const GET = async (
 
   const pool = getWorkflowPool()
 
-  // Base parameters for vendor isolation
-  const values: any[] = [`%${vendorAdminId}%`, `%${vendorId}%`]
+  // An execution is the seller's only when their id is the VALUE of vendor_admin_id
+  // or vendor_id in its stored input (see ./scope.ts), not when it merely appears
+  // somewhere in the JSON.
+  const owner = executionOwnerPatterns(vendorAdminId, vendorId)
+
+  if (!owner) {
+    res.json({ workflow_executions: [], count: 0, offset, limit })
+    return
+  }
+
+  const values: any[] = [owner.sql]
   const conditions: string[] = [
     `deleted_at IS NULL`,
-    `(context::text ILIKE $1 OR execution::text ILIKE $1 OR context::text ILIKE $2 OR execution::text ILIKE $2)`,
+    `(context::text ~ $1 OR execution::text ~ $1)`,
   ]
 
-  let paramIndex = 3
+  let paramIndex = 2
 
   if (state && state !== "all") {
     conditions.push(`state = $${paramIndex++}`)

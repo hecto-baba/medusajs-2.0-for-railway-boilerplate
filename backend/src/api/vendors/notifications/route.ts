@@ -36,12 +36,12 @@ export const GET = async (
   }
 
   try {
+    // Only notifications addressed to this seller. The platform-wide "feed"
+    // notifications (to: "" or channel: "feed") belong to the admin panel, and
+    // the old filter matched EVERY feed notification, including those addressed
+    // to other sellers.
     const filters: Record<string, any> = {
-      $or: [
-        { to: targetRecipients },
-        { to: "" },
-        { channel: "feed" },
-      ],
+      to: targetRecipients,
     }
 
     const { data: notifications, metadata } = await query.graph({

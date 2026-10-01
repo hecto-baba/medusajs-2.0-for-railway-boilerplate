@@ -32,6 +32,8 @@ const REVIEWED_SAFE: Record<string, string> = {
     "SQL is constrained to metadata->>'vendor_id' of the calling vendor",
   "products/import/[transaction_id]/confirm/route.ts":
     "legacy alias: a re-export of imports/[transaction_id]/confirm, which checks the import belongs to the seller",
+  "workflow-executions/[id]/route.ts":
+    "checks the execution was run for the seller (executionBelongsToSeller); covered by notifications-and-executions.spec.ts",
   "categories/[id]/route.ts":
     "shared taxonomy by design; its write handlers are 403 stubs",
 }
@@ -39,7 +41,6 @@ const REVIEWED_SAFE: Record<string, string> = {
 const BACKLOG: string[] = [
   "layouts/[zone]/configuration/route.ts",
   "tax-regions/[id]/route.ts",
-  "workflow-executions/[id]/route.ts",
 ]
 
 // Routes that query a whole entity table with no filter. Must only shrink.
