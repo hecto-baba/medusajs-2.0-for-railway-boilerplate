@@ -147,6 +147,11 @@ import {
 } from "./vendors/shipping-option-types/route";
 import { UpdateVendorShippingOptionTypeSchema } from "./vendors/shipping-option-types/[id]/route";
 import {
+  CreateVendorShippingOptionSchema,
+  GetVendorShippingOptionsSchema,
+} from "./vendors/shipping-options/route";
+import { UpdateVendorShippingOptionSchema } from "./vendors/shipping-options/[id]/route";
+import {
   GetVendorSalesChannelsSchema,
   CreateVendorSalesChannelSchema,
 } from "./vendors/sales-channels/route";
@@ -1556,6 +1561,27 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(UpdateVendorShippingOptionTypeSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/shipping-options",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(GetVendorShippingOptionsSchema, {})
+      ]
+    },
+    {
+      matcher: "/vendors/shipping-options",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(CreateVendorShippingOptionSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/shipping-options/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(UpdateVendorShippingOptionSchema)
       ]
     },
     {
