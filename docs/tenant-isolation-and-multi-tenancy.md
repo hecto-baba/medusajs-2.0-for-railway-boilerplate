@@ -1,6 +1,6 @@
 # Tenant Isolation and Multi-Tenancy Plan
 
-Status: Phases 0 and 1 complete; Phase 2 in progress (steps 1 to 4 done, see section 11). Branch: `feature/tenant-isolation` (off `feature/marketplace`).
+Status: Phases 0 and 1 complete; Phase 2 in progress (steps 1 to 5 done, see section 11). Branch: `feature/tenant-isolation` (off `feature/marketplace`).
 Scope: the seller (vendor) API `backend/src/api/vendors/**`, the seller panel `sellers/`, and bringing the missing admin features to sellers.
 Out of scope: Vendor Transactions (stays admin-only), drivers, and the admin API / store routes (see "What this plan does not cover").
 
@@ -378,7 +378,7 @@ Each step: test first, then the fix, one commit, listed below with its test file
 | 2 | yes | `/vendors/shipping-options` list, create, read, update, delete. Ownership by chain seller -> location -> set -> zone -> option (no new link). Only the seller's own profile, own-or-platform option type, provider linked to the location, flat price, fixed storefront rules | shipping-options (8) |
 | 3 | yes | Checkout per seller: `GET /store/carts/:id/seller-shipping-options` returns one group per shipping profile with only the options that ship those items; an `addShippingMethodToCart` hook refuses an option that ships nothing in the cart; the storefront shows one choice per seller | cart-shipping (3) |
 | 4 | yes | Seller tax: `/vendors/tax-rates` (own rates only), a new vendor <-> tax rate link, and rules that keep each rate attached to the seller's products and shipping options | seller-tax (5) |
-| 5 | no | Backfill of existing records |  |
+| 5 | yes (script written and tested, **not yet run on any real database**) | `src/scripts/phase2-backfill.ts`: dry run by default. Per seller: an own shipping profile if missing; products on a shared platform profile move to it; locations without a fulfilment set get the step 1 setup. Reports, never changes, records with no provable owner (unowned products, inventory items, customers; sellers with products but no location) | backfill (1, covers dry run, apply, second run) |
 | 6 | no | Seller panel screens for shipping options and tax, nav links |  |
 
 ### 11.1 Findings from Phase 2
@@ -393,3 +393,10 @@ Each step: test first, then the fix, one commit, listed below with its test file
 - Existing seller products usually sit on a shared platform profile, so they form one group at checkout served by platform options. A seller's own shipping options are only offered for products on the seller's own profile, so step 5 must move each seller's products onto an own profile (creating one when the seller has none).
 - Existing sellers have no fulfilment set on their location (step 1 only covers new locations), so step 5 must provision it.
 - Tax regions must have a platform default rate for seller rates to override.
+
+### 11.3 Running the backfill (not done yet)
+
+1. Back up the database.
+2. Dry run: `npx medusa exec ./src/scripts/phase2-backfill.ts` and read the counts.
+3. Apply: `npx medusa exec ./src/scripts/phase2-backfill.ts apply`. Safe to run again.
+4. The "needs attention" list is for a person to decide: unowned products, inventory items and customers (platform-owned or assigned to a seller), and sellers who have products but no stock location.
