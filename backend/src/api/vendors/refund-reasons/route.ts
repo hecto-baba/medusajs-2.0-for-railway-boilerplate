@@ -48,7 +48,8 @@ export const GET = async (
   let orderConfig: Record<string, "ASC" | "DESC"> | undefined
   if (order) {
     const isDesc = order.startsWith("-")
-    const field = isDesc ? order.slice(1) : order
+    const rawField = isDesc ? order.slice(1) : order
+    const field = rawField === "value" ? "code" : rawField
     orderConfig = { [field]: isDesc ? "DESC" : "ASC" }
   }
 

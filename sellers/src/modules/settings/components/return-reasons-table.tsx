@@ -20,7 +20,7 @@ import {
 } from "@medusajs/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 
 const columnHelper = createDataTableColumnHelper<VendorReturnReason>()
 
@@ -68,59 +68,78 @@ export const ReturnReasonsTable = () => {
     },
   })
 
-  const handleDelete = async (reason: VendorReturnReason) => {
-    const confirmed = await prompt({
-      title: "Delete return reason",
-      description: `Are you sure you want to delete "${reason.label}"? This cannot be undone.`,
-      confirmText: "Delete",
-      cancelText: "Cancel",
-      variant: "danger",
-    })
+  const handleDelete = useCallback(
+    async (reason: VendorReturnReason) => {
+      const confirmed = await prompt({
+        title: "Delete return reason",
+        description: `Are you sure you want to delete "${reason.label}"? This cannot be undone.`,
+        confirmText: "Delete",
+        cancelText: "Cancel",
+        variant: "danger",
+      })
 
-    if (!confirmed) {
-      return
-    }
+      if (!confirmed) {
+        return
+      }
 
-    try {
-      await remove(reason.id)
-      toast.success(`"${reason.label}" was deleted.`)
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not delete the return reason."
-      )
-    }
-  }
+      try {
+        await remove(reason.id)
+        toast.success(`"${reason.label}" was deleted.`)
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not delete the return reason."
+        )
+      }
+    },
+    [prompt, remove]
+  )
 
-  const columns = [
-    columnHelper.accessor("label", {
-      header: "Label",
-      enableSorting: true,
-    }),
-    columnHelper.accessor("value", {
-      header: "Value",
-      enableSorting: true,
-    }),
-    columnHelper.accessor("description", {
-      header: "Description",
-      cell: ({ row }) => row.original.description || "-",
-    }),
-    columnHelper.action({
-      actions: (ctx) => [
-        {
-          label: "Edit",
-          icon: <PencilSquare />,
-          onClick: () => {
-            router.push(`/settings/return-reasons/${ctx.row.original.id}/edit`)
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("label", {
+        id: "label",
+        header: "Label",
+        enableSorting: true,
+        sortLabel: "Label",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+      }),
+      columnHelper.accessor("value", {
+        id: "value",
+        header: "Value",
+        enableSorting: true,
+        sortLabel: "Value",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+      }),
+      columnHelper.accessor("description", {
+        id: "description",
+        header: "Description",
+        enableSorting: true,
+        sortLabel: "Description",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => row.original.description || "-",
+      }),
+      columnHelper.action({
+        actions: (ctx) => [
+          {
+            label: "Edit",
+            icon: <PencilSquare />,
+            onClick: () => {
+              router.push(`/settings/return-reasons/${ctx.row.original.id}/edit`)
+            },
           },
-        },
-        {
-          label: "Delete",
-          icon: <Trash />,
-          onClick: () => handleDelete(ctx.row.original),
-        },
-      ],
-    }),
-  ]
+          {
+            label: "Delete",
+            icon: <Trash />,
+            onClick: () => handleDelete(ctx.row.original),
+          },
+        ],
+      }),
+    ],
+    [handleDelete, router]
+  )
 
   const table = useDataTable({
     columns,
@@ -140,6 +159,7 @@ export const ReturnReasonsTable = () => {
           <Heading>Return Reasons</Heading>
           <div className="flex items-center gap-x-2 w-full sm:w-auto">
             <DataTable.Search placeholder="Search return reasons..." />
+            <DataTable.SortingMenu tooltip="Sort" />
             <Button
               size="small"
               variant="secondary"
