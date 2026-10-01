@@ -73,6 +73,11 @@ export const DraftOrdersTable = () => {
     staleTime: 5 * 60 * 1000,
   })
 
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
+    sales_channel: false,
+    region: false,
+  })
+
   // Dynamic filters matching Backend Production
   const filters = useMemo(() => {
     const list: any[] = [
@@ -85,33 +90,24 @@ export const DraftOrdersTable = () => {
           { label: "Has customer account", value: "has_customer" },
         ],
       }),
-    ]
-
-    const channels = salesChannelsData?.sales_channels ?? []
-    if (channels.length > 0) {
-      list.push(
-        filterHelper.custom({
-          id: "sales_channel_id",
-          label: "Sales Channel",
-          type: "select",
-          options: channels.map((sc) => ({ label: sc.name, value: sc.id })),
-        })
-      )
-    }
-
-    const regions = regionsData?.regions ?? []
-    if (regions.length > 0) {
-      list.push(
-        filterHelper.custom({
-          id: "region_id",
-          label: "Region",
-          type: "select",
-          options: regions.map((r) => ({ label: r.name, value: r.id })),
-        })
-      )
-    }
-
-    list.push(
+      filterHelper.custom({
+        id: "sales_channel_id",
+        label: "Sales Channel",
+        type: "select",
+        options: (salesChannelsData?.sales_channels ?? []).map((sc) => ({
+          label: sc.name,
+          value: sc.id,
+        })),
+      }),
+      filterHelper.custom({
+        id: "region_id",
+        label: "Region",
+        type: "select",
+        options: (regionsData?.regions ?? []).map((r) => ({
+          label: r.name,
+          value: r.id,
+        })),
+      }),
       filterHelper.custom({
         id: "created_at_gte",
         label: "Created At",
@@ -121,10 +117,7 @@ export const DraftOrdersTable = () => {
           { label: "Last 30 days", value: "30d" },
           { label: "Last 90 days", value: "90d" },
         ],
-      })
-    )
-
-    list.push(
+      }),
       filterHelper.custom({
         id: "updated_at_gte",
         label: "Updated At",
@@ -134,8 +127,8 @@ export const DraftOrdersTable = () => {
           { label: "Last 30 days", value: "30d" },
           { label: "Last 90 days", value: "90d" },
         ],
-      })
-    )
+      }),
+    ]
 
     return list
   }, [salesChannelsData, regionsData])
@@ -151,6 +144,7 @@ export const DraftOrdersTable = () => {
   const updatedFilterVal = extractFilterVal(filtering.updated_at_gte)
   const salesChannelId = extractFilterVal(filtering.sales_channel_id)
   const regionId = extractFilterVal(filtering.region_id)
+  const qCustomer = extractFilterVal(filtering.q_customer)
 
   const createdAtGte = useMemo(() => {
     if (!dateFilterVal) return undefined
@@ -167,7 +161,17 @@ export const DraftOrdersTable = () => {
   const { data, isLoading } = useQuery({
     queryKey: [
       "vendor-draft-orders",
-      { limit, offset, q: search, order, created_at_gte: createdAtGte, updated_at_gte: updatedAtGte, sales_channel_id: salesChannelId, region_id: regionId },
+      {
+        limit,
+        offset,
+        q: search,
+        order,
+        created_at_gte: createdAtGte,
+        updated_at_gte: updatedAtGte,
+        sales_channel_id: salesChannelId,
+        region_id: regionId,
+        q_customer: qCustomer,
+      },
     ],
     queryFn: () =>
       listVendorDraftOrders({
@@ -179,6 +183,7 @@ export const DraftOrdersTable = () => {
         updated_at_gte: updatedAtGte,
         sales_channel_id: salesChannelId,
         region_id: regionId,
+        q_customer: qCustomer,
       }),
     placeholderData: (previous) => previous,
   })
@@ -239,6 +244,7 @@ export const DraftOrdersTable = () => {
   const columns = useMemo(
     () => [
       columnHelper.accessor("display_id", {
+        id: "display_id",
         header: "Order #",
         enableSorting: true,
         sortLabel: "Display ID",
@@ -256,12 +262,34 @@ export const DraftOrdersTable = () => {
           )
         },
       }),
+      columnHelper.accessor("created_at", {
+        id: "created_at",
+        header: "Date",
+        enableSorting: true,
+        sortLabel: "Date",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ getValue }) => {
+          const date = getValue()
+          if (!date) return <PlaceholderCell />
+          return (
+            <Text size="small" className="text-ui-fg-subtle">
+              {new Date(date).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </Text>
+          )
+        },
+      }),
       columnHelper.accessor("customer", {
+        id: "customer",
         header: "Customer",
         enableSorting: true,
         sortLabel: "Customer",
-        sortAscLabel: "A-Z",
-        sortDescLabel: "Z-A",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           const d = row.original
           const customer = d.customer
@@ -283,11 +311,31 @@ export const DraftOrdersTable = () => {
           )
         },
       }),
+      columnHelper.accessor("sales_channel" as any, {
+        id: "sales_channel",
+        header: "Sales Channel",
+        enableSorting: true,
+        sortLabel: "Sales Channel",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => (row.original as any).sales_channel?.name || "-",
+      }),
+      columnHelper.accessor("region" as any, {
+        id: "region",
+        header: "Region",
+        enableSorting: true,
+        sortLabel: "Region",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => (row.original as any).region?.name || "-",
+      }),
       columnHelper.accessor("status", {
+        id: "status",
         header: "Status",
         cell: () => <StatusBadge color="grey">Draft</StatusBadge>,
       }),
       columnHelper.accessor("items", {
+        id: "items",
         header: "Items",
         cell: ({ getValue }) => {
           const items = getValue() ?? []
@@ -299,34 +347,14 @@ export const DraftOrdersTable = () => {
         },
       }),
       columnHelper.accessor("total", {
+        id: "total",
         header: "Total",
-        enableSorting: true,
         cell: ({ row }) => {
           const d = row.original
           return (
             <Text size="small" weight="plus">
               {(d.currency_code || "USD").toUpperCase()}{" "}
               {(d.total ?? 0).toFixed(2)}
-            </Text>
-          )
-        },
-      }),
-      columnHelper.accessor("created_at", {
-        header: "Date",
-        enableSorting: true,
-        sortLabel: "Date",
-        sortAscLabel: "Ascending",
-        sortDescLabel: "Descending",
-        cell: ({ getValue }) => {
-          const date = getValue()
-          if (!date) return <PlaceholderCell />
-          return (
-            <Text size="small" className="text-ui-fg-subtle">
-              {new Date(date).toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
             </Text>
           )
         },
@@ -394,6 +422,10 @@ export const DraftOrdersTable = () => {
       },
     },
     filters,
+    columnVisibility: {
+      state: columnVisibility,
+      onColumnVisibilityChange: setColumnVisibility,
+    },
     search: {
       state: search,
       onSearchChange: (value) => {

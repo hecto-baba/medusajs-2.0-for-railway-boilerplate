@@ -2018,7 +2018,8 @@ export type VendorDraftOrder = {
   billing_address?: Record<string, any> | null
   items?: any[]
   shipping_methods?: any[]
-  summary?: any
+  sales_channel?: { id: string; name: string } | null
+  region?: { id: string; name: string } | null
   created_at: string
   updated_at?: string
 }
@@ -2033,6 +2034,7 @@ export const listVendorDraftOrders = (params: {
   currency_code?: string
   sales_channel_id?: string
   region_id?: string
+  q_customer?: string
 }) =>
   request<ListResponse<{ draft_orders: VendorDraftOrder[] }>>(
     "draft-orders",
