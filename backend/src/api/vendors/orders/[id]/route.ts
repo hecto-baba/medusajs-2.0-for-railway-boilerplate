@@ -5,6 +5,7 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { getOrdersListWorkflow } from "@medusajs/medusa/core-flows"
 import { assertVendorOwns } from "../../shared/vendor-scope"
+import { scopeOrderToVendor } from "../helpers"
 
 /**
  * A single order, scoped to the calling vendor - the by-id counterpart to
@@ -81,24 +82,15 @@ export const GET = async (
     return
   }
 
-  const vendorItems = (order.items || []).filter((item: any) => {
-    const itemProductId =
-      item.product_id || item.variant?.product_id || item.variant?.product?.id
-    return itemProductId && vendorProductIds.has(itemProductId)
-  })
+  // Keep only this vendor's items, and withhold whole-order figures when the
+  // order also holds other sellers' items (see ../helpers.ts).
+  const scoped = scopeOrderToVendor(order, vendorProductIds)
 
-  const vendorSubtotal = vendorItems.reduce((acc: number, item: any) => {
-    const unitPrice = Number(item.unit_price) || 0
-    const quantity = Number(item.quantity) || 1
-    return acc + unitPrice * quantity
-  }, 0)
+  if (!scoped) {
+    // Linked to the seller but none of the items are theirs.
+    res.status(404).json({ message: "Order not found." })
+    return
+  }
 
-  res.json({
-    order: {
-      ...order,
-      items: vendorItems,
-      subtotal: vendorSubtotal,
-      total: vendorSubtotal,
-    },
-  })
+  res.json({ order: scoped })
 }

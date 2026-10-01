@@ -5,6 +5,7 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { getOrdersListWorkflow } from "@medusajs/medusa/core-flows"
+import { scopeOrderToVendor } from "./helpers"
 
 export const GetVendorOrdersSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -117,35 +118,10 @@ export const GET = async (
     ? rawOrders
     : (rawOrders as any)?.rows || []
 
-  // Filter out any line items that do not belong to this vendor's catalog
+  // Keep only this vendor's items, and withhold whole-order figures when the
+  // order also holds other sellers' items (see ./helpers.ts).
   const scopedOrders = orderRows
-    .map((rawOrder: any) => {
-      const vendorItems = (rawOrder.items || []).filter((item: any) => {
-        const itemProductId =
-          item.product_id ||
-          item.variant?.product_id ||
-          item.variant?.product?.id
-        return itemProductId && vendorProductIds.has(itemProductId)
-      })
-
-      if (!vendorItems.length) {
-        return null
-      }
-
-      // Calculate vendor-specific subtotal
-      const vendorSubtotal = vendorItems.reduce((acc: number, item: any) => {
-        const unitPrice = Number(item.unit_price) || 0
-        const quantity = Number(item.quantity) || 1
-        return acc + unitPrice * quantity
-      }, 0)
-
-      return {
-        ...rawOrder,
-        items: vendorItems,
-        subtotal: vendorSubtotal,
-        total: vendorSubtotal,
-      }
-    })
+    .map((rawOrder: any) => scopeOrderToVendor(rawOrder, vendorProductIds))
     .filter(Boolean)
 
   // Filter by search query
