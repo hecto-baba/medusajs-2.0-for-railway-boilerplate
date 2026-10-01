@@ -5,6 +5,8 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { createVendorProductOptionWorkflow } from "../../../workflows/create-vendor-product-option"
+import { assertOwnership } from "../products/helpers"
+import { getVendorOptionIds } from "./helpers"
 
 export const GetVendorProductOptionsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -36,6 +38,11 @@ export const POST = async (
   res: MedusaResponse
 ) => {
   const { title, values = [], product_id } = req.validatedBody
+
+  // An option can only be attached to one of the seller's own products.
+  if (product_id) {
+    await assertOwnership(req, product_id)
+  }
 
   const { result } = await createVendorProductOptionWorkflow(req.scope).run({
     input: {
@@ -69,33 +76,8 @@ export const GET = async (
     order,
   } = req.validatedQuery as unknown as z.infer<typeof GetVendorProductOptionsSchema>
 
-  // Get vendor's own options and products
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: [
-      "vendor.id",
-      "vendor.product_options.id",
-      "vendor.products.id",
-      "vendor.products.options.id",
-    ],
-    filters: { id: [req.auth_context.actor_id] },
-  })
-
-  const vendorOptionIds = new Set<string>(
-    (vendorAdmin?.vendor?.product_options || [])
-      .map((o: any) => o?.id)
-      .filter(Boolean)
-  )
-
-  for (const prod of vendorAdmin?.vendor?.products || []) {
-    for (const opt of prod.options || []) {
-      if (opt?.id) vendorOptionIds.add(opt.id)
-    }
-  }
-
-  const allOptionIds = Array.from(vendorOptionIds)
+  // Options linked to the seller plus options of the seller's own products.
+  const allOptionIds = await getVendorOptionIds(req)
 
   if (!allOptionIds.length) {
     res.json({ product_options: [], count: 0, limit, offset })

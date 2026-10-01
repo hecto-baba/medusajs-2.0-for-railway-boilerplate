@@ -8,6 +8,13 @@ import {
   updateProductTagsWorkflow,
   deleteProductTagsWorkflow,
 } from "@medusajs/medusa/core-flows"
+import { assertVendorCanSee, getVisibleIds, ScopedEntity } from "../../shared/platform-scope"
+import { assertVendorOwns } from "../../shared/vendor-scope"
+
+const PRODUCT_TAGS: ScopedEntity = {
+  linkField: "product_tags",
+  entity: "product_tag",
+}
 
 export const UpdateVendorProductTagSchema = z.object({
   value: z.string().optional(),
@@ -20,6 +27,9 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const tagId = req.params.id
+
+  // Own or shared platform tag; another seller's tag is a 404.
+  await assertVendorCanSee(req, PRODUCT_TAGS, tagId, "Product tag not found.")
 
   const { data: tags } = await query.graph({
     entity: "product_tag",
@@ -41,6 +51,8 @@ export const POST = async (
 ) => {
   const tagId = req.params.id
 
+  await assertVendorOwns(req, "product_tags", tagId, "Product tag not found.")
+
   const { result } = await updateProductTagsWorkflow(req.scope).run({
     input: {
       selector: { id: tagId },
@@ -56,6 +68,8 @@ export const DELETE = async (
   res: MedusaResponse
 ) => {
   const tagId = req.params.id
+
+  await assertVendorOwns(req, "product_tags", tagId, "Product tag not found.")
 
   await deleteProductTagsWorkflow(req.scope).run({
     input: { ids: [tagId] },

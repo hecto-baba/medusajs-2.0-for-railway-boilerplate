@@ -9,6 +9,7 @@ import {
   updateProductsWorkflow,
 } from "@medusajs/medusa/core-flows"
 import { assertVendorCanUseShippingProfiles } from "../../shared/shipping-profile-scope"
+import { assertVendorCanUseProductReferences } from "../../shared/product-reference-scope"
 import { assertOwnership, VENDOR_PRODUCT_DETAIL_FIELDS } from "../helpers"
 
 export const GET = async (
@@ -40,6 +41,7 @@ export const POST = async (
   await assertVendorCanUseShippingProfiles(req, [
     (req.validatedBody as any)?.shipping_profile_id,
   ])
+  await assertVendorCanUseProductReferences(req, [req.validatedBody as any])
 
   const { result } = await updateProductsWorkflow(req.scope).run({
     input: {

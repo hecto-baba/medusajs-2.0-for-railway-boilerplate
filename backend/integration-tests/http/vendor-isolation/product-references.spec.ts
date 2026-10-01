@@ -21,6 +21,9 @@ medusaIntegrationTestRunner({
       let profileB: string
       let platformProfile: string
       let locationB: string
+      let typeB: string
+      let tagB: string
+      let platformType: string
       let ownProduct: string
 
       const fulfillment = () => getContainer().resolve(Modules.FULFILLMENT) as any
@@ -77,6 +80,10 @@ medusaIntegrationTestRunner({
           )
         ).data.stock_location.id
 
+        typeB = (await must("type B", api.post("/vendors/product-types", { value: "B type" }, sellerB.headers))).data.product_type.id
+        tagB = (await must("tag B", api.post("/vendors/product-tags", { value: "b-tag" }, sellerB.headers))).data.product_tag.id
+        platformType = (await (getContainer().resolve(Modules.PRODUCT) as any).createProductTypes([{ value: "Platform type" }]))[0].id
+
         // Data created inside a test is rolled back after it; only setup persists.
         ownProduct = (await must("own product", api.post("/vendors/products", productBody("Own product"), sellerA.headers))).data
           .product.id
@@ -121,6 +128,32 @@ medusaIntegrationTestRunner({
         )
         expect(res.status).toBe(404)
         expect(await profileOf(ownProduct)).toBe(profileA)
+      })
+
+      it("a product cannot be created with another seller's type (404, nothing created)", async () => {
+        const before = await productCount()
+        const res = await call(api.post("/vendors/products", productBody("Stolen type", { type_id: typeB }), sellerA.headers))
+        expect(res.status).toBe(404)
+        expect(await productCount()).toBe(before)
+      })
+
+      it("a product cannot be created with another seller's tag (404, nothing created)", async () => {
+        const before = await productCount()
+        const res = await call(
+          api.post("/vendors/products", productBody("Stolen tag", { tags: [{ id: tagB }] }), sellerA.headers)
+        )
+        expect(res.status).toBe(404)
+        expect(await productCount()).toBe(before)
+      })
+
+      it("a product can use a shared platform type", async () => {
+        const res = await call(api.post("/vendors/products", productBody("Platform type product", { type_id: platformType }), sellerA.headers))
+        expect(res.status).toBe(201)
+      })
+
+      it("a product cannot be switched to another seller's type (404)", async () => {
+        const res = await call(api.post(`/vendors/products/${ownProduct}`, { type_id: typeB }, sellerA.headers))
+        expect(res.status).toBe(404)
       })
 
       it("a product can be switched to the seller's own profile", async () => {

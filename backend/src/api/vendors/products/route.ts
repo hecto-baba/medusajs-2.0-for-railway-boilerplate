@@ -61,6 +61,7 @@ import {
   getVisibleStockLocations,
 } from "../shared/stock-location-scope"
 import { assertVendorCanUseShippingProfiles } from "../shared/shipping-profile-scope"
+import { assertVendorCanUseProductReferences } from "../shared/product-reference-scope"
 
 export const POST = async (
   req: AuthenticatedMedusaRequest<HttpTypes.AdminCreateProduct>,
@@ -75,6 +76,7 @@ export const POST = async (
   await assertVendorCanUseShippingProfiles(req, [
     (req.validatedBody as any)?.shipping_profile_id,
   ])
+  await assertVendorCanUseProductReferences(req, [req.validatedBody as any])
 
   const { result } = await createVendorProductWorkflow(req.scope).run({
     input: {

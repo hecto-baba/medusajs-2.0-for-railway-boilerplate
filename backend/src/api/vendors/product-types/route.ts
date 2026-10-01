@@ -5,6 +5,12 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { createVendorProductTypeWorkflow } from "../../../workflows/create-vendor-product-type"
+import { getVisibleIds, ScopedEntity } from "../shared/platform-scope"
+
+const PRODUCT_TYPES: ScopedEntity = {
+  linkField: "product_types",
+  entity: "product_type",
+}
 
 export const GetVendorProductTypesSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -43,7 +49,17 @@ export const GET = async (
   const { limit, offset, q, order, status, created_at_gte, updated_at_gte } =
     req.validatedQuery as unknown as z.infer<typeof GetVendorProductTypesSchema>
 
-  const filters: Record<string, any> = {}
+  // Own types plus shared platform types. Never another seller's.
+  const { owned, platform } = await getVisibleIds(req, PRODUCT_TYPES)
+  const visibleIds = [...owned, ...platform]
+
+  // An empty id list means "no constraint" downstream, so answer directly.
+  if (!visibleIds.length) {
+    res.json({ product_types: [], count: 0, limit, offset })
+    return
+  }
+
+  const filters: Record<string, any> = { id: visibleIds }
   if (q) {
     filters.value = { $ilike: `%${q}%` }
   }

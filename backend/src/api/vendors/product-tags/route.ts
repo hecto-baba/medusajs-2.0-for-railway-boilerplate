@@ -5,6 +5,12 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { createVendorProductTagWorkflow } from "../../../workflows/create-vendor-product-tag"
+import { getVisibleIds, ScopedEntity } from "../shared/platform-scope"
+
+const PRODUCT_TAGS: ScopedEntity = {
+  linkField: "product_tags",
+  entity: "product_tag",
+}
 
 export const GetVendorProductTagsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -40,10 +46,21 @@ export const GET = async (
     typeof GetVendorProductTagsSchema
   >
 
+  // Own tags plus shared platform tags. Never another seller's.
+  const { owned, platform } = await getVisibleIds(req, PRODUCT_TAGS)
+  const visibleIds = [...owned, ...platform]
+
+  // An empty id list means "no constraint" downstream, so answer directly.
+  if (!visibleIds.length) {
+    res.json({ product_tags: [], count: 0, limit, offset })
+    return
+  }
+
   const { data: tags, metadata } = await query.graph({
     entity: "product_tag",
     fields: ["id", "value", "metadata", "created_at", "updated_at"],
     filters: {
+      id: visibleIds,
       ...(q ? { value: { $ilike: `%${q}%` } } : {}),
     },
     pagination: {
