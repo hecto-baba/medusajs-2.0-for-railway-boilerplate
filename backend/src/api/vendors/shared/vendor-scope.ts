@@ -3,8 +3,9 @@ import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/util
 
 /**
  * Generic vendor-ownership helpers for entities linked directly off `vendor`
- * (return reasons, refund reasons, regions, sales channels, stock locations,
- * shipping profiles, tax regions, ...).
+ * (return reasons, refund reasons, orders, stock locations, sales channels, ...).
+ * The field must be an existing vendor link in src/links/. Regions and country
+ * tax regions are platform-owned and have no vendor link.
  *
  * `assertOwnership` in products/helpers.ts is not reused here on purpose: it
  * walks a fixed `vendor.products.id` path. These entities each hang off
@@ -22,10 +23,10 @@ import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/util
 /**
  * Returns the vendor id behind the calling admin.
  *
- * Duplicated from products/helpers.ts' getVendorId rather than imported: that
- * file is scoped to the products feature, and importing across feature
- * folders here would make the two drift in step for the wrong reason. Kept
- * identical on purpose - if one changes, so should the other.
+ * The single source of truth for resolving the vendor from the session. Every
+ * feature's helpers.ts re-exports this rather than keeping its own copy, so a
+ * fix here reaches every route. The vendor id is always derived from
+ * `actor_id`, never from the request.
  */
 export const getVendorId = async (
   req: AuthenticatedMedusaRequest

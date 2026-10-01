@@ -1,33 +1,11 @@
 import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
+import { getVendorId } from "../shared/vendor-scope"
 
-/**
- * Returns the vendor id behind the calling admin.
- */
-export const getVendorId = async (
-  req: AuthenticatedMedusaRequest
-): Promise<string> => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+// Single source of truth lives in shared/vendor-scope.ts; re-exported so
+// existing imports from this file keep working.
+export { getVendorId }
 
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
-
-  const vendorId = vendorAdmin?.vendor?.id
-
-  if (!vendorId) {
-    throw new MedusaError(
-      MedusaError.Types.NOT_FOUND,
-      "No vendor found for the authenticated session."
-    )
-  }
-
-  return vendorId
-}
 
 /**
  * Returns all customer ids that belong to the calling vendor:
