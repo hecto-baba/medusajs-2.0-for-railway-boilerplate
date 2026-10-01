@@ -108,7 +108,10 @@ export const PriceListPricesAddModal = ({
     pageSize: 20,
   })
   const [productFiltering, setProductFiltering] = useState<DataTableFilteringState>({})
-  const [productSorting, setProductSorting] = useState<DataTableSortingState | null>(null)
+  const [productSorting, setProductSorting] = useState<DataTableSortingState | null>({
+    id: "title",
+    desc: false,
+  })
   const [selectedProducts, setSelectedProducts] = useState<VendorProduct[]>([])
 
   const [selectedCurrency, setSelectedCurrency] = useState("usd")
@@ -265,7 +268,10 @@ export const PriceListPricesAddModal = ({
     setSelectedProducts([])
     setPricesState({})
     setProductFiltering({})
-    setProductSorting(null)
+    setProductSorting({
+      id: "title",
+      desc: false,
+    })
     setProductSearch("")
   }
 
@@ -408,9 +414,10 @@ export const PriceListPricesAddModal = ({
           value: sc.id,
         })),
       }),
-      productFilterHelper.accessor("status", {
+      productFilterHelper.custom({
+        id: "status",
         label: "Status",
-        type: "multiselect",
+        type: "select",
         options: [
           { label: "Draft", value: "draft" },
           { label: "Proposed", value: "proposed" },

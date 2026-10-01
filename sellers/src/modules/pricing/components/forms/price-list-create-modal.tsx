@@ -129,7 +129,10 @@ export const PriceListCreateModal = ({
     pageSize: 20,
   })
   const [productFiltering, setProductFiltering] = useState<DataTableFilteringState>({})
-  const [productSorting, setProductSorting] = useState<DataTableSortingState | null>(null)
+  const [productSorting, setProductSorting] = useState<DataTableSortingState | null>({
+    id: "title",
+    desc: false,
+  })
   const [selectedProducts, setSelectedProducts] = useState<VendorProduct[]>([])
 
   // Tab 3: Prices
@@ -296,7 +299,10 @@ export const PriceListCreateModal = ({
     setPricesState({})
     setIsCgModalOpen(false)
     setProductFiltering({})
-    setProductSorting(null)
+    setProductSorting({
+      id: "title",
+      desc: false,
+    })
     setProductSearch("")
   }
 
@@ -443,9 +449,10 @@ export const PriceListCreateModal = ({
           value: sc.id,
         })),
       }),
-      productFilterHelper.accessor("status", {
+      productFilterHelper.custom({
+        id: "status",
         label: "Status",
-        type: "multiselect",
+        type: "select",
         options: [
           { label: "Draft", value: "draft" },
           { label: "Proposed", value: "proposed" },
