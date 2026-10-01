@@ -10,6 +10,8 @@ export const GetVendorRegionsSchema = z.object({
   q: z.string().optional(),
   currency_code: z.string().optional(),
   order: z.string().optional(),
+  created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
 })
 
 export const CreateVendorRegionSchema = z.object({
@@ -24,13 +26,18 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { q, currency_code, order } = (req.validatedQuery ?? {}) as z.infer<
-    typeof GetVendorRegionsSchema
-  >
+  const { q, currency_code, order, created_at_gte, updated_at_gte } =
+    (req.validatedQuery ?? {}) as z.infer<typeof GetVendorRegionsSchema>
 
   const filters: Record<string, any> = {}
   if (currency_code) {
     filters.currency_code = currency_code.toLowerCase()
+  }
+  if (created_at_gte) {
+    filters.created_at = { $gte: new Date(created_at_gte) }
+  }
+  if (updated_at_gte) {
+    filters.updated_at = { $gte: new Date(updated_at_gte) }
   }
   if (q) {
     filters.$or = [

@@ -2080,6 +2080,8 @@ export const listVendorTeam = (params: {
   offset: number
   q?: string
   order?: string
+  created_at_gte?: string
+  updated_at_gte?: string
 }) =>
   request<ListResponse<{ members: VendorTeamMember[] }>>(
     "team",
@@ -2600,6 +2602,8 @@ export const listVendorRegions = (
     q?: string
     currency_code?: string
     order?: string
+    created_at_gte?: string
+    updated_at_gte?: string
   } = {}
 ) => request<{ regions: VendorRegion[] }>("regions", params)
 

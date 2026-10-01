@@ -11,6 +11,8 @@ export const GetVendorTeamSchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   q: z.string().optional(),
   order: z.string().optional(),
+  created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
 })
 
 export const InviteVendorMemberSchema = z.object({
@@ -24,9 +26,8 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, order } = req.validatedQuery as unknown as z.infer<
-    typeof GetVendorTeamSchema
-  >
+  const { limit, offset, q, order, created_at_gte, updated_at_gte } =
+    req.validatedQuery as unknown as z.infer<typeof GetVendorTeamSchema>
 
   // Get vendor id of current user
   const {
@@ -47,7 +48,8 @@ export const GET = async (
   let orderObj: Record<string, "ASC" | "DESC"> = { created_at: "ASC" }
   if (order) {
     const isDesc = order.startsWith("-")
-    const field = isDesc ? order.slice(1) : order
+    const rawField = isDesc ? order.slice(1) : order
+    const field = rawField === "name" ? "first_name" : rawField
     orderObj = { [field]: isDesc ? "DESC" : "ASC" }
   }
 
@@ -63,6 +65,8 @@ export const GET = async (
     ],
     filters: {
       vendor: { id: [vendorId] },
+      ...(created_at_gte ? { created_at: { $gte: new Date(created_at_gte) } } : {}),
+      ...(updated_at_gte ? { updated_at: { $gte: new Date(updated_at_gte) } } : {}),
       ...(q
         ? {
             $or: [
