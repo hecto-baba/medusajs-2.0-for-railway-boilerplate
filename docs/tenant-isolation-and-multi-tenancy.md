@@ -1,6 +1,6 @@
 # Tenant Isolation and Multi-Tenancy Plan
 
-Status: Phase 0 complete; Phase 1 next. Branch: `feature/tenant-isolation` (off `feature/marketplace`).
+Status: Phases 0 and 1 complete; Phase 2 next. Branch: `feature/tenant-isolation` (off `feature/marketplace`).
 Scope: the seller (vendor) API `backend/src/api/vendors/**`, the seller panel `sellers/`, and bringing the missing admin features to sellers.
 Out of scope: Vendor Transactions (stays admin-only), drivers, and the admin API / store routes (see "What this plan does not cover").
 
@@ -127,7 +127,7 @@ Regions, country tax regions, shared taxonomy (category and collection lists), p
 
 **Gate:** the harness runs and the first two-seller test passes.
 
-### Phase 1: Isolate everything that exists today
+### Phase 1: Isolate everything that exists today (COMPLETE, see section 10)
 
 For each item: ownership check on read, update and delete; 404 for non-owners; the list returns only the seller's rows with no store-wide fallback; a cross-seller test.
 
@@ -294,3 +294,71 @@ These four failures prove the hole and become the Phase 1 step 3 acceptance test
 - Config: `backend/medusa-config.js` (tax provider, test config)
 - Seller panel: `sellers/src/lib/data/vendor-client.ts`, `sellers/src/modules/**`, `sellers/src/app/(panel)/**`, `sellers/src/modules/layout/components/sidebar.tsx`, `sellers/src/lib/permissions/feature-access.ts`
 - Storefront: `storefront/src/lib/data/cart.ts`, checkout shipping component, order confirmation and list pages
+
+## 10. Phase 1 results (completed)
+
+Gate: **23 of 23 HTTP spec files and 193 of 193 HTTP tests pass**, plus 12 database-free tests (the route guard ratchet, a safety check, and 8 tests of the CSV reader). Backend typecheck: 0 errors. Seller panel typecheck and lint: clean. Every fix was written test first: the new test failed on the old code, then passed on the fix, then was committed (one commit per step, `feature/tenant-isolation`).
+
+### 10.1 What was closed
+
+| Step | Closed |
+|---|---|
+| 1 | API keys: ownership on every by-id route; sellers create publishable keys only |
+| 2 | Team members: only your own team |
+| 3 | Stock locations: own plus shared platform locations, never another seller's |
+| 4 | Sales channels: same rule |
+| 5 | Shipping profiles and option types: new vendor links; a product uses a profile the seller may use |
+| 6 | Product tags, types, options; types and tags named in product bodies |
+| 7 | Draft orders, including the chain where naming a stranger's customer made it "yours" |
+| 8 | Customers (decision D1), addresses, groups |
+| 9 | Collections; internal categories hidden; collections and categories named in products |
+| 10 | Inventory: every location, inventory item and line item id in a request |
+| 11 | Price list prices, promotion rules (confirmed exploitable), customer groups on price lists |
+| 12 | Product imports: every CSV reference, import ownership, linking imported products |
+| 13 | Search: no longer loads every customer, group, collection, category and inventory item |
+| 14 | Notifications and workflow executions |
+| 15 | Regions and tax regions: platform-owned, read-only (D6) |
+| 16 | Appointment slots, rentals on shared orders, onboarding after approval, recurring availability |
+| 17 | Orders that contain other sellers' items: whole-order figures withheld (interim) |
+| 18 | Seller panel: capability flags now guard routes; expired sessions go to /login |
+
+The route guard ratchet backlog went from 24 unguarded by-id routes to 1 (an inert one).
+
+### 10.2 Findings beyond the original audit
+
+- Any seller could read EVERY seller's notifications, not only broadcast ones: the `feed` filter matched all of them.
+- **Medusa allows only one seller per order link** ("Cannot create multiple links between marketplace and order"). The `link-vendor-order` subscriber therefore cannot record a multi-seller cart, which is likely why most live orders have no seller link. One order per seller (Phase 3) is required, not optional.
+- A new database could not register a seller: the `vendor.metadata` column had no migration (fixed in Phase 0).
+- Existing bugs fixed along the way: `POST /vendors/customers/:id/customer-groups` returned 500 for every request (no validator registered); creating a price list without a description returned 500; the code read a seller's collections through a field that does not exist, so their own empty collections never listed; the workflow execution route's database pool had no error handler.
+- Confirming an import released the importer for ANY transaction id, and imported products were never linked to the seller.
+- The product import CSV check read only the "Product Id" column with line splitting; Medusa's importer also acts on variant ids, types, collections, categories, tags (by value), sales channels, shipping profiles and option ids.
+
+### 10.3 Deploy notes (run before or with this release)
+
+1. `medusa db:migrate` creates three things: the `vendor.metadata` column (idempotent, already present on the live database), the `vendor_product_import` table, and the link tables `vendor-shipping-profile` and `vendor-shipping-option-type`.
+2. Existing shipping profiles, option types, tax regions and regions have no owner and are shared platform resources: sellers can see and use them, not edit or delete them. No backfill is needed for that.
+
+### 10.4 Behaviour changes sellers will notice
+
+- Regions and tax regions can no longer be created, changed or deleted by sellers (403). The Settings screens for them will show an error until Phase 2 replaces them.
+- The platform's stock location and sales channel stay visible and usable (read-only) so existing sellers keep working; they are retired from view in Phase 2.
+- A customer who only ordered from a seller is shown without addresses or metadata and cannot be edited by that seller.
+- On an order that also holds other sellers' items, the seller no longer sees the whole order's payment, shipping and fulfilment.
+- Approved sellers can no longer edit onboarding answers.
+- Internal categories are no longer listed to sellers.
+- Notifications: sellers get only those addressed to them.
+
+### 10.5 Known limits (not closed by Phase 1)
+
+- Uploaded files are not tied to a seller (only import CSVs are, by their file key).
+- `/vendors/layouts/*` is inert (no behaviour); left as is.
+- The admin API, store routes and the restaurant/driver logins were not audited.
+- Mixed orders stay mixed until Phase 3; the redaction in step 17 is interim.
+- No Postgres row-level security: isolation is enforced in code and by the tests above.
+
+### 10.6 Running the tests
+
+- `pnpm run test:unit`: database-free ratchet, safety check and CSV reader tests.
+- `pnpm run test:integration`: starts a local embedded Postgres, runs every HTTP spec in its own process (one long-lived process runs out of memory after about fifteen), prints a summary, and removes the database.
+- `pnpm run test:integration -- <path>`: one spec.
+- Runner behaviour worth knowing: data created inside a test is rolled back after it (only `beforeAll` data persists), setup in a second describe block is lost, and an import left waiting for confirmation blocks teardown, so tests must abandon what they start.

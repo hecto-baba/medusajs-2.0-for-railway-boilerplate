@@ -7,7 +7,14 @@
  * real database; the process environment set here takes precedence over
  * anything in .env.test.
  *
- * Usage: pnpm run test:integration [-- <jest args>]
+ * Every spec file boots the whole Medusa app, and one long-lived jest process
+ * runs out of memory after about fifteen of them. So with no arguments each spec
+ * file under integration-tests/http runs in its OWN jest process, one after the
+ * other against the same Postgres, and a summary is printed at the end.
+ *
+ * Usage:
+ *   pnpm run test:integration                      every HTTP spec, one process each
+ *   pnpm run test:integration -- <path or args>    just that, as one jest run
  */
 const { spawn } = require("child_process")
 const fs = require("fs")
@@ -17,6 +24,32 @@ const EmbeddedPostgres = require("embedded-postgres").default
 
 const PORT = 54329
 const PASSWORD = "postgres"
+const HTTP_ROOT = path.join("integration-tests", "http")
+
+const collectSpecs = (dir) =>
+  fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      return collectSpecs(full)
+    }
+    return /\.spec\.[jt]s$/.test(entry.name) ? [full] : []
+  })
+
+const runJest = (jestArgs, env) =>
+  new Promise((resolve) => {
+    const child = spawn(
+      process.execPath,
+      [
+        "--experimental-vm-modules",
+        path.join("node_modules", "jest", "bin", "jest.js"),
+        ...jestArgs,
+        "--runInBand",
+        "--forceExit",
+      ],
+      { stdio: "inherit", env }
+    )
+    child.on("exit", (code) => resolve(code ?? 1))
+  })
 
 async function main() {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "medusa-test-pg-"))
@@ -36,28 +69,37 @@ async function main() {
     await pg.start()
     console.log(`[tests] local Postgres started on port ${PORT}`)
 
-    const jestArgs = process.argv.slice(2)
-    const args = [
-      "--experimental-vm-modules",
-      path.join("node_modules", "jest", "bin", "jest.js"),
-      ...(jestArgs.length ? jestArgs : ["integration-tests/http"]),
-      "--runInBand",
-      "--forceExit",
-    ]
+    const env = {
+      ...process.env,
+      DB_HOST: "localhost",
+      DB_PORT: String(PORT),
+      DB_USERNAME: "postgres",
+      DB_PASSWORD: PASSWORD,
+    }
 
-    exitCode = await new Promise((resolve) => {
-      const child = spawn(process.execPath, args, {
-        stdio: "inherit",
-        env: {
-          ...process.env,
-          DB_HOST: "localhost",
-          DB_PORT: String(PORT),
-          DB_USERNAME: "postgres",
-          DB_PASSWORD: PASSWORD,
-        },
-      })
-      child.on("exit", (code) => resolve(code ?? 1))
-    })
+    const jestArgs = process.argv.slice(2)
+
+    if (jestArgs.length) {
+      exitCode = await runJest(jestArgs, env)
+    } else {
+      // Jest reads the argument as a pattern, so Windows backslashes must become slashes.
+      const specs = collectSpecs(HTTP_ROOT).map((spec) => spec.split(path.sep).join("/")).sort()
+      const results = []
+
+      for (const spec of specs) {
+        console.log(`\n[tests] ===== ${spec} =====`)
+        const code = await runJest([spec], env)
+        results.push({ spec, code })
+      }
+
+      const failed = results.filter((r) => r.code !== 0)
+      console.log("\n[tests] ===== SUMMARY =====")
+      for (const { spec, code } of results) {
+        console.log(`[tests] ${code === 0 ? "PASS" : "FAIL"} ${spec}`)
+      }
+      console.log(`[tests] ${results.length - failed.length}/${results.length} spec files passed`)
+      exitCode = failed.length ? 1 : 0
+    }
   } finally {
     try {
       await pg.stop()
