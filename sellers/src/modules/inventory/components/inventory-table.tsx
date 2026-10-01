@@ -87,7 +87,10 @@ export const InventoryTable = () => {
   const [rowSelection, setRowSelection] = useState<DataTableRowSelectionState>(
     {}
   )
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "title",
+    desc: false,
+  })
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,

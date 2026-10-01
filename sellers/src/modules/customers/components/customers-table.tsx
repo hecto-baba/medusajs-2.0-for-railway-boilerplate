@@ -92,7 +92,10 @@ export const CustomersTable = () => {
 
   const [search, setSearch] = useState("")
   const [filtering, setFiltering] = useState<DataTableFilteringState>({})
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "created_at",
+    desc: true,
+  })
   const [columnVisibility, setColumnVisibility] = useState<
     Record<string, boolean>
   >({
@@ -233,14 +236,6 @@ export const CustomersTable = () => {
         type: "select",
         options: groupOptions,
       }),
-      filterHelper.accessor("has_account", {
-        type: "select",
-        label: "Account",
-        options: [
-          { label: "Registered", value: "true" },
-          { label: "Guest", value: "false" },
-        ],
-      }),
       filterHelper.custom({
         id: "created_at",
         label: "Account Created",
@@ -267,6 +262,7 @@ export const CustomersTable = () => {
   const columns = useMemo(
     () => [
       columnHelper.accessor("email", {
+        id: "email",
         header: () => <EmailHeader />,
         enableSorting: true,
         sortLabel: "Email",
@@ -312,6 +308,7 @@ export const CustomersTable = () => {
         cell: ({ getValue }) => <AccountCell hasAccount={getValue()} />,
       }),
       columnHelper.accessor("created_at", {
+        id: "created_at",
         header: () => <FirstSeenHeader />,
         enableSorting: true,
         sortLabel: "Account Created",
