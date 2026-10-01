@@ -9,6 +9,7 @@ import {
   assertVendorOwnsInventoryItem,
   refetchVendorInventoryItem,
 } from "../../helpers"
+import { assertVendorCanUseStockLocations } from "../../../shared/inventory-scope"
 
 export const PostVendorCreateInventoryLevelSchema = z.object({
   location_id: z.string(),
@@ -53,6 +54,7 @@ export const POST = async (
 ) => {
   const { id } = req.params
   await assertVendorOwnsInventoryItem(req, id)
+  await assertVendorCanUseStockLocations(req, [req.validatedBody.location_id])
 
   await createInventoryLevelsWorkflow(req.scope).run({
     input: {

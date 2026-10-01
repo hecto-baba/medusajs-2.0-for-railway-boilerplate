@@ -13,6 +13,7 @@ import {
   assertVendorOwnsAllInventoryItems,
   getVendorInventoryItemIds,
 } from "../../helpers"
+import { assertVendorCanUseStockLocations } from "../../../shared/inventory-scope"
 
 export const PostVendorBatchInventoryItemsLocationLevelsSchema = z.object({
   create: z
@@ -80,6 +81,11 @@ export const POST = async (
     Array.from(referencedItemIds),
     "One or more inventory items do not belong to your store."
   )
+
+  await assertVendorCanUseStockLocations(req, [
+    ...(create ?? []).map((row) => row.location_id),
+    ...(update ?? []).map((row) => row.location_id),
+  ])
 
   // 1. Delete levels
   if (levelsToDelete.length) {

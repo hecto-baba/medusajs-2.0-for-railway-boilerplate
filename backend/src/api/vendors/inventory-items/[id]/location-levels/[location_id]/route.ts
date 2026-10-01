@@ -13,6 +13,7 @@ import {
   assertVendorOwnsInventoryItem,
   refetchVendorInventoryItem,
 } from "../../../helpers"
+import { assertVendorCanUseStockLocations } from "../../../../shared/inventory-scope"
 
 export const PostVendorUpdateInventoryLevelSchema = z.object({
   stocked_quantity: z.number().int().min(0).optional(),
@@ -27,6 +28,7 @@ export const POST = async (
 ) => {
   const { id, location_id } = req.params
   await assertVendorOwnsInventoryItem(req, id)
+  await assertVendorCanUseStockLocations(req, [location_id])
 
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
