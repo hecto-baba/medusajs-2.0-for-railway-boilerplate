@@ -1,4 +1,3 @@
-import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { ArrowPath, CheckCircle, ChevronRight, Folder, SquaresPlus, Tag, XCircle } from "@medusajs/icons"
 import {
   Badge,
@@ -661,10 +660,5 @@ const SegmentsPage = () => {
     </Container>
   )
 }
-
-export const config = defineRouteConfig({
-  label: "Segments",
-  icon: SquaresPlus,
-})
 
 export default SegmentsPage

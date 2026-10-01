@@ -1,9 +1,9 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
-import TicketProductsPage from "../../ticket-products/page"
+import VendorTypesPage from "../../vendor-types/page"
 
 export const config = defineRouteConfig({
-  label: "Shows",
+  label: "Vendor Types",
   rank: 1,
 })
 
-export default TicketProductsPage
+export default VendorTypesPage

@@ -1,4 +1,3 @@
-import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { BuildingStorefront, CheckCircle, Folder, Tag } from "@medusajs/icons"
 import {
   Badge,
@@ -579,10 +578,5 @@ const VendorTypesPage = () => {
     </Container>
   )
 }
-
-export const config = defineRouteConfig({
-  label: "Vendor Types",
-  icon: BuildingStorefront,
-})
 
 export default VendorTypesPage

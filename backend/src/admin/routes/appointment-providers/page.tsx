@@ -1,4 +1,3 @@
-import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { Calendar } from "@medusajs/icons"
 import {
   Badge,
@@ -168,9 +167,5 @@ const AppointmentProvidersPage = () => {
   )
 }
 
-export const config = defineRouteConfig({
-  label: "Appointment Providers",
-  icon: Calendar,
-})
 
 export default AppointmentProvidersPage
