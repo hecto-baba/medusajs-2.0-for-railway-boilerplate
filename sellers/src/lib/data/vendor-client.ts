@@ -3147,3 +3147,93 @@ export const deleteVendorCurrency = (code: string) =>
     "DELETE"
   )
 
+
+/* ------------------------------------------------------- shipping options */
+
+export type VendorShippingOption = {
+  id: string
+  name: string
+  price_type: string
+  service_zone_id: string
+  shipping_profile_id: string
+  provider_id: string
+  shipping_option_type_id: string
+  type?: { id: string; label: string; code: string } | null
+  prices?: Array<{ id: string; currency_code?: string | null; amount: number }>
+  service_zone?: {
+    id: string
+    name: string
+    fulfillment_set?: { location?: { id: string; name: string } | null } | null
+  } | null
+  created_at: string
+}
+
+export const listVendorShippingOptions = (params?: {
+  limit?: number
+  offset?: number
+  q?: string
+  stock_location_id?: string
+}) =>
+  request<{ shipping_options: VendorShippingOption[]; count?: number }>(
+    "shipping-options",
+    params || {}
+  )
+
+export const createVendorShippingOption = (body: {
+  name: string
+  service_zone_id: string
+  shipping_profile_id: string
+  shipping_option_type_id: string
+  prices: Array<{ currency_code: string; amount: number }>
+}) =>
+  mutate<{ shipping_option: VendorShippingOption }>("shipping-options", "POST", body)
+
+export const updateVendorShippingOption = (
+  id: string,
+  body: {
+    name?: string
+    prices?: Array<{ id: string; amount: number }>
+  }
+) =>
+  mutate<{ shipping_option: VendorShippingOption }>(`shipping-options/${id}`, "POST", body)
+
+export const deleteVendorShippingOption = (id: string) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(
+    `shipping-options/${id}`,
+    "DELETE"
+  )
+
+/* ------------------------------------------------------------- tax rates */
+
+export type VendorTaxRate = {
+  id: string
+  name: string
+  code: string
+  rate: number | null
+  is_default: boolean
+  tax_region_id: string
+  tax_region?: { id: string; country_code: string; province_code: string | null } | null
+  created_at: string
+}
+
+export const listVendorTaxRates = (params?: {
+  limit?: number
+  offset?: number
+  tax_region_id?: string
+}) =>
+  request<{ tax_rates: VendorTaxRate[]; count?: number }>("tax-rates", params || {})
+
+export const createVendorTaxRate = (body: {
+  tax_region_id: string
+  name: string
+  code?: string
+  rate: number
+}) => mutate<{ tax_rate: VendorTaxRate }>("tax-rates", "POST", body)
+
+export const updateVendorTaxRateById = (
+  id: string,
+  body: { name?: string; code?: string; rate?: number }
+) => mutate<{ tax_rate: VendorTaxRate }>(`tax-rates/${id}`, "POST", body)
+
+export const deleteVendorTaxRate = (id: string) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(`tax-rates/${id}`, "DELETE")

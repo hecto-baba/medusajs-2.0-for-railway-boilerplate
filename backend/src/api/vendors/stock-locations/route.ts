@@ -73,6 +73,8 @@ export const GET = async (
       "updated_at",
       "address.*",
       "fulfillment_sets.*",
+      "fulfillment_sets.service_zones.id",
+      "fulfillment_sets.service_zones.name",
       "fulfillment_providers.*",
     ],
     filters: {

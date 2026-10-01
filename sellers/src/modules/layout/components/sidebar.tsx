@@ -48,6 +48,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: Tag,
     items: [
       { href: "/products/collections", label: "Collections" },
+      { href: "/products/categories", label: "Categories" },
       { href: "/products/options", label: "Options" },
     ],
   },
@@ -184,6 +185,7 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
                         ? pathname === "/products" ||
                           (pathname.startsWith("/products/") &&
                             !pathname.startsWith("/products/collections") &&
+                            !pathname.startsWith("/products/categories") &&
                             !pathname.startsWith("/products/options"))
                         : item.href === "/inventory"
                         ? pathname === "/inventory" ||
