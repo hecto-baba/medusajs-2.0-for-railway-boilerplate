@@ -181,3 +181,49 @@ export const waitFor = async <T>(read: () => Promise<T>, done: (value: T) => boo
   }
   return value
 }
+
+/**
+ * A product whose stock is managed: the variant has an inventory item with a
+ * stock level at the seller's own location, so completing a cart reserves from
+ * that location.
+ */
+export const createStockedProduct = async (
+  api: any,
+  container: any,
+  seller: TestVendor,
+  profile: string,
+  locationId: string,
+  title: string,
+  price: number,
+  stock: number
+) => {
+  const product = (
+    await must(
+      `stocked product ${title}`,
+      api.post(
+        "/vendors/products",
+        {
+          title,
+          shipping_profile_id: profile,
+          options: [{ title: "Size", values: ["M"] }],
+          variants: [{ title: "M", options: { Size: "M" }, prices: [{ currency_code: "usd", amount: price }], manage_inventory: true }],
+        },
+        seller.headers
+      )
+    )
+  ).data.product
+
+  const query = container.resolve(ContainerRegistrationKeys.QUERY) as any
+  const { data } = await query.graph({
+    entity: "product_variant",
+    fields: ["id", "inventory_items.inventory_item_id"],
+    filters: { id: product.variants[0].id },
+  })
+  const inventoryItemId = data[0].inventory_items[0].inventory_item_id as string
+
+  await (container.resolve(Modules.INVENTORY) as any).createInventoryLevels([
+    { inventory_item_id: inventoryItemId, location_id: locationId, stocked_quantity: stock },
+  ])
+
+  return { productId: product.id as string, variantId: product.variants[0].id as string, inventoryItemId }
+}

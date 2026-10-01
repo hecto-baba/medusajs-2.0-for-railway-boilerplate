@@ -280,6 +280,8 @@ export const splitOrderBySeller = async (
       } as any,
     })
 
+    await moveReservationsToChild(container, child.id)
+
     const {
       data: [totals],
     } = await query.graph({
@@ -371,4 +373,49 @@ export const withParentLineItemIds = async (
     .map((line: any) => line?.metadata?.parent_line_item_id)
     .filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
   return [...new Set([...lineItemIds, ...parents])]
+}
+
+/**
+ * Stock is reserved when the cart completes, against the PARENT order's line
+ * items. A seller fulfils their CHILD order, whose line items are copies with new
+ * ids, so Medusa would find no reservation to consume, the stock would never go
+ * down, and the parent's reservation would hold stock forever. Move each
+ * reservation onto the child's copy of the line (same stock location, same
+ * quantity). Reservations of lines that stay on the parent are left alone.
+ */
+const moveReservationsToChild = async (container: MedusaContainer, childOrderId: string) => {
+  const query: any = container.resolve(ContainerRegistrationKeys.QUERY)
+  const inventory: any = container.resolve(Modules.INVENTORY)
+
+  const {
+    data: [child],
+  } = await query.graph({
+    entity: "order",
+    fields: ["id", "items.id", "items.metadata"],
+    filters: { id: childOrderId },
+  })
+
+  for (const item of (child?.items ?? []) as any[]) {
+    const parentLineId = item.metadata?.parent_line_item_id
+    if (!parentLineId) {
+      continue
+    }
+    const reservations: any[] = await inventory.listReservationItems({ line_item_id: parentLineId })
+    if (!reservations.length) {
+      continue
+    }
+
+    await inventory.createReservationItems(
+      reservations.map((reservation) => ({
+        line_item_id: item.id,
+        inventory_item_id: reservation.inventory_item_id,
+        location_id: reservation.location_id,
+        quantity: reservation.quantity,
+        allow_backorder: reservation.allow_backorder,
+        description: reservation.description,
+        metadata: reservation.metadata,
+      }))
+    )
+    await inventory.deleteReservationItems(reservations.map((reservation) => reservation.id))
+  }
 }

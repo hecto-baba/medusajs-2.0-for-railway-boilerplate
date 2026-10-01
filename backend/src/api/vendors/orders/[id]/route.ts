@@ -65,6 +65,9 @@ export const GET = async (
         "shipping_methods",
         "payment_collections",
         "fulfillments",
+        "fulfillments.labels.*",
+        "fulfillments.items.*",
+        "shipping_methods.shipping_option_id",
       ],
       variables: {
         filters: { id: [id] },

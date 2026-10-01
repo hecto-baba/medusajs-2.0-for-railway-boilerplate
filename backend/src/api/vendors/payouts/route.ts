@@ -37,7 +37,10 @@ export const GET = async (
   const all: any[] = await marketplace.listVendorOrderSplits({ vendor_id: vendorId })
   const totals: Record<string, Record<string, number>> = {}
   for (const row of all) {
-    totals[row.currency_code] ??= { owed: 0, paid: 0, void: 0 }
+    totals[row.currency_code] ??= { owed: 0, paid: 0, void: 0, refunded: 0 }
+    // Money already returned to buyers on these orders; the seller is owed total minus this.
+    totals[row.currency_code].refunded =
+      Math.round(((totals[row.currency_code].refunded ?? 0) + Number(row.refunded_total ?? 0)) * 100) / 100
     totals[row.currency_code][row.payout_status] =
       Math.round(((totals[row.currency_code][row.payout_status] ?? 0) + Number(row.total)) * 100) / 100
   }

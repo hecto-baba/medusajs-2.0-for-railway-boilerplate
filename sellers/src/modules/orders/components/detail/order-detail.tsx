@@ -11,6 +11,7 @@ import {
 import { ArrowLeft, Buildings, CreditCard, User } from "@medusajs/icons"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
+import { OrderActions } from "./order-actions"
 import { OrderRentalsSection } from "./order-rentals-section"
 
 type OrderDetailProps = {
@@ -86,7 +87,7 @@ export const OrderDetail = ({ id }: OrderDetailProps) => {
       {order.is_mixed && (
         <Container className="p-4" data-testid="legacy-shared-order-note">
           <Text size="small" className="text-ui-fg-subtle">
-            This is an older order that also contained other sellers' items. You see only your own
+            This is an older order that also contained other sellers&apos; items. You see only your own
             items; payment, shipping and the whole-order totals are not shown here.
           </Text>
         </Container>
@@ -120,7 +121,7 @@ export const OrderDetail = ({ id }: OrderDetailProps) => {
           <Container className="p-6 flex flex-col gap-y-4">
             <Heading level="h2">Items</Heading>
             <Text size="small" className="text-ui-fg-muted -mt-2">
-              Only your own products are shown; other vendors' items on this
+              Only your own products are shown; other vendors&apos; items on this
               order are not visible here.
             </Text>
             <div className="border border-ui-border-base rounded-lg overflow-hidden">
@@ -163,6 +164,8 @@ export const OrderDetail = ({ id }: OrderDetailProps) => {
               </Table>
             </div>
           </Container>
+
+          <OrderActions order={order} />
 
           <Container className="p-6 flex flex-col gap-y-3">
             <Heading level="h2">Order Summary</Heading>

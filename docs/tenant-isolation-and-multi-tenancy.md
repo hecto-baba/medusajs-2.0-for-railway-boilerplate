@@ -1,6 +1,6 @@
 # Tenant Isolation and Multi-Tenancy Plan
 
-Status: Phases 0 and 1 complete; Phases 2 and 3 code complete and automatically tested (32/32 spec files); browser checks, QA rollout, ledger screens and owner decisions pending (see sections 11.5 and 12.8). Branch: `feature/tenant-isolation` (off `feature/marketplace`).
+Status: Phases 0 and 1 complete; Phases 2, 3 and 4 code complete and automatically tested; browser checks, QA rollout, ledger screens and owner decisions pending (see sections 11.5 and 12.8). Branch: `feature/tenant-isolation` (off `feature/marketplace`).
 Scope: the seller (vendor) API `backend/src/api/vendors/**`, the seller panel `sellers/`, and bringing the missing admin features to sellers.
 Out of scope: Vendor Transactions (stays admin-only), drivers, and the admin API / store routes (see "What this plan does not cover").
 
@@ -572,3 +572,39 @@ Phase 3 is code complete and passes its automated tests (32 of 32 spec files, 12
 **E. Left for Phase 4 on purpose**
 - Refunds and returns against a child order (the ledger entry is only voided on cancel today).
 - Seller fulfilment, shipment and delivery from the seller panel (the rental activation on shipment is already wired and tested).
+
+## 13. Phase 4: seller fulfilment
+
+A seller now fulfils, ships, delivers, cancels, refunds and returns THEIR OWN order, and nobody else's. Test: `integration-tests/http/phase4/seller-fulfilment.spec.ts` (11 tests, a real two-seller cart with managed stock and a captured payment).
+
+### 13.1 The seven steps
+
+| # | Step | Status |
+|---|---|---|
+| 1 | Routes wrapping Medusa's order workflows | Done. `POST /vendors/orders/:id/fulfillments`, `.../fulfillments/:fid/shipments` (with tracking), `.../cancel`, `.../mark-as-delivered`. Each checks the order is the seller's, every item is on that order and the seller's own, the fulfilment is on that order, the shipping option is the seller's own AND one the buyer chose (and must be named: Medusa would default to the first method), and a location named is the seller's own |
+| 2 | Cancel order, refund, returns | Done. `POST .../cancel` (a child order alone: ledger entry voided, rentals cancelled, stock released), `.../refunds` (against the buyer's single payment on the parent, capped at the seller's own share, recorded on the ledger as `refunded_total`), `.../returns` (the standard open, add items, confirm, receive sequence, because Medusa's one-shot flow needs a return shipping option sellers do not have; goods received at the seller's own location restore stock) |
+| 3 | Reservations | Done, and a real bug found. Stock is reserved at checkout against the PARENT order's line items; a seller fulfils the CHILD, whose lines have new ids, so Medusa found no reservation, stock never went down and the parent's reservation held stock forever. The splitter now moves each reservation onto the child's copy of the line (same location, same quantity). Seller locations are linked to the sales channel (Phase 2.1), so checkout reserves from the seller's own location |
+| 4 | Rentals | Done in Phase 3 (found through the parent; activated by a seller shipment; cancelled with the seller order). Re-verified here |
+| 5 | Delivery module | Done. The hard-coded `loc_1` is replaced by `lib/fulfillment-location.ts`: the location of the shipping option the buyer chose, else the first location of the seller of the order's product, else a clear error. Nothing is shipped from a guessed place |
+| 6 | Seller screens | Done in code: the order detail screen has a Fulfilment section (fulfil items, mark shipped with tracking, mark delivered, cancel fulfilment) and Refund, Record a return and Cancel order buttons (hidden on an older shared order). Typechecked and linted only, not run in a browser |
+| 7 | Buyer emails | Done. One template (`fulfillment-update`), sent on `shipment.created` and `delivery.created`, naming the seller, the items in that parcel, the tracking, and the order number the buyer knows (the parent's). Skipped when the seller unticks "Email the buyer". Tested with a stand-in for the email service |
+
+### 13.2 Rules worth knowing
+
+- **Older shared orders** (items of several sellers, from before Phase 3): a seller may fulfil only their own items; cancel, refund and return are refused (400) because they would reach other sellers' items and money.
+- **Refunds and the ledger.** The seller is owed `total` minus `refunded_total`. If the entry is already paid out, a later refund makes the net negative; the platform recovers it. `GET /vendors/payouts` totals now include `refunded`.
+- **Returns and refunds are separate actions**, so the seller chooses the amount. A return does not refund by itself.
+
+### 13.3 Tested
+
+Reservation moved to the seller's order at the seller's location and the parent's gone; fulfil, ship with tracking and deliver, with stock 10 to 8 and reserved 2 to 0; cancelling a fulfilment puts stock back; the shipping option must be named, the seller's own and one the buyer chose; another seller's location, order, items and fulfilment answer 404 on every action; cancelling one seller's order leaves the other seller's and the parent's untouched, voids the entry and releases the stock; refund capped at the seller's share, recorded on the parent payment and the ledger; return received back restores stock, B's location and an unknown item refused; the older shared order case; the delivery location; the buyer email content and the no-notify case.
+
+### 13.4 Pending in Phase 4
+
+- [ ] Run the new order screens in a browser (fulfil, ship with tracking, deliver, cancel, refund, return) with a real seller login.
+- [ ] Check the buyer shipment and delivery emails with a real email provider (the test uses a stand-in; the template renders through the same engine as the others).
+- [ ] Migration `20261001160000` adds `refunded_total` to the ledger: run `medusa db:migrate` on deploy.
+- [ ] Orders placed before Phase 3 have no ledger row, so their refunds are not recorded on any ledger (they are older shared orders and refunds are refused anyway).
+- [ ] Admin screen for the payout ledger and a seller earnings screen are still API only (Phase 3 item A).
+- [ ] Return shipping labels and a return shipping option for sellers are not offered: returns are recorded, the physical return is arranged outside the system.
+- [ ] Partial refunds do not yet adjust how a payout is described to the seller beyond the `refunded` total.

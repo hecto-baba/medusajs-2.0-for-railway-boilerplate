@@ -23,6 +23,10 @@ export const VendorOrderSplit = model
     shipping_total: model.float(),
     tax_total: model.float(),
     total: model.float(),
+    // Money returned to the buyer for this seller's order (refunds). The seller is
+    // owed total minus this; it can exceed what is still owed once paid out, which
+    // the platform then recovers.
+    refunded_total: model.float().default(0),
     // owed -> paid, or void (e.g. the order was cancelled or refunded)
     payout_status: model.text().default("owed"),
     paid_at: model.dateTime().nullable(),

@@ -96,7 +96,7 @@ export type VendorOrder = {
   customer?: { email: string | null } | null
   sales_channel?: { name: string | null } | null
   payment_collections?: { status: string }[]
-  fulfillments?: { id: string; delivered_at: string | null; shipped_at: string | null }[]
+  fulfillments?: VendorFulfillment[]
   // True for an older order that holds other sellers' items too: only this
   // seller's items are shown and whole-order figures are withheld.
   is_mixed?: boolean
@@ -121,7 +121,10 @@ export type VendorOrderDetail = VendorOrder & {
     quantity: number
     unit_price: number
     metadata?: Record<string, unknown> | null
+    // How many of this line are already packed (see fulfillments).
+    detail?: { quantity?: number | { value?: string } ; fulfilled_quantity?: number | { value?: string } } | null
   }[]
+  shipping_methods?: { shipping_option_id?: string | null; name?: string }[]
 }
 
 export type ListResponse<T> = {
@@ -3240,3 +3243,97 @@ export const updateVendorTaxRateById = (
 
 export const deleteVendorTaxRate = (id: string) =>
   mutate<{ id: string; object: string; deleted: boolean }>(`tax-rates/${id}`, "DELETE")
+
+/* ------------------------------------------------------ order fulfilment */
+
+export type VendorFulfillment = {
+  id: string
+  shipped_at: string | null
+  delivered_at: string | null
+  canceled_at: string | null
+  labels?: { tracking_number: string; tracking_url?: string | null }[]
+  items?: { line_item_id: string; title?: string; quantity: number }[]
+}
+
+export const fulfillVendorOrder = (
+  orderId: string,
+  body: {
+    items: { id: string; quantity: number }[]
+    shipping_option_id: string
+    location_id?: string
+    no_notification?: boolean
+  }
+) =>
+  mutate<{ fulfillment: { id: string } }>(`orders/${orderId}/fulfillments`, "POST", body)
+
+export const shipVendorFulfillment = (
+  orderId: string,
+  fulfillmentId: string,
+  body: {
+    labels?: { tracking_number: string; tracking_url?: string }[]
+    no_notification?: boolean
+  }
+) =>
+  mutate<{ shipped: boolean }>(
+    `orders/${orderId}/fulfillments/${fulfillmentId}/shipments`,
+    "POST",
+    body
+  )
+
+export const deliverVendorFulfillment = (orderId: string, fulfillmentId: string) =>
+  mutate<{ delivered: boolean }>(
+    `orders/${orderId}/fulfillments/${fulfillmentId}/mark-as-delivered`,
+    "POST",
+    {}
+  )
+
+export const cancelVendorFulfillment = (orderId: string, fulfillmentId: string) =>
+  mutate<{ canceled: boolean }>(
+    `orders/${orderId}/fulfillments/${fulfillmentId}/cancel`,
+    "POST",
+    {}
+  )
+
+export const cancelVendorOrder = (orderId: string) =>
+  mutate<{ canceled: boolean }>(`orders/${orderId}/cancel`, "POST", {})
+
+export const refundVendorOrder = (orderId: string, body: { amount: number; note?: string }) =>
+  mutate<{ refunded: number }>(`orders/${orderId}/refunds`, "POST", body)
+
+export const returnVendorOrderItems = (
+  orderId: string,
+  body: {
+    items: { id: string; quantity: number }[]
+    note?: string
+    receive_now?: boolean
+    location_id?: string
+  }
+) => mutate<{ return: { id: string } }>(`orders/${orderId}/returns`, "POST", body)
+
+/** The seller's own payout ledger (what the platform owes them). */
+export type VendorPayoutEntry = {
+  id: string
+  parent_order_id: string
+  child_order_id: string
+  currency_code: string
+  items_total: number
+  shipping_total: number
+  tax_total: number
+  total: number
+  refunded_total: number
+  payout_status: "owed" | "paid" | "void"
+  paid_at: string | null
+  payout_reference: string | null
+  created_at: string
+}
+
+export const listVendorPayouts = (params?: {
+  limit?: number
+  offset?: number
+  payout_status?: "owed" | "paid" | "void"
+}) =>
+  request<{
+    payouts: VendorPayoutEntry[]
+    count: number
+    totals: Record<string, { owed: number; paid: number; void: number; refunded: number }>
+  }>("payouts", params || {})
