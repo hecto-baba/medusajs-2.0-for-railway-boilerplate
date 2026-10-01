@@ -6,6 +6,8 @@ import {
 } from "@medusajs/framework/http";
 import { createFindParams } from "@medusajs/medusa/api/utils/validators";
 import { PostRentalConfigBodySchema } from "./admin/products/[id]/rental-config/route";
+import { PostEoiConfigBodySchema } from "./admin/products/[id]/eoi-config/validators";
+import { PostEoiStatusBodySchema } from "./admin/eois/[id]/route";
 import { PostRentalStatusBodySchema } from "./admin/rentals/[id]/route";
 import { PostRentalDepositBodySchema } from "./admin/rentals/[id]/deposit/route";
 import { GetRentalAvailabilitySchema } from "./store/products/[id]/rental-availability/route";
@@ -13,7 +15,12 @@ import { GetRentalBlockedDatesSchema } from "./store/products/[id]/rental-blocke
 import { PostCartItemsRentalsBody } from "./store/carts/[id]/line-items/rentals/route";
 import { PostCartItemsTicketsBody } from "./store/carts/[id]/line-items/tickets/route";
 import { PostCartItemsAppointmentsBody } from "./store/carts/[id]/line-items/appointments/route";
+import { PostCartItemsEoiBody } from "./store/carts/[id]/line-items/eoi/route";
 import { GetAvailableSlotsSchema } from "./store/providers/[id]/available-slots/route";
+import { PostStoreEnquirySchema } from "./store/enquiries/route";
+import { PostAdminEnquiryReplyBodySchema } from "./admin/enquiries/[id]/route";
+import { PostAdminEnquiryStatusBodySchema } from "./admin/enquiries/[id]/status/route";
+import { PostEnquiryConfigBodySchema } from "./admin/products/[id]/enquiry-config/route";
 import { PostVendorProviderSchema } from "./vendors/providers/me/route";
 import { PostVendorRecurringAvailabilitySchema } from "./vendors/providers/me/recurring-availability/route";
 import { PostVendorAvailabilityExceptionSchema } from "./vendors/providers/me/exceptions/route";
@@ -340,6 +347,42 @@ export default defineMiddlewares({
       ]
     },
     {
+      matcher: "/admin/products/:id/eoi-config",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostEoiConfigBodySchema)
+      ]
+    },
+    {
+      matcher: "/admin/eois",
+      methods: ["GET"],
+      middlewares: [
+        validateAndTransformQuery(createFindParams(), {
+          isList: true,
+          defaults: [
+            "id",
+            "product_id",
+            "variant_id",
+            "customer_email",
+            "order_id",
+            "value_type",
+            "value_amount",
+            "eoi_charged_amount",
+            "remaining_amount",
+            "status",
+            "created_at",
+          ]
+        })
+      ]
+    },
+    {
+      matcher: "/admin/eois/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostEoiStatusBodySchema)
+      ]
+    },
+    {
       matcher: "/admin/rentals/:id/deposit",
       methods: ["POST"],
       middlewares: [
@@ -375,6 +418,13 @@ export default defineMiddlewares({
       ]
     },
     {
+      matcher: "/store/carts/:id/line-items/eoi",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostCartItemsEoiBody)
+      ]
+    },
+    {
       matcher: "/store/carts/:id/line-items/tickets",
       methods: ["POST"],
       middlewares: [
@@ -393,6 +443,34 @@ export default defineMiddlewares({
       methods: ["GET"],
       middlewares: [
         validateAndTransformQuery(GetAvailableSlotsSchema, {})
+      ]
+    },
+    {
+      matcher: "/store/enquiries",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostStoreEnquirySchema)
+      ]
+    },
+    {
+      matcher: "/admin/enquiries/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostAdminEnquiryReplyBodySchema)
+      ]
+    },
+    {
+      matcher: "/admin/enquiries/:id/status",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostAdminEnquiryStatusBodySchema)
+      ]
+    },
+    {
+      matcher: "/admin/products/:id/enquiry-config",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostEnquiryConfigBodySchema)
       ]
     },
     {

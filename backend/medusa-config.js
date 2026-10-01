@@ -70,6 +70,12 @@ const medusaConfig = {
       resolve: './src/modules/rental'
     },
     {
+      resolve: './src/modules/product-enquiry'
+    },
+    {
+      resolve: './src/modules/expression-of-interest'
+    },
+    {
       resolve: './src/modules/ticket-booking'
     },
     {
