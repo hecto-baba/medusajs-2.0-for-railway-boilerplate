@@ -38,49 +38,86 @@ export const createVendorProductWorkflow = createWorkflow(
       fields: ["id", "type"],
     }).config({ name: "retrieve-shipping-profiles" })
 
-    const productData = transform({ input, stores, shippingProfiles }, (data) => {
-      const defaultProfile =
-        data.shippingProfiles?.find((sp: any) => sp.type === "default") ||
-        data.shippingProfiles?.[0]
+    const { data: vendorAdmins } = useQueryGraphStep({
+      entity: "vendor_admin",
+      fields: ["vendor.id", "vendor.shipping_profiles.id"],
+      filters: { id: input.vendor_admin_id },
+    }).config({ name: "retrieve-vendor-admins" })
 
-      return {
-        products: [
-          {
-            ...data.input.product,
-            status: ProductStatus.PUBLISHED,
-            shipping_profile_id:
-              data.input.product.shipping_profile_id ?? defaultProfile?.id,
-            sales_channels: [{ id: data.stores[0].default_sales_channel_id }],
-          },
-        ],
+    // Every seller's profiles, to tell shared platform profiles (owned by no
+    // seller) apart from another seller's profile.
+    const { data: allVendors } = useQueryGraphStep({
+      entity: "vendor",
+      fields: ["id", "shipping_profiles.id"],
+    }).config({ name: "retrieve-vendors-for-shipping-profile-scope" })
+
+    // The shipping profile for this product: the one requested if the seller may
+    // use it, otherwise the seller's own default, then any own profile, then
+    // the shared platform default. Never another seller's profile.
+    const resolvedProfileId = transform(
+      { input, shippingProfiles, vendorAdmins, allVendors },
+      (data) => {
+        const ownedIds = new Set<string>(
+          (data.vendorAdmins?.[0]?.vendor?.shipping_profiles ?? [])
+            .map((profile: any) => profile?.id)
+            .filter(Boolean)
+        )
+        const claimedIds = new Set<string>(
+          (data.allVendors ?? []).flatMap((vendor: any) =>
+            (vendor?.shipping_profiles ?? [])
+              .map((profile: any) => profile?.id)
+              .filter(Boolean)
+          )
+        )
+        const visible = (data.shippingProfiles ?? []).filter(
+          (profile: any) => ownedIds.has(profile.id) || !claimedIds.has(profile.id)
+        )
+
+        const requested = data.input.product.shipping_profile_id
+        if (requested) {
+          if (!visible.some((profile: any) => profile.id === requested)) {
+            throw new Error("Shipping profile not found.")
+          }
+          return requested as string
+        }
+
+        const own = visible.filter((profile: any) => ownedIds.has(profile.id))
+        const chosen =
+          own.find((profile: any) => profile.type === "default") ||
+          own[0] ||
+          visible.find((profile: any) => profile.type === "default") ||
+          visible[0]
+
+        return chosen?.id as string | undefined
       }
-    })
+    )
+
+    const productData = transform({ input, stores, resolvedProfileId }, (data) => ({
+      products: [
+        {
+          ...data.input.product,
+          status: ProductStatus.PUBLISHED,
+          shipping_profile_id: data.resolvedProfileId,
+          sales_channels: [{ id: data.stores[0].default_sales_channel_id }],
+        },
+      ],
+    }))
 
     const createdProducts = createProductsWorkflow.runAsStep({
       input: productData as CreateProductsWorkflowInput,
     })
-
-    const { data: vendorAdmins } = useQueryGraphStep({
-      entity: "vendor_admin",
-      fields: ["vendor.id"],
-      filters: { id: input.vendor_admin_id },
-    }).config({ name: "retrieve-vendor-admins" })
 
     // Build all remote links in a single transform and create them in one step.
     // createRemoteLinkStep is a named step ("create-remote-links") and Medusa's
     // workflow SDK does not allow the same step name to appear more than once
     // in a workflow — calling it twice would crash the server on startup.
     const linksToCreate = transform(
-      { createdProducts, vendorAdmins, shippingProfiles },
+      { createdProducts, vendorAdmins, resolvedProfileId },
       (data) => {
         const vendorId = data.vendorAdmins?.[0]?.vendor?.id
         if (!vendorId) {
           throw new Error("Cannot link product: Authenticated vendor admin profile does not exist.")
         }
-
-        const resolvedProfileId =
-          data.shippingProfiles?.find((sp: any) => sp.type === "default")?.id ||
-          data.shippingProfiles?.[0]?.id
 
         // vendor ↔ product links
         const vendorLinks = data.createdProducts.map((product) => ({
@@ -97,13 +134,13 @@ export const createVendorProductWorkflow = createWorkflow(
         // shipping profile in the link table. Without it Medusa rejects the
         // cart at checkout: "cart items require shipping profiles not satisfied
         // by current shipping methods".
-        const shippingLinks = resolvedProfileId
+        const shippingLinks = data.resolvedProfileId
           ? data.createdProducts.map((product) => ({
               [Modules.PRODUCT]: {
                 product_id: product.id,
               },
               [Modules.FULFILLMENT]: {
-                shipping_profile_id: resolvedProfileId,
+                shipping_profile_id: data.resolvedProfileId,
               },
             }))
           : []

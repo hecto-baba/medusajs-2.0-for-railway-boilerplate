@@ -4,7 +4,13 @@ import type {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
-import { createShippingOptionTypesWorkflow } from "@medusajs/medusa/core-flows"
+import { createVendorShippingOptionTypeWorkflow } from "../../../workflows/create-vendor-shipping-option-type"
+import { getVisibleIds, ScopedEntity } from "../shared/platform-scope"
+
+const SHIPPING_OPTION_TYPES: ScopedEntity = {
+  linkField: "shipping_option_types",
+  entity: "shipping_option_type",
+}
 
 export const CreateVendorShippingOptionTypeSchema = z.object({
   label: z.string().min(1),
@@ -38,9 +44,20 @@ export const GET = async (
   const limit = typeof qParams.limit !== "undefined" ? Number(qParams.limit) : 20
   const offset = typeof qParams.offset !== "undefined" ? Number(qParams.offset) : 0
 
+  // Own types plus shared platform types. Never another seller's.
+  const { owned, platform } = await getVisibleIds(req, SHIPPING_OPTION_TYPES)
+  const visibleIds = [...owned, ...platform]
+
+  // An empty id list means "no constraint" downstream, so answer directly.
+  if (!visibleIds.length) {
+    res.json({ shipping_option_types: [], count: 0, limit, offset })
+    return
+  }
+
   const { data: optionTypes } = await query.graph({
     entity: "shipping_option_type",
     fields: ["id", "label", "code", "description", "created_at", "updated_at"],
+    filters: { id: visibleIds },
   })
 
   let filtered = (optionTypes || []) as any[]
@@ -120,11 +137,13 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<z.infer<typeof CreateVendorShippingOptionTypeSchema>>,
   res: MedusaResponse
 ) => {
-  const { result } = await (createShippingOptionTypesWorkflow(req.scope) as any).run({
+  const { result: created } = await createVendorShippingOptionTypeWorkflow(req.scope).run({
     input: {
-      shipping_option_types: [req.validatedBody as any],
+      vendor_admin_id: req.auth_context.actor_id,
+      shipping_option_type: req.validatedBody as any,
     },
   })
+  const result = [created.shipping_option_type]
 
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const { data: optionTypes } = await query.graph({

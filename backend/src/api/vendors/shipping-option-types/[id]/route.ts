@@ -8,6 +8,13 @@ import {
   updateShippingOptionTypesWorkflow,
 } from "@medusajs/medusa/core-flows"
 import { z } from "@medusajs/framework/zod"
+import { assertVendorCanSee, ScopedEntity } from "../../shared/platform-scope"
+import { assertVendorOwns } from "../../shared/vendor-scope"
+
+const SHIPPING_OPTION_TYPES: ScopedEntity = {
+  linkField: "shipping_option_types",
+  entity: "shipping_option_type",
+}
 
 export const UpdateVendorShippingOptionTypeSchema = z.object({
   label: z.string().optional(),
@@ -21,6 +28,9 @@ export const GET = async (
 ) => {
   const { id } = req.params
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+
+  // Own or shared platform type; another seller's type is a 404.
+  await assertVendorCanSee(req, SHIPPING_OPTION_TYPES, id, "Shipping option type not found.")
 
   const { data: optionTypes } = await query.graph({
     entity: "shipping_option_type",
@@ -40,6 +50,8 @@ export const POST = async (
   res: MedusaResponse
 ) => {
   const { id } = req.params
+
+  await assertVendorOwns(req, "shipping_option_types", id, "Shipping option type not found.")
 
   await (updateShippingOptionTypesWorkflow(req.scope) as any).run({
     input: {
@@ -63,6 +75,8 @@ export const DELETE = async (
   res: MedusaResponse
 ) => {
   const { id } = req.params
+
+  await assertVendorOwns(req, "shipping_option_types", id, "Shipping option type not found.")
 
   try {
     await (deleteShippingOptionTypesWorkflow(req.scope) as any).run({

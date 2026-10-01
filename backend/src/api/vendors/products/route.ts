@@ -60,6 +60,7 @@ import {
   assertVendorCanUseStockLocation,
   getVisibleStockLocations,
 } from "../shared/stock-location-scope"
+import { assertVendorCanUseShippingProfiles } from "../shared/shipping-profile-scope"
 
 export const POST = async (
   req: AuthenticatedMedusaRequest<HttpTypes.AdminCreateProduct>,
@@ -67,10 +68,13 @@ export const POST = async (
 ) => {
   const rawBody = ((req as any).body || {}) as any
 
-  // Reject another seller's stock location BEFORE anything is created.
+  // Reject another seller's stock location or shipping profile BEFORE anything is created.
   if (rawBody.stock_location_id) {
     await assertVendorCanUseStockLocation(req, rawBody.stock_location_id)
   }
+  await assertVendorCanUseShippingProfiles(req, [
+    (req.validatedBody as any)?.shipping_profile_id,
+  ])
 
   const { result } = await createVendorProductWorkflow(req.scope).run({
     input: {
