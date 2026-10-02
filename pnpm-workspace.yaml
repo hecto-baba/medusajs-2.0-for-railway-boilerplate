@@ -1,0 +1,13 @@
+packages:
+  - 'backend'
+  - 'sellers'
+  - 'storefront'
+allowBuilds:
+  '@embedded-postgres/windows-x64': true
+  '@medusajs/telemetry': true
+  '@swc/core': true
+  esbuild: true
+  msgpackr-extract: true
+  protobufjs: true
+  sharp: true
+  unrs-resolver: true
