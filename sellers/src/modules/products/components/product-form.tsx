@@ -160,6 +160,9 @@ type FormVariant = {
   price: string
   manage_inventory: boolean
   inventory_quantity: string
+  allow_backorder?: boolean
+  inventory_kit?: boolean
+  price_eur?: string
 }
 
 export const ProductForm = ({ product }: ProductFormProps) => {

@@ -10,6 +10,7 @@ import {
   Button,
   Container,
   createDataTableColumnHelper,
+  createDataTableFilterHelper,
   DataTable,
   DataTablePaginationState,
   DataTableSortingState,
