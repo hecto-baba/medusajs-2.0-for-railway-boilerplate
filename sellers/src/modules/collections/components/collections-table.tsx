@@ -29,8 +29,12 @@ import {
 } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo, useState } from "react"
-import { ActionMenu, PlaceholderCell } from "@modules/common"
+import {
+  ActionMenu,
+  PlaceholderCell,
+  createMedusaDateFilter,
+  resolveMedusaDateFilter,
+} from "@modules/common"
 import { CollectionDrawer } from "./forms/collection-drawer"
 import { CollectionProductsModal } from "./forms/collection-products-modal"
 
@@ -175,26 +179,8 @@ export const CollectionsTable = () => {
 
   const filters = useMemo(
     () => [
-      filterHelper.custom({
-        id: "created_at",
-        label: "Created",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
-      filterHelper.custom({
-        id: "updated_at",
-        label: "Updated",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
+      createMedusaDateFilter(filterHelper, "created_at", "Created"),
+      createMedusaDateFilter(filterHelper, "updated_at", "Updated"),
     ],
     []
   )

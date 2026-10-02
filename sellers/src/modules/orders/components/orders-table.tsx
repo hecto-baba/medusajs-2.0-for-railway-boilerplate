@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useState, useMemo } from "react"
 import { OrderExportButton } from "./order-export-button"
+import { createMedusaDateFilter, resolveMedusaDateFilter } from "@modules/common"
 
 const columnHelper = createDataTableColumnHelper<VendorOrder>()
 const filterHelper = createDataTableFilterHelper<VendorOrder>()
@@ -201,29 +202,8 @@ export const OrdersTable = () => {
     )
 
     list.push(
-      filterHelper.custom({
-        id: "created_at_gte",
-        label: "Created",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      })
-    )
-
-    list.push(
-      filterHelper.custom({
-        id: "updated_at_gte",
-        label: "Updated",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      })
+      createMedusaDateFilter(filterHelper, "created_at", "Created"),
+      createMedusaDateFilter(filterHelper, "updated_at", "Updated")
     )
 
     return list
@@ -238,20 +218,20 @@ export const OrdersTable = () => {
 
   const regionId = extractFilterValue(filtering.region_id)
   const salesChannelId = extractFilterValue(filtering.sales_channel_id)
-  const dateCreatedVal = extractFilterValue(filtering.created_at_gte)
-  const dateUpdatedVal = extractFilterValue(filtering.updated_at_gte)
 
   const createdAtGte = useMemo(() => {
-    if (!dateCreatedVal) return undefined
-    const days = dateCreatedVal === "7d" ? 7 : dateCreatedVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [dateCreatedVal])
+    return (
+      resolveMedusaDateFilter(filtering.created_at) ??
+      resolveMedusaDateFilter(filtering.created_at_gte)
+    )
+  }, [filtering.created_at, filtering.created_at_gte])
 
   const updatedAtGte = useMemo(() => {
-    if (!dateUpdatedVal) return undefined
-    const days = dateUpdatedVal === "7d" ? 7 : dateUpdatedVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [dateUpdatedVal])
+    return (
+      resolveMedusaDateFilter(filtering.updated_at) ??
+      resolveMedusaDateFilter(filtering.updated_at_gte)
+    )
+  }, [filtering.updated_at, filtering.updated_at_gte])
 
   const { data, isLoading } = useQuery({
     queryKey: [

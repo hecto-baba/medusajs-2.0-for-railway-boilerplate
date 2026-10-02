@@ -36,6 +36,7 @@ import {
 } from "@medusajs/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useMemo, useState } from "react"
+import { createMedusaDateFilter, resolveMedusaDateFilter } from "@modules/common"
 
 const extractFilterVal = (val: any): string | undefined => {
   if (!val) return undefined
@@ -210,11 +211,17 @@ export const PriceListPricesAddModal = ({
   }
 
   const createdDateFilter = useMemo(() => {
-    return resolveDateFilter(productFiltering["created_at_gte"] ?? productFiltering["created_at"])
+    return (
+      resolveMedusaDateFilter(productFiltering["created_at"]) ??
+      resolveMedusaDateFilter(productFiltering["created_at_gte"])
+    )
   }, [productFiltering])
 
   const updatedDateFilter = useMemo(() => {
-    return resolveDateFilter(productFiltering["updated_at_gte"] ?? productFiltering["updated_at"])
+    return (
+      resolveMedusaDateFilter(productFiltering["updated_at"]) ??
+      resolveMedusaDateFilter(productFiltering["updated_at_gte"])
+    )
   }, [productFiltering])
 
   const productOrder = useMemo(() => {
@@ -425,26 +432,8 @@ export const PriceListPricesAddModal = ({
           { label: "Rejected", value: "rejected" },
         ],
       }),
-      productFilterHelper.custom({
-        id: "created_at_gte",
-        label: "Created",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
-      productFilterHelper.custom({
-        id: "updated_at_gte",
-        label: "Updated",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
+      createMedusaDateFilter(productFilterHelper, "created_at", "Created"),
+      createMedusaDateFilter(productFilterHelper, "updated_at", "Updated"),
     ]
 
     return list

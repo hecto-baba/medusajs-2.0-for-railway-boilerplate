@@ -33,6 +33,8 @@ import {
   PlaceholderCell,
   ProductCell,
   ProductStatusCell,
+  createMedusaDateFilter,
+  resolveMedusaDateFilter,
 } from "@modules/common"
 import { ProductExportButton } from "./product-export-button"
 import { ProductImportModal } from "./product-import-modal"
@@ -164,7 +166,10 @@ export const ProductsTable = () => {
   const [rowSelection, setRowSelection] = useState<DataTableRowSelectionState>(
     {}
   )
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "title",
+    desc: false,
+  })
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -229,26 +234,8 @@ export const ProductsTable = () => {
           { label: "Rejected", value: "rejected" },
         ],
       }),
-      filterHelper.custom({
-        id: "created_at_gte",
-        label: "Created",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
-      filterHelper.custom({
-        id: "updated_at_gte",
-        label: "Updated",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
+      createMedusaDateFilter(filterHelper, "created_at", "Created"),
+      createMedusaDateFilter(filterHelper, "updated_at", "Updated"),
     ]
 
     return list
@@ -268,18 +255,20 @@ export const ProductsTable = () => {
   const typeId = extractFilterVal(filtering.type_id)
   const tagId = extractFilterVal(filtering.tag_id)
   const salesChannelId = extractFilterVal(filtering.sales_channel_id)
-  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
-  const updatedFilterVal = extractFilterVal(filtering.updated_at_gte)
+
   const createdAtGte = useMemo(() => {
-    if (!dateFilterVal) return undefined
-    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [dateFilterVal])
+    return (
+      resolveMedusaDateFilter(filtering.created_at) ??
+      resolveMedusaDateFilter(filtering.created_at_gte)
+    )
+  }, [filtering.created_at, filtering.created_at_gte])
+
   const updatedAtGte = useMemo(() => {
-    if (!updatedFilterVal) return undefined
-    const days = updatedFilterVal === "7d" ? 7 : updatedFilterVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [updatedFilterVal])
+    return (
+      resolveMedusaDateFilter(filtering.updated_at) ??
+      resolveMedusaDateFilter(filtering.updated_at_gte)
+    )
+  }, [filtering.updated_at, filtering.updated_at_gte])
 
   // The backend reads a leading "-" as descending, matching the admin.
   const order = sorting

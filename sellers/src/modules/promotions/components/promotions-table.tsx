@@ -63,24 +63,66 @@ const formatValue = (promotion: VendorPromotion) => {
 }
 
 const filters = [
-  filterHelper.custom({
-    id: "created_at",
+  filterHelper.accessor("created_at", {
+    type: "date",
     label: "Created",
-    type: "select",
     options: [
-      { label: "Last 7 days", value: "7d" },
-      { label: "Last 30 days", value: "30d" },
-      { label: "Last 90 days", value: "90d" },
+      {
+        label: "Today",
+        value: {
+          $gte: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+          $lte: new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+        },
+      },
+      {
+        label: "Last 7 days",
+        value: {
+          $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      {
+        label: "Last 30 days",
+        value: {
+          $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      {
+        label: "Last 90 days",
+        value: {
+          $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
     ],
   }),
-  filterHelper.custom({
-    id: "updated_at",
+  filterHelper.accessor("updated_at", {
+    type: "date",
     label: "Updated",
-    type: "select",
     options: [
-      { label: "Last 7 days", value: "7d" },
-      { label: "Last 30 days", value: "30d" },
-      { label: "Last 90 days", value: "90d" },
+      {
+        label: "Today",
+        value: {
+          $gte: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+          $lte: new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+        },
+      },
+      {
+        label: "Last 7 days",
+        value: {
+          $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      {
+        label: "Last 30 days",
+        value: {
+          $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      {
+        label: "Last 90 days",
+        value: {
+          $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
     ],
   }),
 ]
