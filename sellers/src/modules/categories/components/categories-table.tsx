@@ -8,6 +8,7 @@ import {
 import {
   Badge,
   Button,
+  Container,
   createDataTableColumnHelper,
   DataTable,
   DataTablePaginationState,
@@ -236,26 +237,36 @@ export const CategoriesTable = () => {
   })
 
   return (
-    <div className="flex flex-col gap-y-3 p-8">
-      <div className="flex items-center justify-between">
+    <Container className="divide-y p-0">
+      <div className="flex items-center justify-between px-6 py-4">
         <div>
           <Heading level="h1">Categories</Heading>
           <Text size="small" className="text-ui-fg-subtle">
             Organize products in a hierarchical taxonomy of product categories.
           </Text>
         </div>
-        <Button size="small" onClick={() => setIsCreateOpen(true)}>
-          <Plus />
-          Create Category
+        <Button size="small" variant="secondary" onClick={() => setIsCreateOpen(true)}>
+          Create
         </Button>
       </div>
 
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between">
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
           <DataTable.Search placeholder="Search categories..." />
         </DataTable.Toolbar>
 
-        <DataTable.Table />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No categories yet",
+              description: "Create your first category to organize products.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No categories match the selected filters or search query.",
+            },
+          }}
+        />
 
         <DataTable.Pagination />
       </DataTable>
@@ -286,6 +297,6 @@ export const CategoriesTable = () => {
           )}
         />
       )}
-    </div>
+    </Container>
   )
 }

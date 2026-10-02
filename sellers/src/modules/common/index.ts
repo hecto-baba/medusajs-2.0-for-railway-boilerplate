@@ -27,6 +27,8 @@ export {
   RouteDrawer,
   useRouteModal,
 } from "./components/route-drawer/route-drawer"
+export { NoRecords, NoResults } from "./components/no-records"
+export type { NoRecordsProps, NoResultsProps } from "./components/no-records"
 
 export {
   createMedusaDateFilter,

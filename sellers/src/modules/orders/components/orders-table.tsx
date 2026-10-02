@@ -2,6 +2,7 @@
 
 import { listVendorOrders, listVendorRegions, listVendorSalesChannels, type VendorOrder } from "@lib/data/vendor-client"
 import {
+  Container,
   createDataTableColumnHelper,
   createDataTableFilterHelper,
   DataTable,
@@ -16,7 +17,11 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useState, useMemo } from "react"
 import { OrderExportButton } from "./order-export-button"
-import { createMedusaDateFilter, resolveMedusaDateFilter } from "@modules/common"
+import {
+  NoRecords,
+  createMedusaDateFilter,
+  resolveMedusaDateFilter,
+} from "@modules/common"
 
 const columnHelper = createDataTableColumnHelper<VendorOrder>()
 const filterHelper = createDataTableFilterHelper<VendorOrder>()
@@ -292,14 +297,21 @@ export const OrdersTable = () => {
     },
   })
 
-  return (
-    <DataTable instance={table}>
-      <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-        <Heading level="h2">Orders</Heading>
-        <div className="flex items-center gap-x-2">
-          <DataTable.Search placeholder="Search orders..." />
-          <DataTable.FilterMenu tooltip="Filter" />
-          <DataTable.SortingMenu tooltip="Sort" />
+  const hasActiveQuery = Boolean(
+    search ||
+      regionId ||
+      salesChannelId ||
+      createdAtGte ||
+      updatedAtGte
+  )
+
+  const isNoRecords = !isLoading && (data?.count ?? 0) === 0 && !hasActiveQuery
+
+  if (isNoRecords) {
+    return (
+      <Container className="divide-y p-0">
+        <div className="flex items-center justify-between px-6 py-4">
+          <Heading level="h2">Orders</Heading>
           <OrderExportButton
             search={search}
             order={order}
@@ -310,22 +322,50 @@ export const OrdersTable = () => {
             currentOrders={data?.orders}
           />
         </div>
-      </DataTable.Toolbar>
-      <DataTable.FilterBar />
-      <DataTable.Table
-        emptyState={{
-          empty: {
-            heading: "No orders yet",
-            description: "Orders containing your products will appear here.",
-          },
-          filtered: {
-            heading: "No matches",
-            description: "No orders match the selected filters or search query.",
-          },
-        }}
-      />
-      <DataTable.Pagination />
-    </DataTable>
+        <NoRecords
+          title="No records"
+          message="Your orders will show up here."
+        />
+      </Container>
+    )
+  }
+
+  return (
+    <Container className="divide-y p-0">
+      <DataTable instance={table}>
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <Heading level="h2">Orders</Heading>
+          <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search orders..." />
+            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTable.SortingMenu tooltip="Sort" />
+            <OrderExportButton
+              search={search}
+              order={order}
+              regionId={regionId}
+              salesChannelId={salesChannelId}
+              createdAtGte={createdAtGte}
+              updatedAtGte={updatedAtGte}
+              currentOrders={data?.orders}
+            />
+          </div>
+        </DataTable.Toolbar>
+        <DataTable.FilterBar />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No records",
+              description: "Your orders will show up here.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No orders match the selected filters or search query.",
+            },
+          }}
+        />
+        <DataTable.Pagination />
+      </DataTable>
+    </Container>
   )
 }
 

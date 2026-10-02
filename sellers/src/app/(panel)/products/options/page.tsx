@@ -7,5 +7,9 @@ export const metadata: Metadata = {
 }
 
 export default function ProductOptionsPage() {
-  return <ProductOptionsTable />
+  return (
+    <div className="p-6">
+      <ProductOptionsTable />
+    </div>
+  )
 }

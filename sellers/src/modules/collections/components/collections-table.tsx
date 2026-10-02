@@ -7,6 +7,7 @@ import {
 } from "@lib/data/vendor-client"
 import {
   Button,
+  Container,
   createDataTableColumnHelper,
   createDataTableFilterHelper,
   DataTable,
@@ -359,31 +360,41 @@ export const CollectionsTable = () => {
   })
 
   return (
-    <div className="flex flex-col gap-y-3 p-8">
-      <div className="flex items-center justify-between">
+    <Container className="divide-y p-0">
+      <div className="flex items-center justify-between px-6 py-4">
         <div>
           <Heading level="h1">Collections</Heading>
           <Text size="small" className="text-ui-fg-subtle">
             Group products into collections for promotions, categories, and seasonal curation.
           </Text>
         </div>
-        <Button size="small" onClick={() => setIsCreateOpen(true)}>
-          <Plus />
-          Create Collection
+        <Button size="small" variant="secondary" onClick={() => setIsCreateOpen(true)}>
+          Create
         </Button>
       </div>
 
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between">
-          <DataTable.Search placeholder="Search collections..." />
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search collections..." />
             <DataTable.FilterMenu tooltip="Filter" />
             <DataTable.SortingMenu tooltip="Sort" />
           </div>
         </DataTable.Toolbar>
         <DataTable.FilterBar />
 
-        <DataTable.Table />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No collections yet",
+              description: "Create your first collection to group products.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No collections match the selected filters or search query.",
+            },
+          }}
+        />
 
         <DataTable.Pagination />
       </DataTable>
@@ -414,6 +425,6 @@ export const CollectionsTable = () => {
           )}
         />
       )}
-    </div>
+    </Container>
   )
 }

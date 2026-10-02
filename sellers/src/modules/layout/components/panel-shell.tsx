@@ -20,7 +20,7 @@ import {
 import { Notifications } from "../notifications"
 import { SearchProvider } from "../search"
 import { useVendorOnboardingStatus } from "@modules/onboarding"
-import { ArrowRight, Clock, ExclamationCircle, Sparkles } from "@medusajs/icons"
+import { ArrowRight, Clock, ExclamationCircle, Sparkles, TriangleRightMini } from "@medusajs/icons"
 
 /**
  * Labels for the fixed segments of a path. Anything not listed - a product id,
@@ -29,9 +29,29 @@ import { ArrowRight, Clock, ExclamationCircle, Sparkles } from "@medusajs/icons"
 const SEGMENT_LABELS: Record<string, string> = {
   products: "Products",
   orders: "Orders",
+  drafts: "Draft Orders",
+  "draft-orders": "Draft Orders",
+  collections: "Collections",
+  categories: "Categories",
+  options: "Product Options",
+  inventory: "Inventory",
+  reservations: "Reservations",
+  customers: "Customers",
+  groups: "Customer Groups",
+  "customer-groups": "Customer Groups",
+  pricing: "Price Lists",
+  "price-lists": "Price Lists",
+  promotions: "Promotions",
+  campaigns: "Campaigns",
+  earnings: "Earnings",
+  venues: "Venues",
+  shows: "Shows",
+  "my-schedule": "My Schedule",
   dashboard: "Commerce Infrastructure",
   "commerce-infra": "Commerce Infrastructure",
   settings: "Settings",
+  store: "Store",
+  locations: "Locations",
   profile: "Profile",
   "return-reasons": "Return Reasons",
   "refund-reasons": "Refund Reasons",
@@ -88,9 +108,7 @@ const Breadcrumbs = ({ recordTitle }: { recordTitle: string | null }) => {
         return (
           <div key={crumb.href ?? index} className="flex items-center gap-x-2">
             {index > 0 ? (
-              <span className="text-ui-fg-muted" aria-hidden>
-                ›
-              </span>
+              <TriangleRightMini className="text-ui-fg-muted rtl:rotate-180" aria-hidden />
             ) : null}
             {isLast || !crumb.href ? (
               <Text size="small" className="text-ui-fg-base truncate">

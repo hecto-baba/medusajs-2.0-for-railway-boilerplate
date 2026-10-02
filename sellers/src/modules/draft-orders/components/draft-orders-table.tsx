@@ -11,6 +11,7 @@ import {
 import {
   Badge,
   Button,
+  Container,
   createDataTableColumnHelper,
   createDataTableFilterHelper,
   DataTable,
@@ -29,7 +30,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
-import { ActionMenu, PlaceholderCell } from "@modules/common"
+import {
+  ActionMenu,
+  PlaceholderCell,
+  createMedusaDateFilter,
+  resolveMedusaDateFilter,
+} from "@modules/common"
 import { DraftOrderModal } from "./forms/draft-order-modal"
 
 const columnHelper = createDataTableColumnHelper<VendorDraftOrder>()
@@ -111,26 +117,8 @@ export const DraftOrdersTable = () => {
           value: r.id,
         })),
       }),
-      filterHelper.custom({
-        id: "created_at_gte",
-        label: "Created At",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
-      filterHelper.custom({
-        id: "updated_at_gte",
-        label: "Updated At",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
+      createMedusaDateFilter(filterHelper, "created_at", "Created At"),
+      createMedusaDateFilter(filterHelper, "updated_at", "Updated At"),
     ]
 
     return list
@@ -143,23 +131,19 @@ export const DraftOrdersTable = () => {
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
-  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
-  const updatedFilterVal = extractFilterVal(filtering.updated_at_gte)
   const salesChannelId = extractFilterVal(filtering.sales_channel_id)
   const regionId = extractFilterVal(filtering.region_id)
   const qCustomer = extractFilterVal(filtering.q_customer)
 
-  const createdAtGte = useMemo(() => {
-    if (!dateFilterVal) return undefined
-    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [dateFilterVal])
+  const createdAtGte = useMemo(
+    () => resolveMedusaDateFilter(filtering.created_at),
+    [filtering.created_at]
+  )
 
-  const updatedAtGte = useMemo(() => {
-    if (!updatedFilterVal) return undefined
-    const days = updatedFilterVal === "7d" ? 7 : updatedFilterVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [updatedFilterVal])
+  const updatedAtGte = useMemo(
+    () => resolveMedusaDateFilter(filtering.updated_at),
+    [filtering.updated_at]
+  )
 
   const { data, isLoading } = useQuery({
     queryKey: [
@@ -439,31 +423,37 @@ export const DraftOrdersTable = () => {
   })
 
   return (
-    <div className="flex flex-col gap-y-3 p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <Heading level="h1">Draft Orders</Heading>
-          <Text size="small" className="text-ui-fg-subtle">
-            Create and manage custom draft orders for customers before payment and conversion.
-          </Text>
-        </div>
-        <Button size="small" onClick={() => setIsCreateOpen(true)}>
-          <Plus />
-          Create Draft Order
-        </Button>
-      </div>
-
+    <Container className="divide-y p-0">
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between">
-          <DataTable.Search placeholder="Search draft orders..." />
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <Heading level="h2">Draft Orders</Heading>
           <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search draft orders..." />
             <DataTable.FilterMenu tooltip="Filter" />
             <DataTable.SortingMenu tooltip="Sort" />
+            <Button
+              size="small"
+              variant="primary"
+              onClick={() => setIsCreateOpen(true)}
+            >
+              Create
+            </Button>
           </div>
         </DataTable.Toolbar>
         <DataTable.FilterBar />
 
-        <DataTable.Table />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No draft orders found",
+              description: "Create a new draft order to get started.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No draft orders match the selected filters or search query.",
+            },
+          }}
+        />
 
         <DataTable.Pagination />
       </DataTable>
@@ -473,6 +463,6 @@ export const DraftOrdersTable = () => {
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
       />
-    </div>
+    </Container>
   )
 }

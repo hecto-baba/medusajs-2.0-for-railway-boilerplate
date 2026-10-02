@@ -6,6 +6,7 @@ import {
   type VendorPromotion,
 } from "@lib/data/vendor-client"
 import {
+  Container,
   createDataTableColumnHelper,
   createDataTableCommandHelper,
   createDataTableFilterHelper,
@@ -412,36 +413,38 @@ export const PromotionsTable = () => {
   })
 
   return (
-    <DataTable instance={table}>
-      <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-        <Heading level="h2">Promotions</Heading>
-        <div className="flex items-center gap-x-2">
-          <DataTable.Search placeholder="Search promotions..." />
-          <DataTable.FilterMenu tooltip="Filter" />
-          <DataTable.SortingMenu tooltip="Sort" />
-          <Link
-            href="/promotions/new"
-            className="bg-ui-button-inverted text-ui-contrast-fg-primary shadow-buttons-inverted txt-compact-small-plus rounded-md px-3 py-1.5"
-          >
-            Create
-          </Link>
-        </div>
-      </DataTable.Toolbar>
-      <DataTable.FilterBar />
-      <DataTable.Table
-        emptyState={{
-          empty: {
-            heading: "No promotions yet",
-            description: "Create your first promotion to offer a discount.",
-          },
-          filtered: {
-            heading: "No matches",
-            description: "No promotions match that search.",
-          },
-        }}
-      />
-      <DataTable.Pagination />
-      <DataTable.CommandBar selectedLabel={(count) => count + " selected"} />
-    </DataTable>
+    <Container className="divide-y p-0">
+      <DataTable instance={table}>
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <Heading level="h2">Promotions</Heading>
+          <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search promotions..." />
+            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTable.SortingMenu tooltip="Sort" />
+            <Link
+              href="/promotions/new"
+              className="bg-ui-button-inverted text-ui-contrast-fg-primary shadow-buttons-inverted txt-compact-small-plus rounded-md px-3 py-1.5"
+            >
+              Create
+            </Link>
+          </div>
+        </DataTable.Toolbar>
+        <DataTable.FilterBar />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No promotions yet",
+              description: "Create your first promotion to offer a discount.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No promotions match that search.",
+            },
+          }}
+        />
+        <DataTable.Pagination />
+        <DataTable.CommandBar selectedLabel={(count) => count + " selected"} />
+      </DataTable>
+    </Container>
   )
 }
