@@ -52,7 +52,10 @@ export const DraftOrdersTable = () => {
   const prompt = usePrompt()
 
   const [search, setSearch] = useState("")
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "display_id",
+    desc: true,
+  })
   const [filtering, setFiltering] = useState<DataTableFilteringState>({})
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,

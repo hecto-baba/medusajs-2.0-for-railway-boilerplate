@@ -23,7 +23,7 @@ import {
   useDataTable,
   usePrompt,
 } from "@medusajs/ui"
-import { Plus } from "@medusajs/icons"
+import { Plus, Sparkles } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -458,12 +458,23 @@ export const ProductsTable = () => {
             <ProductImportModal />
             <Button
               size="small"
-              variant="primary"
+              variant="secondary"
               onClick={() => setIsAddProductModalOpen(true)}
               className="gap-x-1.5"
             >
-              <Plus className="size-4" />
-              <span>Add Product</span>
+              <Sparkles className="size-4 text-ui-fg-interactive" />
+              <span>Master Catalog</span>
+            </Button>
+            <Button
+              size="small"
+              variant="primary"
+              asChild
+              className="gap-x-1.5"
+            >
+              <Link href="/products/new">
+                <Plus className="size-4" />
+                <span>Create Product</span>
+              </Link>
             </Button>
           </div>
         </DataTable.Toolbar>
