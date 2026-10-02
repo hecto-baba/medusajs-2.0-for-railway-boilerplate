@@ -1462,6 +1462,7 @@ export const listVendorCustomerGroups = (params: {
   offset: number
   q?: string
   created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ customer_groups: VendorCustomerGroup[] }>>(
@@ -1564,6 +1565,7 @@ export const listVendorPriceLists = (params: {
   status?: string | string[]
   type?: string | string[]
   created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ price_lists: VendorPriceList[] }>>(
@@ -2127,7 +2129,8 @@ export type VendorDraftOrder = {
   billing_address?: Record<string, any> | null
   items?: any[]
   shipping_methods?: any[]
-  summary?: any
+  sales_channel?: { id: string; name: string } | null
+  region?: { id: string; name: string } | null
   created_at: string
   updated_at?: string
 }
@@ -2142,6 +2145,7 @@ export const listVendorDraftOrders = (params: {
   currency_code?: string
   sales_channel_id?: string
   region_id?: string
+  q_customer?: string
 }) =>
   request<ListResponse<{ draft_orders: VendorDraftOrder[] }>>(
     "draft-orders",
@@ -2189,6 +2193,8 @@ export const listVendorTeam = (params: {
   offset: number
   q?: string
   order?: string
+  created_at_gte?: string
+  updated_at_gte?: string
 }) =>
   request<ListResponse<{ members: VendorTeamMember[] }>>(
     "team",
@@ -2709,6 +2715,8 @@ export const listVendorRegions = (
     q?: string
     currency_code?: string
     order?: string
+    created_at_gte?: string
+    updated_at_gte?: string
   } = {}
 ) => request<{ regions: VendorRegion[] }>("regions", params)
 

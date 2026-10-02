@@ -77,7 +77,16 @@ export const PriceListsTable = () => {
 
   const [search, setSearch] = useState("")
   const [filtering, setFiltering] = useState<DataTableFilteringState>({})
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "title",
+    desc: false,
+  })
+  const [columnVisibility, setColumnVisibility] = useState<
+    Record<string, boolean>
+  >({
+    created_at: false,
+    updated_at: false,
+  })
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -90,14 +99,19 @@ export const PriceListsTable = () => {
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
 
-  const statusFilter = extractFilterVal(filtering.status)
-  const typeFilter = extractFilterVal(filtering.type)
   const dateFilterVal = extractFilterVal(filtering.created_at_gte)
   const createdAtGte = useMemo(() => {
     if (!dateFilterVal) return undefined
     const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
     return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
   }, [dateFilterVal])
+
+  const updatedFilterVal = extractFilterVal(filtering.updated_at_gte)
+  const updatedAtGte = useMemo(() => {
+    if (!updatedFilterVal) return undefined
+    const days = updatedFilterVal === "7d" ? 7 : updatedFilterVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [updatedFilterVal])
 
   const order = sorting
     ? (sorting.desc ? "-" : "") + sorting.id
@@ -106,16 +120,15 @@ export const PriceListsTable = () => {
   const { data, isLoading } = useQuery({
     queryKey: [
       "vendor-price-lists",
-      { limit, offset, q: search, status: statusFilter, type: typeFilter, created_at_gte: createdAtGte, order },
+      { limit, offset, q: search, created_at_gte: createdAtGte, updated_at_gte: updatedAtGte, order },
     ],
     queryFn: () =>
       listVendorPriceLists({
         limit,
         offset,
         q: search || undefined,
-        status: statusFilter,
-        type: typeFilter,
         created_at_gte: createdAtGte,
+        updated_at_gte: updatedAtGte,
         order,
       }),
   })
@@ -152,25 +165,19 @@ export const PriceListsTable = () => {
 
   const filters = useMemo(
     () => [
-      filterHelper.accessor("status", {
+      filterHelper.custom({
+        id: "created_at_gte",
+        label: "Created",
         type: "select",
-        label: "Status",
         options: [
-          { label: "Active", value: "active" },
-          { label: "Draft", value: "draft" },
-        ],
-      }),
-      filterHelper.accessor("type", {
-        type: "select",
-        label: "Type",
-        options: [
-          { label: "Sale", value: "sale" },
-          { label: "Override", value: "override" },
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
         ],
       }),
       filterHelper.custom({
-        id: "created_at_gte",
-        label: "Date Created",
+        id: "updated_at_gte",
+        label: "Updated",
         type: "select",
         options: [
           { label: "Last 7 days", value: "7d" },
@@ -185,8 +192,12 @@ export const PriceListsTable = () => {
   const columns = useMemo(
     () => [
       columnHelper.accessor("title", {
+        id: "title",
         header: "Title",
         enableSorting: true,
+        sortLabel: "Title",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           const pl = row.original
           return (
@@ -200,11 +211,46 @@ export const PriceListsTable = () => {
         },
       }),
       columnHelper.accessor("status", {
+        id: "status",
         header: "Status",
+        enableSorting: true,
+        sortLabel: "Status",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           const { color, text } = getPriceListStatus(row.original)
           return <StatusBadge color={color}>{text}</StatusBadge>
         },
+      }),
+      columnHelper.accessor("created_at", {
+        id: "created_at",
+        header: "Created",
+        enableSorting: true,
+        sortLabel: "Created",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => (
+          <Text size="small" className="text-ui-fg-subtle">
+            {row.original.created_at
+              ? new Date(row.original.created_at).toLocaleDateString()
+              : "-"}
+          </Text>
+        ),
+      }),
+      columnHelper.accessor("updated_at", {
+        id: "updated_at",
+        header: "Updated",
+        enableSorting: true,
+        sortLabel: "Updated",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => (
+          <Text size="small" className="text-ui-fg-subtle">
+            {row.original.updated_at
+              ? new Date(row.original.updated_at).toLocaleDateString()
+              : "-"}
+          </Text>
+        ),
       }),
       columnHelper.display({
         id: "price_overrides",
@@ -258,6 +304,10 @@ export const PriceListsTable = () => {
     rowCount: count,
     getRowId: (row) => row.id,
     isLoading,
+    columnVisibility: {
+      state: columnVisibility,
+      onColumnVisibilityChange: setColumnVisibility,
+    },
     filters,
     pagination: {
       state: pagination,

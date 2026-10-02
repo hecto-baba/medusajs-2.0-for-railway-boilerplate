@@ -631,7 +631,24 @@ export default defineMiddlewares({
     },
     {
       matcher: "/store/products",
-      middlewares: [allowFields("variants.digital_product")],
+      middlewares: [
+        (req: any, res: any, next: any) => {
+          if (typeof req.query?.fields === "string") {
+            req.query.fields = req.query.fields.replace(/\*variants\.digital_product(\.\*)?/g, "+variants.digital_product");
+          } else if (Array.isArray(req.query?.fields)) {
+            req.query.fields = req.query.fields.map((f: any) =>
+              typeof f === "string" ? f.replace(/\*variants\.digital_product(\.\*)?/g, "+variants.digital_product") : f
+            );
+          }
+          if (req.queryConfig?.fields && Array.isArray(req.queryConfig.fields)) {
+            req.queryConfig.fields = req.queryConfig.fields.map((f: any) =>
+              typeof f === "string" ? f.replace(/\*variants\.digital_product(\.\*)?/g, "+variants.digital_product") : f
+            );
+          }
+          next();
+        },
+        allowFields("variants.digital_product"),
+      ],
     },
     {
       matcher: "/store/customers/me/**",

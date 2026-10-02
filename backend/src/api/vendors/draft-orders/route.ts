@@ -18,6 +18,7 @@ export const GetVendorDraftOrdersSchema = z.object({
   currency_code: z.string().optional(),
   sales_channel_id: z.string().optional(),
   region_id: z.string().optional(),
+  q_customer: z.string().optional(),
 })
 
 export const CreateVendorDraftOrderSchema = z.object({
@@ -126,8 +127,18 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { limit, offset, q, order, created_at_gte, updated_at_gte, currency_code, sales_channel_id, region_id } =
-    req.validatedQuery as unknown as z.infer<typeof GetVendorDraftOrdersSchema>
+  const {
+    limit,
+    offset,
+    q,
+    order,
+    created_at_gte,
+    updated_at_gte,
+    currency_code,
+    sales_channel_id,
+    region_id,
+    q_customer,
+  } = req.validatedQuery as unknown as z.infer<typeof GetVendorDraftOrdersSchema>
 
   const {
     data: [vendorAdmin],
@@ -160,6 +171,7 @@ export const GET = async (
         "status",
         "is_draft_order",
         "created_at",
+        "updated_at",
         "currency_code",
         "total",
         "subtotal",
@@ -167,7 +179,12 @@ export const GET = async (
         "tax_total",
         "discount_total",
         "email",
+        "customer_id",
         "customer.*",
+        "sales_channel_id",
+        "sales_channel.*",
+        "region_id",
+        "region.*",
         "items.*",
         "items.variant.*",
         "items.variant.product.*",
@@ -236,6 +253,15 @@ export const GET = async (
     )
   }
 
+  // Filter by q_customer
+  if (q_customer) {
+    if (q_customer === "guest") {
+      filtered = filtered.filter((o: any) => !o.customer_id)
+    } else if (q_customer === "has_customer") {
+      filtered = filtered.filter((o: any) => !!o.customer_id)
+    }
+  }
+
   // Dynamic sorting
   const sortField = order
     ? order.startsWith("-")
@@ -248,12 +274,21 @@ export const GET = async (
     let valA = a[sortField]
     let valB = b[sortField]
 
-    if (sortField === "created_at") {
-      valA = new Date(valA || 0).getTime()
-      valB = new Date(valB || 0).getTime()
+    if (sortField === "created_at" || sortField === "date") {
+      valA = new Date(a.created_at || 0).getTime()
+      valB = new Date(b.created_at || 0).getTime()
     } else if (sortField === "display_id" || sortField === "total") {
       valA = Number(valA) || 0
       valB = Number(valB) || 0
+    } else if (sortField === "customer") {
+      valA = (a.customer?.first_name || a.customer?.last_name || a.email || "").toLowerCase()
+      valB = (b.customer?.first_name || b.customer?.last_name || b.email || "").toLowerCase()
+    } else if (sortField === "sales_channel") {
+      valA = (a.sales_channel?.name || "").toLowerCase()
+      valB = (b.sales_channel?.name || "").toLowerCase()
+    } else if (sortField === "region") {
+      valA = (a.region?.name || "").toLowerCase()
+      valB = (b.region?.name || "").toLowerCase()
     }
 
     if (valA < valB) return isDesc ? 1 : -1

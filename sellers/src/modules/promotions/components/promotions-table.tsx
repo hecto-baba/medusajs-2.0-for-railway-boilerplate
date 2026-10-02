@@ -63,41 +63,24 @@ const formatValue = (promotion: VendorPromotion) => {
 }
 
 const filters = [
-  filterHelper.accessor("status", {
-    label: "Status",
-    type: "multiselect",
-    options: [
-      { label: "Draft", value: "draft" },
-      { label: "Active", value: "active" },
-      { label: "Inactive", value: "inactive" },
-    ],
-  }),
-  filterHelper.accessor("type", {
-    label: "Type",
-    type: "multiselect",
-    options: [
-      { label: "Standard (Amount off)", value: "standard" },
-      { label: "Buy X, get Y", value: "buyget" },
-    ],
-  }),
-  filterHelper.accessor("created_at", {
+  filterHelper.custom({
+    id: "created_at",
     label: "Created",
-    type: "radio",
+    type: "select",
     options: [
-      { label: "All time", value: "all" },
-      { label: "Past 7 days", value: "7d" },
-      { label: "Past 30 days", value: "30d" },
-      { label: "Past 90 days", value: "90d" },
+      { label: "Last 7 days", value: "7d" },
+      { label: "Last 30 days", value: "30d" },
+      { label: "Last 90 days", value: "90d" },
     ],
   }),
-  filterHelper.accessor("updated_at", {
+  filterHelper.custom({
+    id: "updated_at",
     label: "Updated",
-    type: "radio",
+    type: "select",
     options: [
-      { label: "All time", value: "all" },
-      { label: "Past 7 days", value: "7d" },
-      { label: "Past 30 days", value: "30d" },
-      { label: "Past 90 days", value: "90d" },
+      { label: "Last 7 days", value: "7d" },
+      { label: "Last 30 days", value: "30d" },
+      { label: "Last 90 days", value: "90d" },
     ],
   }),
 ]
@@ -106,19 +89,11 @@ const useColumns = (onDelete: (promotion: VendorPromotion) => void) => [
   columnHelper.accessor("code", {
     id: "code",
     header: "Code",
-    enableSorting: true,
-    sortLabel: "Code",
-    sortAscLabel: "Ascending",
-    sortDescLabel: "Descending",
     cell: ({ row }) => <span className="truncate font-medium">{row.original.code}</span>,
   }),
   columnHelper.accessor("type", {
     id: "type",
     header: "Type",
-    enableSorting: true,
-    sortLabel: "Type",
-    sortAscLabel: "Ascending",
-    sortDescLabel: "Descending",
     cell: ({ row }) =>
       row.original.type === "buyget" ? "Buy X, get Y" : "Amount off",
   }),
@@ -130,10 +105,6 @@ const useColumns = (onDelete: (promotion: VendorPromotion) => void) => [
   columnHelper.accessor("status", {
     id: "status",
     header: "Status",
-    enableSorting: true,
-    sortLabel: "Status",
-    sortAscLabel: "Ascending",
-    sortDescLabel: "Descending",
     cell: ({ row }) => <PromotionStatusCell status={row.original.status} />,
   }),
   columnHelper.accessor("created_at", {
@@ -194,7 +165,10 @@ export const PromotionsTable = () => {
   const [rowSelection, setRowSelection] = useState<DataTableRowSelectionState>(
     {}
   )
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "created_at",
+    desc: true,
+  })
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,

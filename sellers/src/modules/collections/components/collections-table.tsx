@@ -99,12 +99,13 @@ export const CollectionsTable = () => {
 
   const [search, setSearch] = useState("")
   const [filtering, setFiltering] = useState<DataTableFilteringState>({})
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "created_at",
+    desc: true,
+  })
   const [columnVisibility, setColumnVisibility] = useState<
     Record<string, boolean>
-  >({
-    updated_at: false,
-  })
+  >({})
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -174,15 +175,25 @@ export const CollectionsTable = () => {
 
   const filters = useMemo(
     () => [
-      filterHelper.accessor("created_at", {
-        type: "date",
+      filterHelper.custom({
+        id: "created_at",
         label: "Created",
-        options: dateFilterOptions,
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
       }),
-      filterHelper.accessor("updated_at", {
-        type: "date",
+      filterHelper.custom({
+        id: "updated_at",
         label: "Updated",
-        options: dateFilterOptions,
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
       }),
     ],
     []
