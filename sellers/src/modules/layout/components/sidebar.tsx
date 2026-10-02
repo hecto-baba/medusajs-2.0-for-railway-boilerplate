@@ -4,8 +4,10 @@ import {
   Buildings,
   BuildingStorefront,
   Calendar,
+  ChefHat,
   CogSixTooth,
   CurrencyDollar,
+  DocumentText,
   ReceiptPercent,
   ShoppingCart,
   Sparkles,
@@ -82,6 +84,30 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/venues", label: "Venues", icon: Buildings },
   { href: "/shows", label: "Shows", icon: Calendar },
   { href: "/my-schedule", label: "My Schedule", icon: Calendar },
+  {
+    href: "/b2b",
+    label: "B2B",
+    icon: BuildingStorefront,
+    items: [
+      { href: "/b2b/quotes", label: "Quotes" },
+      { href: "/b2b/companies", label: "Companies" },
+      { href: "/b2b/approvals", label: "Approvals" },
+    ],
+  },
+  {
+    href: "/restaurants",
+    label: "Restaurants",
+    icon: ChefHat,
+    items: [
+      { href: "/restaurants", label: "Overview & Menu" },
+      { href: "/restaurants/deliveries", label: "Live Deliveries" },
+    ],
+  },
+  {
+    href: "/digital-products",
+    label: "Digital Products",
+    icon: DocumentText,
+  },
 ]
 
 const BASE_NAV_LINK_CLASSES =
@@ -131,6 +157,9 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
       if (item.href === "/promotions" && !capabilities.hasPromotions) return false
       if (item.href === "/venues" && !capabilities.hasVenues) return false
       if (item.href === "/shows" && !capabilities.hasShows) return false
+      if (item.href === "/b2b" && !capabilities.hasB2B) return false
+      if (item.href === "/restaurants" && !capabilities.hasRestaurants) return false
+      if (item.href === "/digital-products" && !capabilities.hasDigitalProducts) return false
       return true
     })
 
