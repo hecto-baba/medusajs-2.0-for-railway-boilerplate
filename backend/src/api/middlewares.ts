@@ -20,6 +20,7 @@ import { PostCartItemsEoiBody } from "./store/carts/[id]/line-items/eoi/route";
 import { GetAvailableSlotsSchema } from "./store/providers/[id]/available-slots/route";
 import { PostStoreEnquirySchema } from "./store/enquiries/route";
 import { PostAdminEnquiryReplyBodySchema } from "./admin/enquiries/[id]/route";
+import { enquiryRateLimit } from "./store/enquiries/rate-limit";
 import { PostAdminEnquiryStatusBodySchema } from "./admin/enquiries/[id]/status/route";
 import { PostEnquiryConfigBodySchema } from "./admin/products/[id]/enquiry-config/route";
 import { PostVendorProviderSchema } from "./vendors/providers/me/route";
@@ -504,6 +505,7 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(PostStoreEnquirySchema)
+        enquiryRateLimit,
       ]
     },
     {

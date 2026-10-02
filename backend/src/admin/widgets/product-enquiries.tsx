@@ -49,6 +49,10 @@ type EnquiryConfigResponse = {
   enquiry_config: EnquiryConfig | null
 }
 
+// Stable reference: a fresh `[]` each render makes the field builder's reset
+// effect fire on every parent re-render and wipe in-progress edits.
+const NO_FIELDS: EnquiryFieldDefinition[] = []
+
 const STATUS_COLOR: Record<EnquiryStatus, "orange" | "green" | "grey"> = {
   pending: "orange",
   responded: "green",
@@ -299,7 +303,7 @@ const ProductEnquiriesWidget = ({
       <EnquiryFieldBuilder
         open={builderOpen}
         onOpenChange={setBuilderOpen}
-        initialFields={config?.custom_fields ?? []}
+        initialFields={config?.custom_fields ?? NO_FIELDS}
         isEnabling={!isEnabled}
         isSaving={upsertConfigMutation.isPending}
         onSave={handleSaveFields}

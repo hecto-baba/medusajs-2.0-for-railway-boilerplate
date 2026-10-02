@@ -31,6 +31,8 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
       "customer_id",
       "customer_email",
       "message",
+      "custom_field_answers",
+      "custom_fields_snapshot",
       "reply",
       "status",
       "responded_at",
