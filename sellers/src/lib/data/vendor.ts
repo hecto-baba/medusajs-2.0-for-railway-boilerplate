@@ -139,6 +139,10 @@ export async function vendorSignup(
     // The credential now exists but owns no vendor. That identity is still
     // "claimable" - its app_metadata is empty - so registering again with the
     // same email resumes rather than colliding.
+    const msg = toMessage(error, "")
+    if (msg.includes("already authenticated as a vendor")) {
+      return "This email is already registered with a store. Please sign in instead."
+    }
     return toMessage(
       error,
       "Your sign-in was created but the store was not. Please try signing up again with the same email."
@@ -210,9 +214,14 @@ export async function vendorLogin(
       await removeVendorAuthToken()
       return "This account does not have a store associated with it yet. Please sign up to create your store."
     }
-  } catch {
+  } catch (err: any) {
+    const errorMsg = toMessage(err, "")
+    console.error("[vendorLogin] Session verification failed:", errorMsg, err)
     await removeVendorAuthToken()
-    return "This account does not have a store associated with it yet. Please sign up to create your store."
+    if (errorMsg.includes("No vendor admin found") || err?.status === 404) {
+      return "This account does not have a store associated with it yet. Please sign up to create your store."
+    }
+    return errorMsg || "Could not verify your store session. Please try again."
   }
 
   redirect("/dashboard")
