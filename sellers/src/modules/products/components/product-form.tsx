@@ -429,12 +429,18 @@ export const ProductForm = ({ product }: ProductFormProps) => {
           sku: v.sku.trim() || undefined,
           barcode: v.barcode.trim() || undefined,
           manage_inventory: v.manage_inventory,
-          inventory_quantity: v.manage_inventory
-            ? parseInt(v.inventory_quantity, 10) || 0
-            : undefined,
+          metadata: {
+            inventory_quantity: v.manage_inventory
+              ? parseInt(v.inventory_quantity, 10) || 0
+              : undefined,
+          },
           prices: [
             {
               currency_code: "usd",
+              amount: parseFloat(v.price) || 0,
+            },
+            {
+              currency_code: "eur",
               amount: parseFloat(v.price) || 0,
             },
           ],
@@ -442,6 +448,29 @@ export const ProductForm = ({ product }: ProductFormProps) => {
         }))
       } else {
         payloadOptions = [{ title: "Default", values: ["Default"] }]
+        const singlePrices = Object.entries(prices)
+          .filter(([, value]) => value && value.trim() !== "")
+          .map(([currency_code, value]) => ({
+            currency_code,
+            amount: Number(value),
+          }))
+        if (
+          singlePrices.length > 0 &&
+          !singlePrices.some((e) => e.currency_code === "eur") &&
+          singlePrices.some((e) => e.currency_code === "usd")
+        ) {
+          const usdAmount = singlePrices.find((e) => e.currency_code === "usd")!.amount
+          singlePrices.push({ currency_code: "eur", amount: usdAmount })
+        }
+        if (
+          singlePrices.length > 0 &&
+          !singlePrices.some((e) => e.currency_code === "usd") &&
+          singlePrices.some((e) => e.currency_code === "eur")
+        ) {
+          const eurAmount = singlePrices.find((e) => e.currency_code === "eur")!.amount
+          singlePrices.push({ currency_code: "usd", amount: eurAmount })
+        }
+
         payloadVariants = [
           {
             title: "Default",
@@ -449,15 +478,12 @@ export const ProductForm = ({ product }: ProductFormProps) => {
             sku: singleSku.trim() || undefined,
             barcode: singleBarcode.trim() || undefined,
             manage_inventory: singleManageInventory,
-            inventory_quantity: singleManageInventory
-              ? parseInt(singleQuantity, 10) || 0
-              : undefined,
-            prices: Object.entries(prices)
-              .filter(([, value]) => value.trim() !== "")
-              .map(([currency_code, value]) => ({
-                currency_code,
-                amount: Number(value),
-              })),
+            metadata: {
+              inventory_quantity: singleManageInventory
+                ? parseInt(singleQuantity, 10) || 0
+                : undefined,
+            },
+            prices: singlePrices,
           },
         ]
       }
