@@ -10,6 +10,7 @@ import {
   ReceiptPercent,
   ShoppingCart,
   Sparkles,
+  ServerStack,
   Tag,
   Users,
 } from "@medusajs/icons"
@@ -36,6 +37,11 @@ type NavItem = {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  {
+    href: "/dashboard",
+    label: "Commerce Infra",
+    icon: ServerStack,
+  },
   {
     href: "/orders",
     label: "Orders",
@@ -180,7 +186,9 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
                   {visibleNavItems.map((item) => {
                     const Icon = item.icon
                     const isExactParentActive =
-                      item.href === "/orders"
+                      item.href === "/dashboard"
+                        ? pathname === "/dashboard" || pathname === "/commerce-infra"
+                        : item.href === "/orders"
                         ? pathname === "/orders" ||
                           (pathname.startsWith("/orders/") &&
                             !pathname.startsWith("/orders/drafts") &&
@@ -206,10 +214,12 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
                         : pathname.startsWith(item.href)
 
                     const isSectionActive =
-                      pathname.startsWith(item.href) ||
-                      (item.href === "/inventory" &&
-                        (pathname.startsWith("/reservations") ||
-                          pathname.startsWith("/inventory/reservations")))
+                      item.href === "/dashboard"
+                        ? pathname === "/dashboard" || pathname === "/commerce-infra"
+                        : pathname.startsWith(item.href) ||
+                          (item.href === "/inventory" &&
+                            (pathname.startsWith("/reservations") ||
+                              pathname.startsWith("/inventory/reservations")))
                     const hasChildren = Boolean(item.items?.length)
                     const isExpanded = expanded[item.href] ?? isSectionActive
 

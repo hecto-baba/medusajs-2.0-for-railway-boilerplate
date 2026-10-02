@@ -7,11 +7,9 @@ export const metadata: Metadata = {
   description: "Unified management hub for core commerce operations.",
 }
 
-// The session is read from a cookie on every request, so there is nothing here
-// that could be prerendered at build time.
 export const dynamic = "force-dynamic"
 
-export default async function DashboardPage() {
+export default async function CommerceInfraPage() {
   const admin = await requireVendorSession()
   const vendor = admin.vendor
 

@@ -29,7 +29,8 @@ import { ArrowRight, Clock, ExclamationCircle, Sparkles } from "@medusajs/icons"
 const SEGMENT_LABELS: Record<string, string> = {
   products: "Products",
   orders: "Orders",
-  dashboard: "Dashboard",
+  dashboard: "Commerce Infrastructure",
+  "commerce-infra": "Commerce Infrastructure",
   settings: "Settings",
   profile: "Profile",
   "return-reasons": "Return Reasons",
