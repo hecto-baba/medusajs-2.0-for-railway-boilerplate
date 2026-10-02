@@ -6,10 +6,17 @@ import { z } from "@medusajs/framework/zod"
  * admin/products/[id]/eoi-config/route.ts and
  * vendors/products/[id]/eoi-config/route.ts.
  */
-export const PostEoiConfigBodySchema = z.object({
-  value_type: z.enum(["fixed", "percentage"]).optional(),
-  value_amount: z.number().optional(),
-  status: z.enum(["active", "inactive"]).optional(),
-})
+export const PostEoiConfigBodySchema = z
+  .object({
+    value_type: z.enum(["fixed", "percentage"]).optional(),
+    value_amount: z.number().finite().min(0).optional(),
+    status: z.enum(["active", "inactive"]).optional(),
+  })
+  .refine(
+    (body) =>
+      !(body.value_type === "percentage" && body.value_amount !== undefined) ||
+      body.value_amount <= 100,
+    { message: "A percentage value_amount cannot exceed 100.", path: ["value_amount"] }
+  )
 
 export type PostEoiConfigBody = z.infer<typeof PostEoiConfigBodySchema>

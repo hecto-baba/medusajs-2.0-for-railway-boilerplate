@@ -1,4 +1,5 @@
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
+import { MedusaError } from "@medusajs/framework/utils"
 import { EOI_MODULE } from "../../modules/expression-of-interest"
 import ExpressionOfInterestModuleService from "../../modules/expression-of-interest/service"
 
@@ -14,6 +15,15 @@ export const createEoiConfigurationStep = createStep(
   async (input: CreateEoiConfigurationInput, { container }) => {
     const eoiModuleService: ExpressionOfInterestModuleService =
       container.resolve(EOI_MODULE)
+
+    // value_amount is NOT NULL in the table: without this check a first POST
+    // that omits it surfaces as an opaque 500 instead of a 400.
+    if (typeof input.value_amount !== "number") {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "value_amount is required when creating an EOI configuration."
+      )
+    }
 
     const eoiConfig = await eoiModuleService.createEoiConfigurations({
       product_id: input.product_id,
