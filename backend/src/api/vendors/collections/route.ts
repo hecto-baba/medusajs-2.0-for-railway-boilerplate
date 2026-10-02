@@ -54,15 +54,22 @@ export const POST = async (
     // fallback will be handled by workflow
   }
 
-  const { result } = await createVendorCollectionWorkflow(req.scope).run({
-    input: {
-      vendor_id: vendorId,
-      vendor_admin_id: req.auth_context.actor_id,
-      collection: req.validatedBody,
-    },
-  })
+  try {
+    const { result } = await createVendorCollectionWorkflow(req.scope).run({
+      input: {
+        vendor_id: vendorId,
+        vendor_admin_id: req.auth_context.actor_id,
+        collection: req.validatedBody,
+      },
+    })
 
-  res.status(201).json({ collection: result.collection })
+    res.status(201).json({ collection: result.collection })
+  } catch (err: any) {
+    console.error("[Vendors:Collections:POST] Error creating collection:", err)
+    res.status(400).json({
+      message: err.message || "Failed to create collection",
+    })
+  }
 }
 
 export const GET = async (
