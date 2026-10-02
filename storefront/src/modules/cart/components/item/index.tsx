@@ -42,6 +42,8 @@ const Item = ({ item, type = "full" }: ItemProps) => {
   }, [item.quantity])
 
   const handleQtyCommit = (val: number) => {
+    // Enter then blur both commit; ignore the second while the first is in flight.
+    if (updating) return
     if (isNaN(val) || val < 1) {
       setLocalQty(String(item.quantity))
       return
@@ -66,6 +68,9 @@ const Item = ({ item, type = "full" }: ItemProps) => {
       })
       .catch((err) => {
         setError(err.message)
+        // The update was rejected, so item.quantity never changes and the
+        // effect above won't resync the box - put the real value back.
+        setLocalQty(String(item.quantity))
       })
       .finally(() => {
         setUpdating(false)
