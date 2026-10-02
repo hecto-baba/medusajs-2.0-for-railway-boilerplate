@@ -9,6 +9,7 @@ import {
 } from "@lib/data/vendor-client"
 import {
   ActionMenu,
+  DataTableAddFilter,
   createMedusaDateFilter,
   resolveMedusaDateFilter,
 } from "@modules/common"
@@ -330,10 +331,12 @@ export const PriceListsTable = () => {
 
       {/* DataTable */}
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between">
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-x-2">
-            <DataTable.Search placeholder="Search price lists..." />
-            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTableAddFilter table={table} />
+          </div>
+          <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search" />
             <DataTable.SortingMenu tooltip="Sort" />
           </div>
         </DataTable.Toolbar>

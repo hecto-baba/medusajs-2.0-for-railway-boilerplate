@@ -25,6 +25,7 @@ import {
   IconButton,
   Input,
   Label,
+  ProgressTabs,
   Select,
   Switch,
   Table,
@@ -165,6 +166,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
   const router = useRouter()
   const queryClient = useQueryClient()
   const isEdit = Boolean(product)
+  const [activeStep, setActiveStep] = useState<"details" | "organize" | "variants">("details")
 
   // 1. General Info
   const [title, setTitle] = useState(product?.title ?? "")
@@ -541,6 +543,767 @@ export const ProductForm = ({ product }: ProductFormProps) => {
 
   const removeTag = (tag: string) => {
     setSelectedTags(selectedTags.filter((t) => t !== tag))
+  }
+
+  if (!isEdit) {
+    return (
+      <form onSubmit={onSubmit} className="flex flex-col min-h-[calc(100vh-64px)] bg-ui-bg-subtle -m-6">
+        {/* Top Header matching Screenshot 2 & 3 */}
+        <div className="flex items-center justify-between border-b px-6 py-3 bg-ui-bg-base sticky top-0 z-20">
+          <div className="flex items-center gap-x-4">
+            <Link
+              href="/products"
+              className="text-ui-fg-muted hover:text-ui-fg-base flex items-center gap-x-1.5 text-xs font-mono"
+            >
+              <XMark className="size-4" />
+              <span>esc</span>
+            </Link>
+            <div className="h-4 w-px bg-ui-border-base" />
+            <ProgressTabs
+              value={activeStep}
+              onValueChange={(val) => setActiveStep(val as any)}
+            >
+              <ProgressTabs.List className="flex items-center gap-x-1">
+                <ProgressTabs.Trigger
+                  value="details"
+                  status={activeStep === "details" ? "in-progress" : "completed"}
+                  className="max-w-[200px]"
+                >
+                  Details
+                </ProgressTabs.Trigger>
+                <ProgressTabs.Trigger
+                  value="organize"
+                  status={
+                    activeStep === "organize"
+                      ? "in-progress"
+                      : activeStep === "variants"
+                        ? "completed"
+                        : "not-started"
+                  }
+                  className="max-w-[200px]"
+                >
+                  Organize
+                </ProgressTabs.Trigger>
+                <ProgressTabs.Trigger
+                  value="variants"
+                  status={activeStep === "variants" ? "in-progress" : "not-started"}
+                  className="max-w-[200px]"
+                >
+                  Variants
+                </ProgressTabs.Trigger>
+              </ProgressTabs.List>
+            </ProgressTabs>
+          </div>
+        </div>
+
+        {/* Form Body */}
+        <div className="flex-1 p-8 max-w-4xl mx-auto w-full flex flex-col gap-y-6">
+          {error && (
+            <div className="p-4 rounded-lg bg-ui-bg-error/10 border border-ui-border-error text-ui-fg-error text-sm">
+              {error}
+            </div>
+          )}
+
+          {activeStep === "details" && (
+            <>
+              {/* Category Classification */}
+              <Card
+                title="Product Category & Classification"
+                description="Assign a standardized category tailored to your registered business vertical."
+              >
+                <TrustClawCategoryPicker
+                  selectedMedusaCategoryId={categoryIds[0] ?? null}
+                  selectedCategoryName={product?.categories?.[0]?.name ?? null}
+                  onSelectCategory={(categoryId) => {
+                    setCategoryIds(categoryId ? [categoryId] : [])
+                  }}
+                />
+              </Card>
+
+              {/* General */}
+              <Card title="General">
+                <Field id="title" label="Title">
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Winter Jacket"
+                  />
+                </Field>
+
+                <Field id="subtitle" label="Subtitle">
+                  <Input
+                    id="subtitle"
+                    value={subtitle ?? ""}
+                    onChange={(e) => setSubtitle(e.target.value)}
+                  />
+                </Field>
+
+                <Field
+                  id="handle"
+                  label="Handle"
+                  hint="The product's address in the storefront. Leave blank to generate one from the title."
+                >
+                  <Input
+                    id="handle"
+                    value={handle ?? ""}
+                    onChange={(e) => setHandle(e.target.value)}
+                    placeholder="winter-jacket"
+                  />
+                </Field>
+
+                <Field id="description" label="Description">
+                  <Textarea
+                    id="description"
+                    rows={5}
+                    value={description ?? ""}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                </Field>
+              </Card>
+
+              {/* Media */}
+              <Card
+                title="Media"
+                description="Upload product images. The first image will be used as the thumbnail."
+                action={
+                  <>
+                    <input
+                      ref={mediaInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={async (e) => {
+                        const files = e.target.files
+                        if (!files?.length) return
+                        e.target.value = ""
+                        setMediaUploading(true)
+                        try {
+                          const uploaded = await uploadVendorImages(Array.from(files))
+                          setMediaImages((prev) => [
+                            ...prev,
+                            ...uploaded.map((f) => ({ url: f.url })),
+                          ])
+                          toast.success(uploaded.length === 1 ? "Image ready." : `${uploaded.length} images ready.`)
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Could not upload images.")
+                        } finally {
+                          setMediaUploading(false)
+                        }
+                      }}
+                    />
+                    <Button
+                      size="small"
+                      variant="secondary"
+                      type="button"
+                      isLoading={mediaUploading}
+                      onClick={() => mediaInputRef.current?.click()}
+                    >
+                      Add images
+                    </Button>
+                  </>
+                }
+              >
+                {mediaImages.length > 0 ? (
+                  <div className="flex flex-wrap gap-3">
+                    {mediaImages.map((img, idx) => (
+                      <div
+                        key={img.url}
+                        className="group relative h-28 w-28 overflow-hidden rounded-lg border border-ui-border-base"
+                      >
+                        <img
+                          src={img.url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                        {idx === 0 && (
+                          <span className="absolute left-1 top-1 rounded bg-ui-bg-base px-1.5 py-0.5 text-[10px] font-medium text-ui-fg-subtle">
+                            Thumbnail
+                          </span>
+                        )}
+                        <IconButton
+                          size="small"
+                          variant="transparent"
+                          type="button"
+                          disabled={mediaUploading}
+                          onClick={() =>
+                            setMediaImages((prev) => prev.filter((_, i) => i !== idx))
+                          }
+                          className="absolute right-1 top-1 hidden bg-ui-bg-base group-hover:flex"
+                        >
+                          <XMark />
+                        </IconButton>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={mediaUploading}
+                    onClick={() => mediaInputRef.current?.click()}
+                    className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ui-border-base bg-ui-bg-subtle p-8 text-ui-fg-muted transition-colors hover:border-ui-border-strong hover:bg-ui-bg-base"
+                  >
+                    <Photo className="size-8 opacity-40" />
+                    <Text size="small">
+                      Click to upload images — first image becomes the thumbnail
+                    </Text>
+                  </button>
+                )}
+              </Card>
+            </>
+          )}
+
+          {activeStep === "organize" && (
+            <Card title="Organize" description="Organize this product into collections, categories, tags, and sales channels.">
+              {/* Discountable toggle matching Screenshot 2 */}
+              <div className="flex items-center justify-between rounded-lg border border-ui-border-base p-4 bg-ui-bg-subtle mb-6">
+                <div className="flex flex-col gap-y-0.5">
+                  <div className="flex items-center gap-x-2">
+                    <Text size="small" weight="plus">Discountable</Text>
+                    <Text size="xsmall" className="text-ui-fg-muted">(Optional)</Text>
+                  </div>
+                  <Text size="small" className="text-ui-fg-subtle">
+                    When unchecked, discounts will not be applied to this product
+                  </Text>
+                </div>
+                <Switch
+                  checked={discountable}
+                  onCheckedChange={setDiscountable}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Type */}
+                <div className="flex flex-col gap-y-2">
+                  <div className="flex items-center gap-x-1.5">
+                    <Label size="small" weight="plus">Type</Label>
+                    <Text size="xsmall" className="text-ui-fg-muted">(Optional)</Text>
+                  </div>
+                  <Select
+                    value={selectedTypeId || "none"}
+                    onValueChange={(val) => setSelectedTypeId(val === "none" ? "" : val)}
+                  >
+                    <Select.Trigger>
+                      <Select.Value placeholder="Select type..." />
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="none">None</Select.Item>
+                      {productTypes
+                        .filter((pt) => Boolean(pt?.id))
+                        .map((pt) => (
+                          <Select.Item key={pt.id} value={String(pt.id)}>
+                            {pt.value}
+                          </Select.Item>
+                        ))}
+                    </Select.Content>
+                  </Select>
+                </div>
+
+                {/* Collection */}
+                <div className="flex flex-col gap-y-2">
+                  <div className="flex items-center gap-x-1.5">
+                    <Label size="small" weight="plus">Collection</Label>
+                    <Text size="xsmall" className="text-ui-fg-muted">(Optional)</Text>
+                  </div>
+                  <Select
+                    value={selectedCollectionId || "none"}
+                    onValueChange={(val) => setSelectedCollectionId(val === "none" ? "" : val)}
+                  >
+                    <Select.Trigger>
+                      <Select.Value placeholder="Select collection..." />
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="none">None</Select.Item>
+                      {collections
+                        .filter((c) => Boolean(c?.id))
+                        .map((c) => (
+                          <Select.Item key={c.id} value={String(c.id)}>
+                            {c.title}
+                          </Select.Item>
+                        ))}
+                    </Select.Content>
+                  </Select>
+                </div>
+
+                {/* Categories */}
+                <div className="flex flex-col gap-y-2">
+                  <div className="flex items-center gap-x-1.5">
+                    <Label size="small" weight="plus">Categories</Label>
+                    <Text size="xsmall" className="text-ui-fg-muted">(Optional)</Text>
+                  </div>
+                  <TrustClawCategoryPicker
+                    selectedMedusaCategoryId={categoryIds[0] ?? null}
+                    selectedCategoryName={null}
+                    onSelectCategory={(catId) => setCategoryIds(catId ? [catId] : [])}
+                  />
+                </div>
+
+                {/* Tags */}
+                <div className="flex flex-col gap-y-2">
+                  <div className="flex items-center gap-x-1.5">
+                    <Label size="small" weight="plus">Tags</Label>
+                    <Text size="xsmall" className="text-ui-fg-muted">(Optional)</Text>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 min-h-[38px] p-2 rounded-lg border border-ui-border-base bg-ui-bg-subtle">
+                    {selectedTags.map((tag) => (
+                      <Badge
+                        key={tag}
+                        size="small"
+                        className="flex items-center gap-1 bg-ui-bg-base border border-ui-border-base"
+                      >
+                        <span>{tag}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          className="hover:text-ui-fg-error"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                    <input
+                      type="text"
+                      placeholder="Type tag and press Enter..."
+                      value={newTagInput}
+                      onChange={(e) => setNewTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          addTag(newTagInput)
+                        }
+                      }}
+                      className="flex-1 bg-transparent text-sm outline-none placeholder:text-ui-fg-muted min-w-[120px]"
+                    />
+                  </div>
+                </div>
+
+                {/* Shipping Profile */}
+                <div className="col-span-1 md:col-span-2 flex flex-col gap-y-2">
+                  <div className="flex items-center gap-x-1.5">
+                    <Label size="small" weight="plus">Shipping profile</Label>
+                    <Text size="xsmall" className="text-ui-fg-muted">(Optional)</Text>
+                  </div>
+                  <Select
+                    value={selectedShippingProfileId || "default"}
+                    onValueChange={(val) =>
+                      setSelectedShippingProfileId(val === "default" ? "" : val)
+                    }
+                  >
+                    <Select.Trigger>
+                      <Select.Value placeholder="Select a shipping profile..." />
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="default">Default (auto-assigned)</Select.Item>
+                      {shippingProfiles.map((sp) => (
+                        <Select.Item key={sp.id} value={sp.id}>
+                          {sp.name}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select>
+                  <Text size="xsmall" className="text-ui-fg-subtle">
+                    Connect the product to a shipping profile
+                  </Text>
+                </div>
+
+                {/* Sales Channels matching Screenshot 2 */}
+                <div className="col-span-1 md:col-span-2 flex flex-col gap-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-x-1.5">
+                      <Label size="small" weight="plus">Sales channels</Label>
+                      <Text size="xsmall" className="text-ui-fg-muted">(Optional)</Text>
+                    </div>
+                  </div>
+                  <Text size="small" className="text-ui-fg-subtle">
+                    This product will only be available in the default sales channel if left untouched.
+                  </Text>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    {salesChannels.map((sc) => {
+                      const isSelected = selectedSalesChannelIds.includes(sc.id)
+                      if (!isSelected) return null
+                      return (
+                        <Badge
+                          key={sc.id}
+                          size="small"
+                          className="flex items-center gap-1.5 bg-ui-bg-subtle border border-ui-border-base px-2.5 py-1 text-xs"
+                        >
+                          <span>{sc.name}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedSalesChannelIds(
+                                selectedSalesChannelIds.filter((id) => id !== sc.id)
+                              )
+                            }
+                            className="hover:text-ui-fg-error"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      )
+                    })}
+                    {selectedSalesChannelIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSalesChannelIds([])}
+                        className="text-xs text-ui-fg-muted hover:text-ui-fg-base underline ml-2"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                    {selectedSalesChannelIds.length < salesChannels.length && (
+                      <Button
+                        size="small"
+                        variant="secondary"
+                        type="button"
+                        onClick={() => setSelectedSalesChannelIds(salesChannels.map((s) => s.id))}
+                        className="ml-auto"
+                      >
+                        Add
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {activeStep === "variants" && (
+            <Card
+              title="Variants"
+              description="Define options and spreadsheet matrix for your variants."
+              action={
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="small"
+                    variant={variantMode === "single" ? "primary" : "secondary"}
+                    onClick={() => setVariantMode("single")}
+                    type="button"
+                  >
+                    View: Single
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={variantMode === "multi" ? "primary" : "secondary"}
+                    onClick={() => setVariantMode("multi")}
+                    type="button"
+                  >
+                    View: Matrix
+                  </Button>
+                </div>
+              }
+            >
+              {variantMode === "multi" && (
+                <div className="space-y-4 mb-6 bg-ui-bg-subtle p-4 rounded-lg border border-ui-border-base">
+                  <div className="flex items-center justify-between">
+                    <Label size="small" weight="plus">Options</Label>
+                    <Button size="small" variant="secondary" onClick={addOptionField} type="button">
+                      <Plus className="size-4" /> Add Option
+                    </Button>
+                  </div>
+                  {options.map((opt, idx) => (
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 items-end gap-3">
+                      <div className="sm:col-span-2">
+                        <Label size="xsmall">Title</Label>
+                        <Input
+                          placeholder="Size, Color"
+                          value={opt.title}
+                          onChange={(e) => {
+                            const next = [...options]
+                            next[idx].title = e.target.value
+                            setOptions(next)
+                          }}
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <Label size="xsmall">Values (comma-separated)</Label>
+                        <Input
+                          placeholder="Small, Medium, Large"
+                          value={opt.valuesString}
+                          onChange={(e) => {
+                            const next = [...options]
+                            next[idx].valuesString = e.target.value
+                            setOptions(next)
+                          }}
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Button
+                          variant="transparent"
+                          size="small"
+                          type="button"
+                          onClick={() => removeOptionField(idx)}
+                          disabled={options.length <= 1}
+                          className="w-full text-ui-fg-muted hover:text-ui-fg-error"
+                        >
+                          <Trash className="size-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Button size="small" variant="primary" type="button" onClick={handleGenerateVariants}>
+                    Generate Matrix
+                  </Button>
+                </div>
+              )}
+
+              {/* Shortcuts Bar matching Screenshot 3 */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-ui-bg-subtle p-3 rounded-lg border border-ui-border-base mb-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-ui-fg-interactive" />
+                  <Text size="small" className="font-semibold text-ui-fg-base">Shortcuts</Text>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      size="small"
+                      type="number"
+                      placeholder="Price ($)"
+                      className="w-24"
+                      value={shortcutPrice}
+                      onChange={(e) => setShortcutPrice(e.target.value)}
+                    />
+                    <Button size="small" variant="secondary" type="button" onClick={applyPriceToAll}>
+                      Apply price
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      size="small"
+                      type="number"
+                      placeholder="Qty"
+                      className="w-20"
+                      value={shortcutInventory}
+                      onChange={(e) => setShortcutInventory(e.target.value)}
+                    />
+                    <Button size="small" variant="secondary" type="button" onClick={applyInventoryToAll}>
+                      Apply qty
+                    </Button>
+                  </div>
+                  <Button size="small" variant="secondary" type="button" onClick={autoGenerateSkus}>
+                    Auto SKUs
+                  </Button>
+                </div>
+              </div>
+
+              {/* Matrix Table matching Screenshot 3 */}
+              <div className="border border-ui-border-base rounded-lg overflow-x-auto">
+                <Table>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.HeaderCell>Default option</Table.HeaderCell>
+                      <Table.HeaderCell>Title</Table.HeaderCell>
+                      <Table.HeaderCell className="w-36">SKU</Table.HeaderCell>
+                      <Table.HeaderCell className="w-24">Managed inventory</Table.HeaderCell>
+                      <Table.HeaderCell className="w-24">Allow backorder</Table.HeaderCell>
+                      <Table.HeaderCell className="w-24">Has inventory kit</Table.HeaderCell>
+                      <Table.HeaderCell className="w-28">Price EUR</Table.HeaderCell>
+                      <Table.HeaderCell className="w-28">Price USD</Table.HeaderCell>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {variantMode === "single" ? (
+                      <Table.Row>
+                        <Table.Cell>
+                          <Text size="small" className="text-ui-fg-muted font-mono">Default option value</Text>
+                        </Table.Cell>
+                        <Table.Cell className="border border-ui-border-interactive bg-ui-bg-base">
+                          <Text size="small" weight="plus" className="text-ui-fg-base">Default variant</Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Input
+                            size="small"
+                            placeholder="SKU"
+                            value={singleSku}
+                            onChange={(e) => setSingleSku(e.target.value)}
+                          />
+                        </Table.Cell>
+                        <Table.Cell className="text-center">
+                          <Checkbox
+                            checked={singleManageInventory}
+                            onCheckedChange={(val) => setSingleManageInventory(Boolean(val))}
+                          />
+                        </Table.Cell>
+                        <Table.Cell className="text-center">
+                          <Checkbox />
+                        </Table.Cell>
+                        <Table.Cell className="text-center">
+                          <Checkbox />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <div className="flex items-center gap-1">
+                            <span className="text-ui-fg-muted text-xs">€</span>
+                            <Input
+                              size="small"
+                              type="number"
+                              placeholder="0.00"
+                              value={prices.eur || ""}
+                              onChange={(e) => setPrices((p) => ({ ...p, eur: e.target.value }))}
+                            />
+                          </div>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <div className="flex items-center gap-1">
+                            <span className="text-ui-fg-muted text-xs">$</span>
+                            <Input
+                              size="small"
+                              type="number"
+                              placeholder="0.00"
+                              value={prices.usd || ""}
+                              onChange={(e) => setPrices((p) => ({ ...p, usd: e.target.value }))}
+                            />
+                          </div>
+                        </Table.Cell>
+                      </Table.Row>
+                    ) : (
+                      variants.map((v, idx) => (
+                        <Table.Row key={v.id}>
+                          <Table.Cell>
+                            <Text size="small" className="text-ui-fg-muted">
+                              {Object.values(v.options).join(" / ") || "Option"}
+                            </Text>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Text size="small" weight="plus">{v.title}</Text>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Input
+                              size="small"
+                              value={v.sku}
+                              placeholder="SKU"
+                              onChange={(e) => {
+                                const next = [...variants]
+                                next[idx].sku = e.target.value
+                                setVariants(next)
+                              }}
+                            />
+                          </Table.Cell>
+                          <Table.Cell className="text-center">
+                            <Checkbox
+                              checked={v.manage_inventory}
+                              onCheckedChange={(val) => {
+                                const next = [...variants]
+                                next[idx].manage_inventory = Boolean(val)
+                                setVariants(next)
+                              }}
+                            />
+                          </Table.Cell>
+                          <Table.Cell className="text-center">
+                            <Checkbox
+                              checked={v.allow_backorder}
+                              onCheckedChange={(val) => {
+                                const next = [...variants]
+                                next[idx].allow_backorder = Boolean(val)
+                                setVariants(next)
+                              }}
+                            />
+                          </Table.Cell>
+                          <Table.Cell className="text-center">
+                            <Checkbox
+                              checked={v.inventory_kit}
+                              onCheckedChange={(val) => {
+                                const next = [...variants]
+                                next[idx].inventory_kit = Boolean(val)
+                                setVariants(next)
+                              }}
+                            />
+                          </Table.Cell>
+                          <Table.Cell>
+                            <div className="flex items-center gap-1">
+                              <span className="text-ui-fg-muted text-xs">€</span>
+                              <Input
+                                size="small"
+                                type="number"
+                                placeholder="0.00"
+                                value={v.price_eur || ""}
+                                onChange={(e) => {
+                                  const next = [...variants]
+                                  next[idx].price_eur = e.target.value
+                                  setVariants(next)
+                                }}
+                              />
+                            </div>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <div className="flex items-center gap-1">
+                              <span className="text-ui-fg-muted text-xs">$</span>
+                              <Input
+                                size="small"
+                                type="number"
+                                placeholder="0.00"
+                                value={v.price}
+                                onChange={(e) => {
+                                  const next = [...variants]
+                                  next[idx].price = e.target.value
+                                  setVariants(next)
+                                }}
+                              />
+                            </div>
+                          </Table.Cell>
+                        </Table.Row>
+                      ))
+                    )}
+                  </Table.Body>
+                </Table>
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* Sticky Footer Bar matching Screenshot 2 & 3 */}
+        <div className="flex items-center justify-end gap-x-2 border-t px-6 py-4 bg-ui-bg-base sticky bottom-0 z-20">
+          <Link href="/products">
+            <Button variant="secondary" size="small" type="button">
+              Cancel
+            </Button>
+          </Link>
+          <Button
+            variant="secondary"
+            size="small"
+            type="button"
+            isLoading={isPending}
+            onClick={async (e) => {
+              setStatus("draft")
+              await onSubmit(e as any)
+            }}
+          >
+            Save as draft
+          </Button>
+          {activeStep !== "variants" ? (
+            <Button
+              variant="primary"
+              size="small"
+              type="button"
+              onClick={() => {
+                if (activeStep === "details") {
+                  if (!title.trim()) {
+                    setError("Title is required.")
+                    return
+                  }
+                  setError(null)
+                  setActiveStep("organize")
+                } else if (activeStep === "organize") {
+                  setActiveStep("variants")
+                }
+              }}
+            >
+              Continue
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              size="small"
+              type="submit"
+              isLoading={isPending}
+              onClick={() => setStatus("published")}
+            >
+              Publish
+            </Button>
+          )}
+        </div>
+      </form>
+    )
   }
 
   return (

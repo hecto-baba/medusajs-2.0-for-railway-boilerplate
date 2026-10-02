@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo, useState } from "react"
 import {
   deleteVendorCollection,
   listVendorCollections,
@@ -32,6 +33,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   ActionMenu,
+  DataTableAddFilter,
   PlaceholderCell,
   createMedusaDateFilter,
   resolveMedusaDateFilter,
@@ -69,33 +71,6 @@ const resolveDateFilter = (val: any): string | undefined => {
   }
   return undefined
 }
-
-const dateFilterOptions = [
-  {
-    label: "Today",
-    value: {
-      $gte: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
-    },
-  },
-  {
-    label: "Last 7 days",
-    value: {
-      $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-  {
-    label: "Last 30 days",
-    value: {
-      $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-  {
-    label: "Last 90 days",
-    value: {
-      $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-]
 
 export const CollectionsTable = () => {
   const router = useRouter()
@@ -376,8 +351,10 @@ export const CollectionsTable = () => {
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-x-2">
-            <DataTable.Search placeholder="Search collections..." />
-            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTableAddFilter table={table} />
+          </div>
+          <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search" />
             <DataTable.SortingMenu tooltip="Sort" />
           </div>
         </DataTable.Toolbar>

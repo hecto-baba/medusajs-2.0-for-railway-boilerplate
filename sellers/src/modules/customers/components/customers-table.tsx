@@ -25,6 +25,7 @@ import {
   AccountCell,
   AccountHeader,
   ActionMenu,
+  DataTableAddFilter,
   DateCell,
   EmailCell,
   EmailHeader,
@@ -400,10 +401,12 @@ export const CustomersTable = () => {
 
       {/* Data Table */}
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between">
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-x-2">
+            <DataTableAddFilter table={table} />
+          </div>
           <div className="flex items-center gap-x-2">
             <DataTable.Search placeholder="Search" />
-            <DataTable.FilterMenu tooltip="Filter" />
             <DataTable.SortingMenu tooltip="Sort" />
           </div>
         </DataTable.Toolbar>

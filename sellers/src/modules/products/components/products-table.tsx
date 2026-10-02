@@ -2,6 +2,7 @@
 
 import {
   deleteVendorProduct,
+  listVendorCollections,
   listVendorProducts,
   listVendorProductTags,
   listVendorProductTypes,
@@ -24,12 +25,13 @@ import {
   useDataTable,
   usePrompt,
 } from "@medusajs/ui"
-import { Plus, Sparkles } from "@medusajs/icons"
+import { Sparkles } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import {
+  DataTableAddFilter,
   ListSummaryCell,
   PlaceholderCell,
   ProductCell,
@@ -185,6 +187,10 @@ export const ProductsTable = () => {
     queryKey: ["vendor-types-filter"],
     queryFn: () => listVendorProductTypes({ limit: 100, offset: 0 }),
   })
+  const { data: collectionsData } = useQuery({
+    queryKey: ["vendor-collections-filter"],
+    queryFn: () => listVendorCollections({ limit: 100, offset: 0 }),
+  })
   const { data: tagsData } = useQuery({
     queryKey: ["vendor-tags-filter"],
     queryFn: () => listVendorProductTags({ limit: 100, offset: 0 }),
@@ -197,6 +203,35 @@ export const ProductsTable = () => {
   // Dynamic filter definitions
   const filters = useMemo(() => {
     const list: any[] = [
+      filterHelper.custom({
+        id: "status",
+        label: "Status",
+        type: "select",
+        options: [
+          { label: "Draft", value: "draft" },
+          { label: "Proposed", value: "proposed" },
+          { label: "Published", value: "published" },
+          { label: "Rejected", value: "rejected" },
+        ],
+      }),
+      filterHelper.custom({
+        id: "collection_id",
+        label: "Collection",
+        type: "select",
+        options: (collectionsData?.collections ?? []).map((c) => ({
+          label: c.title,
+          value: c.id,
+        })),
+      }),
+      filterHelper.custom({
+        id: "sales_channel_id",
+        label: "Sales Channel",
+        type: "select",
+        options: (salesChannelsData?.sales_channels ?? []).map((sc) => ({
+          label: sc.name,
+          value: sc.id,
+        })),
+      }),
       filterHelper.custom({
         id: "type_id",
         label: "Type",
@@ -215,32 +250,12 @@ export const ProductsTable = () => {
           value: t.id,
         })),
       }),
-      filterHelper.custom({
-        id: "sales_channel_id",
-        label: "Sales Channel",
-        type: "select",
-        options: (salesChannelsData?.sales_channels ?? []).map((sc) => ({
-          label: sc.name,
-          value: sc.id,
-        })),
-      }),
-      filterHelper.custom({
-        id: "status",
-        label: "Status",
-        type: "select",
-        options: [
-          { label: "Draft", value: "draft" },
-          { label: "Proposed", value: "proposed" },
-          { label: "Published", value: "published" },
-          { label: "Rejected", value: "rejected" },
-        ],
-      }),
       createMedusaDateFilter(filterHelper, "created_at", "Created"),
       createMedusaDateFilter(filterHelper, "updated_at", "Updated"),
     ]
 
     return list
-  }, [typesData, tagsData, salesChannelsData])
+  }, [typesData, tagsData, salesChannelsData, collectionsData])
 
   // A select filter's value arrives either as a bare array or wrapped in an
   // operator object depending on how it was set, so it is normalised here.
@@ -438,43 +453,42 @@ export const ProductsTable = () => {
   return (
     <>
       <Container className="divide-y p-0">
+        <div className="flex items-center justify-between px-6 py-4">
+          <Heading level="h1">Products</Heading>
+          <div className="flex items-center justify-center gap-x-2">
+            <ProductExportButton />
+            <ProductImportModal />
+            <Button
+              size="small"
+              variant="secondary"
+              onClick={() => setIsAddProductModalOpen(true)}
+              className="gap-x-1.5"
+            >
+              <Sparkles className="size-4 text-ui-fg-interactive" />
+              <span>Master Catalog</span>
+            </Button>
+            <Button size="small" variant="secondary" asChild>
+              <Link href="/products/new">Create</Link>
+            </Button>
+          </div>
+        </div>
+
         <DataTable instance={table}>
           <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-            <Heading level="h2">Products</Heading>
             <div className="flex items-center gap-x-2">
-              <DataTable.Search placeholder="Search products..." />
-              <DataTable.FilterMenu tooltip="Filter" />
+              <DataTableAddFilter table={table} />
+            </div>
+            <div className="flex items-center gap-x-2">
+              <DataTable.Search placeholder="Search" />
               <DataTable.SortingMenu tooltip="Sort" />
-              <ProductExportButton />
-              <ProductImportModal />
-              <Button
-                size="small"
-                variant="secondary"
-                onClick={() => setIsAddProductModalOpen(true)}
-                className="gap-x-1.5"
-              >
-                <Sparkles className="size-4 text-ui-fg-interactive" />
-                <span>Master Catalog</span>
-              </Button>
-              <Button
-                size="small"
-                variant="primary"
-                asChild
-                className="gap-x-1.5"
-              >
-                <Link href="/products/new">
-                  <Plus className="size-4" />
-                  <span>Create Product</span>
-                </Link>
-              </Button>
             </div>
           </DataTable.Toolbar>
           <DataTable.FilterBar />
           <DataTable.Table
             emptyState={{
               empty: {
-                heading: "No products yet",
-                description: "Browse the Master Catalog or create your first custom product.",
+                heading: "No records",
+                description: "No products found. Create a product or browse the Master Catalog.",
               },
               filtered: {
                 heading: "No matches",
