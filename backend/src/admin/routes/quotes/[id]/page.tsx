@@ -435,7 +435,7 @@ const QuoteDetailPage = () => {
               <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-x-3">
                   <div className="w-8 h-8 rounded-lg bg-ui-bg-subtle border border-ui-border-base flex items-center justify-center text-ui-fg-base font-semibold text-sm">
-                    ✓
+                    <CheckCircle className="w-4 h-4" />
                   </div>
                   <div>
                     <div className="flex items-center gap-x-2">
@@ -505,11 +505,12 @@ const QuoteDetailPage = () => {
                       isLoading={recordPaymentMutation.isPending}
                       className="w-full text-xs h-8"
                     >
-                      ✓ Mark Payment Received
+                      <CheckCircle className="w-3 h-3 mr-1" /> Mark Payment Received
                     </Button>
                   ) : (
                     <div className="text-[11px] text-ui-fg-muted flex items-center gap-1">
-                      <span>✓ Payment confirmed in full</span>
+                      <CheckCircle className="w-3 h-3" />
+                      <span>Payment confirmed in full</span>
                     </div>
                   )}
                 </div>
@@ -538,8 +539,8 @@ const QuoteDetailPage = () => {
                   <div className="text-xs text-ui-fg-subtle">
                     {quote.metadata?.fulfillment_status === "delivered" || quote.draft_order?.fulfillment_status === "delivered" ? (
                       <div>
-                        <div className="text-ui-fg-base font-medium">
-                          ✓ Successfully delivered to buyer destination
+                        <div className="text-ui-fg-base font-medium flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" /> Successfully delivered to buyer destination
                         </div>
                         {quote.metadata?.delivered_at && (
                           <div className="text-[11px] text-ui-fg-muted mt-0.5">
@@ -552,8 +553,8 @@ const QuoteDetailPage = () => {
                       </div>
                     ) : quote.metadata?.fulfillment_status === "shipped" || quote.draft_order?.fulfillment_status === "shipped" ? (
                       <div>
-                        <div className="text-ui-fg-base font-medium">
-                          📦 Shipment In Transit
+                        <div className="text-ui-fg-base font-medium flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Shipment In Transit
                         </div>
                         <div className="mt-1">
                           Carrier: <strong className="text-ui-fg-base">{quote.metadata?.carrier || "Express Freight"}</strong> &bull; Tracking: <strong className="text-ui-fg-base font-mono">{quote.metadata?.tracking_number || "TRK-ASSIGNED"}</strong>
@@ -577,7 +578,7 @@ const QuoteDetailPage = () => {
                         >
                           {quote.metadata?.fulfillment_status === "delivered" || quote.metadata?.fulfillment_status === "shipped"
                             ? "Edit Carrier / Tracking"
-                            : "🚚 Dispatch to Buyer's Location"}
+                            : "Dispatch to Buyer's Location"}
                         </Button>
 
                         {/* Stage 4 Action */}
@@ -590,7 +591,7 @@ const QuoteDetailPage = () => {
                             isLoading={deliverOrderMutation.isPending}
                             className="flex-1 text-xs h-8"
                           >
-                            ✓ Mark Delivered to Buyer
+                            <CheckCircle className="w-3 h-3 mr-1" /> Mark Delivered to Buyer
                           </Button>
                         )}
                       </div>
@@ -720,7 +721,7 @@ const QuoteDetailPage = () => {
             {messages.some((m: any) => m.sender === "customer") && (
               <div className="px-6 py-4 bg-ui-bg-subtle border-b border-ui-border-base flex items-start gap-x-3">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 flex items-center justify-center flex-shrink-0 text-sm">
-                  💬
+                  <DocumentText className="w-4 h-4" />
                 </div>
                 <div className="space-y-1">
                   <span className="text-xs font-semibold text-ui-fg-base uppercase tracking-wider block">
@@ -744,22 +745,22 @@ const QuoteDetailPage = () => {
                   )}
                   {deliveryMode === "customer_vehicle_pickup" && (
                     <span className="px-2.5 py-1 rounded-md bg-amber-100 text-amber-900 text-[11px] font-semibold border border-amber-300">
-                      🚗 Self-Pickup (Customer's Own Vehicle) &bull; €0.00 Delivery Fee
+                      Self-Pickup (Customer&apos;s Own Vehicle) &bull; €0.00 Delivery Fee
                     </span>
                   )}
                   {deliveryMode === "free_delivery" && (
                     <span className="px-2.5 py-1 rounded-md bg-green-100 text-green-900 text-[11px] font-semibold border border-green-300">
-                      🚚 Requested Free Delivery &bull; €0.00
+                      Requested Free Delivery &bull; €0.00
                     </span>
                   )}
                   {deliveryMode === "custom_budget" && (
                     <span className="px-2.5 py-1 rounded-md bg-blue-100 text-blue-900 text-[11px] font-semibold border border-blue-300">
-                      📦 Target Freight Budget: €{Number(targetShipping || 0).toFixed(2)}
+                      Target Freight Budget: €{Number(targetShipping || 0).toFixed(2)}
                     </span>
                   )}
                   {vehicleNote && (
                     <span className="text-[11px] text-amber-800 italic">
-                      Note: "{vehicleNote}"
+                      Note: &ldquo;{vehicleNote}&rdquo;
                     </span>
                   )}
                 </div>
@@ -907,7 +908,7 @@ const QuoteDetailPage = () => {
                   <div className="bg-ui-bg-subtle/60 p-4 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="space-y-1">
                       <div className="text-xs font-semibold text-ui-fg-base flex items-center gap-1.5">
-                        🚚 Quoted Delivery / Freight Terms
+                        Quoted Delivery / Freight Terms
                       </div>
                       <p className="text-[11px] text-ui-fg-subtle">
                         Specify whether delivery is complimentary (€0.00) or charge a custom logistics fee.
@@ -972,9 +973,9 @@ const QuoteDetailPage = () => {
                 <span className="flex items-center gap-1.5">
                   Delivery / Logistics
                   {effectiveShippingPrice === 0 ? (
-                    <Badge color="green" size="xsmall">🚚 Free Delivery Included</Badge>
+                    <Badge color="green" size="xsmall">Free Delivery Included</Badge>
                   ) : (
-                    <Badge color="blue" size="xsmall">📦 Quoted Fee</Badge>
+                    <Badge color="blue" size="xsmall">Quoted Fee</Badge>
                   )}
                 </span>
                 <span className="font-mono font-medium">
@@ -1023,7 +1024,7 @@ const QuoteDetailPage = () => {
                     isLoading={isAccepting}
                     disabled={isEditing}
                   >
-                    ✓ Accept & Confirm Order
+                    <CheckCircle className="w-3 h-3 mr-1" /> Accept & Confirm Order
                   </Button>
                 )}
                 {["pending_merchant", "customer_rejected", "merchant_rejected"].includes(quote.status) && (

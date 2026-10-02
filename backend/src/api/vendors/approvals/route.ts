@@ -26,6 +26,7 @@ export const GET = async (
         "cart.total",
         "cart.currency_code",
         "cart.customer.*",
+        "cart.items.*",
       ],
       pagination: {
         take: limit,

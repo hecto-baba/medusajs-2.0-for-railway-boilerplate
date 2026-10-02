@@ -3658,6 +3658,12 @@ export type VendorApproval = {
       last_name?: string | null
       email?: string | null
     } | null
+    items?: {
+      id: string
+      title?: string
+      quantity?: number
+      unit_price?: number
+    }[]
   } | null
 }
 
