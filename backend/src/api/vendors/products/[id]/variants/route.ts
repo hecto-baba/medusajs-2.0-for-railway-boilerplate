@@ -48,6 +48,11 @@ export const GET = async (
       "updated_at",
       "options.*",
       "prices.*",
+      // eoi_configuration.* added so the seller EOI section can read every
+      // variant's config off this one list call instead of firing one
+      // request per variant (fix #4 of
+      // docs/plan/EOI_VARIANT_LEVEL_FIX_EXECUTION_PLAN.md).
+      "eoi_configuration.*",
     ],
     filters: { product_id: [id] },
     pagination: { order: { created_at: "ASC" } },

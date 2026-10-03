@@ -52,8 +52,7 @@ export const addToCartWithEoiWorkflow = createWorkflow(
       entity: "product_variant",
       fields: [
         "id",
-        "product.id",
-        "product.eoi_configuration.*",
+        "eoi_configuration.*",
         "calculated_price.*",
       ],
       filters: {
@@ -71,12 +70,12 @@ export const addToCartWithEoiWorkflow = createWorkflow(
     }).config({ name: "retrieve-variant" })
 
     const eoiData = when({ variants }, (data) => {
-      return data.variants[0].product?.eoi_configuration?.status === "active"
+      return data.variants[0].eoi_configuration?.status === "active"
     }).then(() => {
       return validateEoiCartItemStep({
         variant: variants[0],
         quantity: input.quantity,
-        eoi_configuration: variants[0].product?.eoi_configuration || null,
+        eoi_configuration: variants[0].eoi_configuration || null,
         cart_items: carts[0].items || [],
       } as unknown as ValidateEoiCartItemInput)
     })

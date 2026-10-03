@@ -4,7 +4,7 @@ import { EOI_MODULE } from "../../modules/expression-of-interest"
 import ExpressionOfInterestModuleService from "../../modules/expression-of-interest/service"
 
 type CreateEoiConfigurationInput = {
-  product_id: string
+  variant_id: string
   value_type?: "fixed" | "percentage"
   value_amount?: number
   status?: "active" | "inactive"
@@ -26,7 +26,7 @@ export const createEoiConfigurationStep = createStep(
     }
 
     const eoiConfig = await eoiModuleService.createEoiConfigurations({
-      product_id: input.product_id,
+      variant_id: input.variant_id,
       value_type: input.value_type,
       value_amount: input.value_amount,
       status: input.status,

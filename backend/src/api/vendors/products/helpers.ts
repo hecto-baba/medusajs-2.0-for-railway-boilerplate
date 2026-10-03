@@ -306,3 +306,58 @@ export const ensureVariantInventoryItem = async (
   return newItem.id
 }
 
+
+const MISSING_PRICE_MESSAGE =
+  "Every variant needs a price in at least one currency before the product can be published. Add a price, or save it as a draft."
+
+/**
+ * A published product with a variant that has no price cannot be bought or
+ * booked: the storefront shows no price and checkout rejects it. The product
+ * form warns about this, but a form check can be skipped (editing a draft and
+ * switching it to Published, or calling the API directly), so the rule is
+ * enforced here as well.
+ *
+ * Creating: every variant in the request must carry at least one price.
+ */
+export const assertCreatePublishable = (body: {
+  status?: string
+  variants?: { prices?: unknown[] }[]
+}): void => {
+  if (body?.status !== "published") return
+
+  const variants = body.variants ?? []
+  if (!variants.length || variants.some((v) => !v.prices?.length)) {
+    throw new MedusaError(MedusaError.Types.INVALID_DATA, MISSING_PRICE_MESSAGE)
+  }
+}
+
+/**
+ * Updating: when the request sets the status to published, every variant the
+ * product already has must have a price. Variants are priced through their own
+ * routes, so the stored prices are what count here, not the request body.
+ */
+export const assertUpdatePublishable = async (
+  req: AuthenticatedMedusaRequest,
+  productId: string,
+  body: { status?: string }
+): Promise<void> => {
+  if (body?.status !== "published") return
+
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const {
+    data: [product],
+  } = await query.graph({
+    entity: "product",
+    fields: ["id", "variants.id", "variants.price_set.prices.id"],
+    filters: { id: [productId] },
+  })
+
+  const variants = ((product as any)?.variants ?? []) as any[]
+  const unpriced = variants.filter(
+    (v) => !v.price_set?.prices?.length
+  )
+
+  if (!variants.length || unpriced.length) {
+    throw new MedusaError(MedusaError.Types.INVALID_DATA, MISSING_PRICE_MESSAGE)
+  }
+}

@@ -2,13 +2,10 @@ import type {
   AuthenticatedMedusaRequest,
   MedusaResponse,
 } from "@medusajs/framework/http"
-import { MedusaError } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
-import { APPOINTMENT_BOOKING_MODULE } from "../../../../../modules/appointment-booking"
-import type AppointmentBookingModuleService from "../../../../../modules/appointment-booking/service"
-import { createAppointmentSlotsWorkflow } from "../../../../../workflows/create-appointment-slots"
-import { assertOwnership, assertVariantBelongsToProduct } from "../../../products/helpers"
 
+// Still exported (and registered in middlewares.ts) so the import there keeps
+// resolving; the route itself is retired.
 export const PostVendorAppointmentSlotsSchema = z.object({
   service_product_id: z.string(),
   service_variant_id: z.string().nullable().optional(),
@@ -18,49 +15,18 @@ export const PostVendorAppointmentSlotsSchema = z.object({
   date_to: z.coerce.date(),
 })
 
+/**
+ * Retired. Slots are no longer generated and stored in advance: they are worked
+ * out live from each resource's weekly hours, holidays, session length, buffers
+ * and rules, and a booking row is created only when someone reserves one. Use
+ * GET /vendors/resources/:id/slots-preview to see them.
+ */
 export const POST = async (
-  req: AuthenticatedMedusaRequest<
-    z.infer<typeof PostVendorAppointmentSlotsSchema>
-  >,
+  _req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  const service: AppointmentBookingModuleService = req.scope.resolve(
-    APPOINTMENT_BOOKING_MODULE
-  )
-
-  const [provider] = await service.listProviders({
-    vendor_admin_id: req.auth_context.actor_id,
+  res.status(410).json({
+    type: "not_allowed",
+    message: "Slots are generated automatically. Use GET /vendors/resources/:id/slots-preview.",
   })
-
-  if (!provider) {
-    throw new MedusaError(
-      MedusaError.Types.NOT_FOUND,
-      "No provider profile found for the authenticated session."
-    )
-  }
-
-  // The service must be one of THIS seller's own products (and the variant one of its
-  // variants); otherwise slots could be created against another seller's product.
-  await assertOwnership(req, req.validatedBody.service_product_id)
-  if (req.validatedBody.service_variant_id) {
-    await assertVariantBelongsToProduct(
-      req,
-      req.validatedBody.service_product_id,
-      req.validatedBody.service_variant_id
-    )
-  }
-
-  const { result } = await createAppointmentSlotsWorkflow(req.scope).run({
-    input: {
-      provider_id: provider.id,
-      service_product_id: req.validatedBody.service_product_id,
-      service_variant_id: req.validatedBody.service_variant_id,
-      service_duration_minutes: req.validatedBody.service_duration_minutes,
-      max_capacity: req.validatedBody.max_capacity,
-      date_from: req.validatedBody.date_from,
-      date_to: req.validatedBody.date_to,
-    },
-  })
-
-  res.json({ appointments: result })
 }

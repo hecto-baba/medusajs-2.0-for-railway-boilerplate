@@ -113,9 +113,22 @@ export const createVendorProductWorkflow = createWorkflow(
       products: [
         {
           ...data.input.product,
-          status: ProductStatus.PUBLISHED,
+          // "Save as draft" must stay a draft; anything else publishes, as before.
+          status:
+            data.input.product.status === ProductStatus.DRAFT
+              ? ProductStatus.DRAFT
+              : ProductStatus.PUBLISHED,
           shipping_profile_id: data.resolvedProfileId,
-          sales_channels: [{ id: data.stores[0].default_sales_channel_id }],
+          sales_channels: Array.from(
+            new Set<string>([
+              data.stores[0].default_sales_channel_id as string,
+              ...((data.input.product.sales_channels ?? []) as Array<{ id: string }>).map(
+                (channel) => channel.id
+              ),
+            ])
+          )
+            .filter(Boolean)
+            .map((id) => ({ id })),
         },
       ],
     }))

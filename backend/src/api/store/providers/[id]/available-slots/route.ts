@@ -1,8 +1,8 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { z } from "@medusajs/framework/zod"
-import { APPOINTMENT_BOOKING_MODULE } from "../../../../../modules/appointment-booking"
-import type AppointmentBookingModuleService from "../../../../../modules/appointment-booking/service"
 
+// Kept (and still registered in middlewares.ts) only so the import there keeps
+// resolving; the route itself is retired.
 export const GetAvailableSlotsSchema = z.object({
   service_duration_minutes: z.coerce.number().int().min(1),
   date_from: z.string().refine((v) => !isNaN(Date.parse(v)), {
@@ -14,27 +14,15 @@ export const GetAvailableSlotsSchema = z.object({
 })
 
 /**
- * Read-only slot computation, straight from the module service - no
- * workflow needed since nothing is written. Mirrors the ticket seats route's
- * "call the service directly from a store route" pattern.
+ * Retired. It returned time windows with no ids, took the slot length from the
+ * client, had no range cap, did not check the provider was active or approved,
+ * and could not be booked from. Use
+ * GET /store/appointments/resources/:id/slots, which returns bookable slots with
+ * their final price and enforces all of that.
  */
-export const GET = async (
-  req: MedusaRequest<{}, z.infer<typeof GetAvailableSlotsSchema>>,
-  res: MedusaResponse
-) => {
-  const { id } = req.params
-  const { service_duration_minutes, date_from, date_to } = req.validatedQuery
-
-  const service: AppointmentBookingModuleService = req.scope.resolve(
-    APPOINTMENT_BOOKING_MODULE
-  )
-
-  const slots = await service.expandAvailableSlots(
-    id,
-    service_duration_minutes,
-    new Date(date_from),
-    new Date(date_to)
-  )
-
-  res.json({ slots })
+export const GET = async (_req: MedusaRequest, res: MedusaResponse) => {
+  res.status(410).json({
+    type: "not_allowed",
+    message: "Use GET /store/appointments/resources/:id/slots.",
+  })
 }

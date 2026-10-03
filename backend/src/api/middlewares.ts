@@ -7,7 +7,8 @@ import {
 import * as httpFramework from "@medusajs/framework/http";
 import { createFindParams } from "@medusajs/medusa/api/utils/validators";
 import { PostRentalConfigBodySchema } from "./admin/products/[id]/rental-config/route";
-import { PostEoiConfigBodySchema } from "./admin/products/[id]/eoi-config/validators";
+import { PostEoiConfigBodySchema } from "./admin/products/[id]/variants/[variant_id]/eoi-config/validators";
+import { PostEoiConfigBodySchema as PostVendorEoiConfigSchema } from "./vendors/products/[id]/variants/[variant_id]/eoi-config/route";
 import { PostEoiStatusBodySchema } from "./admin/eois/[id]/route";
 import { PostRentalStatusBodySchema } from "./admin/rentals/[id]/route";
 import { PostRentalDepositBodySchema } from "./admin/rentals/[id]/deposit/route";
@@ -19,8 +20,8 @@ import { PostCartItemsAppointmentsBody } from "./store/carts/[id]/line-items/app
 import { PostCartItemsEoiBody } from "./store/carts/[id]/line-items/eoi/route";
 import { GetAvailableSlotsSchema } from "./store/providers/[id]/available-slots/route";
 import { PostStoreEnquirySchema } from "./store/enquiries/route";
-import { PostAdminEnquiryReplyBodySchema } from "./admin/enquiries/[id]/route";
 import { enquiryRateLimit } from "./store/enquiries/rate-limit";
+import { PostAdminEnquiryReplyBodySchema } from "./admin/enquiries/[id]/route";
 import { PostAdminEnquiryStatusBodySchema } from "./admin/enquiries/[id]/status/route";
 import { PostEnquiryConfigBodySchema } from "./admin/products/[id]/enquiry-config/route";
 import { PostVendorProviderSchema } from "./vendors/providers/me/route";
@@ -30,6 +31,32 @@ import { PostVendorAppointmentSlotsSchema } from "./vendors/providers/me/slots/r
 import { PostAdminRecurringAvailabilitySchema } from "./admin/providers/[id]/recurring-availability/route";
 import { PostAdminAvailabilityExceptionSchema } from "./admin/providers/[id]/exceptions/route";
 import { PostAdminAppointmentSlotsSchema } from "./admin/providers/[id]/slots/route";
+import { PostAppointmentConfigBodySchema } from "./admin/products/[id]/appointment-config/route";
+import { requireApprovedVendor } from "./vendors/shared/require-approved-vendor";
+import { PostAdminResourceSchema } from "./admin/providers/route";
+import { appointmentReserveRateLimit } from "./store/carts/[id]/line-items/appointments/rate-limit";
+import { GetBusinessesSchema } from "./store/appointments/businesses/route";
+import { GetBusinessSchema } from "./store/appointments/businesses/[handle]/route";
+import { GetProductOfferSchema } from "./store/appointments/products/[id]/route";
+import { GetResourceSlotsSchema } from "./store/appointments/resources/[id]/slots/route";
+import { GetMyBookingsSchema } from "./store/appointments/my-bookings/route";
+import { PostBuyerCancelSchema } from "./store/appointments/bookings/[id]/cancel/route";
+import {
+  CancelAppointmentSchema,
+  CopySettingsToSchema,
+  GetPricingPreviewSchema,
+  GetSlotsPreviewSchema,
+  CreateManualAppointmentSchema,
+  GetVendorAppointmentsSchema,
+  PostExceptionSchema,
+  PostHoursSchema,
+  PostPricingRuleSchema,
+  PostResourceSchema,
+  PostServicesSchema,
+  UpdateHoursSchema,
+  UpdatePricingRuleSchema,
+  UpdateResourceSchema,
+} from "./vendors/resources/schemas";
 import { PostVenueBodySchema } from "./admin/venues/route";
 import { PostTicketProductBodySchema } from "./admin/ticket-products/route";
 import { GetTicketProductSeatsSchema } from "./store/ticket-products/[id]/seats/route";
@@ -48,6 +75,12 @@ const allowFields = (httpFramework as any).allowFields || function (...fields: s
 
 import { z } from "@medusajs/framework/zod";
 
+// Answers 404 as if the route did not exist. Used to close routes that ship in
+// an installed plugin but are not meant to be reachable yet.
+const closedRoute = (_req: any, res: any) => {
+  res.status(404).json({ type: "not_found", message: "Not found" });
+};
+
 const upload = multer({ storage: multer.memoryStorage() });
 const GetDigitalProductsSchema = createFindParams().merge(
   z.object({
@@ -60,6 +93,7 @@ import { GetVendorOrdersSchema } from "./vendors/orders/route";
 import { GetVendorPromotionsSchema } from "./vendors/promotions/route";
 import { GetVendorCampaignsSchema } from "./vendors/campaigns/route";
 import { PostVendorRentalConfigSchema } from "./vendors/products/[id]/rental-config/route";
+import { PostVendorAppointmentConfigSchema } from "./vendors/products/[id]/appointment-config/route";
 import { PostVendorRentalStatusBodySchema } from "./vendors/rentals/[id]/route";
 import { PostVendorRentalDepositBodySchema } from "./vendors/rentals/[id]/deposit/route";
 import { PostVendorInventoryLevelSchema } from "./vendors/products/[id]/variants/[variant_id]/inventory-levels/route";
@@ -402,7 +436,7 @@ export default defineMiddlewares({
       ]
     },
     {
-      matcher: "/admin/products/:id/eoi-config",
+      matcher: "/admin/products/:id/variants/:variant_id/eoi-config",
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(PostEoiConfigBodySchema)
@@ -486,10 +520,39 @@ export default defineMiddlewares({
         validateAndTransformBody(PostCartItemsTicketsBody)
       ]
     },
+    // @rsc-labs/medusa-booking-system is installed but not used by any storefront
+    // or seller screen. Its public store routes ship with no customer
+    // authentication, no cart-ownership checks and no overlap checks (see
+    // docs/plan/APPOINTMENT_BOOKING_MODULE_PLAN3.md, section 2). Until they are
+    // deliberately adopted they are closed: bookings need a signed-in customer and
+    // the cart/resource routes answer 404.
+    {
+      matcher: "/store/bookings",
+      middlewares: [
+        authenticate("customer", ["bearer", "session"])
+      ]
+    },
+    ...[
+      "/store/booking-carts",
+      "/store/booking-carts/*",
+      "/store/booking-carts/:id/*",
+      "/store/booking-resources",
+      "/store/booking-resources/*",
+      "/store/booking-resources/:id/*",
+    ].map((matcher) => ({
+      matcher,
+      middlewares: [closedRoute],
+    })),
     {
       matcher: "/store/carts/:id/line-items/appointments",
       methods: ["POST"],
       middlewares: [
+        // Populates auth_context when a customer is signed in, so canUseCart can
+        // tell a customer's own cart from someone else's. Guests pass through.
+        appointmentReserveRateLimit,
+        authenticate("customer", ["bearer", "session"], {
+          allowUnauthenticated: true,
+        }),
         validateAndTransformBody(PostCartItemsAppointmentsBody)
       ]
     },
@@ -500,12 +563,59 @@ export default defineMiddlewares({
         validateAndTransformQuery(GetAvailableSlotsSchema, {})
       ]
     },
+    // ---- buyer appointment API (Plan 3, phase 7) ----
+    {
+      matcher: "/store/appointments/businesses",
+      methods: ["GET"],
+      middlewares: [validateAndTransformQuery(GetBusinessesSchema, {})],
+    },
+    {
+      matcher: "/store/appointments/businesses/:handle",
+      methods: ["GET"],
+      middlewares: [validateAndTransformQuery(GetBusinessSchema, {})],
+    },
+    {
+      matcher: "/store/appointments/products/:id",
+      methods: ["GET"],
+      middlewares: [validateAndTransformQuery(GetProductOfferSchema, {})],
+    },
+    {
+      matcher: "/store/appointments/resources/:id/slots",
+      methods: ["GET"],
+      middlewares: [validateAndTransformQuery(GetResourceSlotsSchema, {})],
+    },
+    {
+      matcher: "/store/appointments/my-bookings",
+      methods: ["GET"],
+      middlewares: [
+        authenticate("customer", ["bearer", "session"]),
+        validateAndTransformQuery(GetMyBookingsSchema, {}),
+      ],
+    },
+    // A booking is reachable by its signed-in customer, or by anyone holding its
+    // signed link (guests), so authentication is optional here; the handlers
+    // enforce who may touch which booking.
+    {
+      matcher: "/store/appointments/bookings/:id",
+      methods: ["GET"],
+      middlewares: [
+        authenticate("customer", ["bearer", "session"], { allowUnauthenticated: true }),
+      ],
+    },
+    {
+      matcher: "/store/appointments/bookings/:id/cancel",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["bearer", "session"], { allowUnauthenticated: true }),
+        validateAndTransformBody(PostBuyerCancelSchema),
+      ],
+    },
     {
       matcher: "/store/enquiries",
       methods: ["POST"],
       middlewares: [
-        validateAndTransformBody(PostStoreEnquirySchema)
         enquiryRateLimit,
+        validateAndTransformBody(PostStoreEnquirySchema)
       ]
     },
     {
@@ -970,11 +1080,29 @@ export default defineMiddlewares({
         validateAndTransformBody(AdminImportProducts)
       ]
     },
+    // Appointment settings of a product: same "setup approved" gate as the rest of
+    // the appointment features. It runs after the authenticate() entry above.
+    {
+      matcher: "/vendors/products/:id/appointment-config",
+      middlewares: [requireApprovedVendor],
+    },
+    {
+      matcher: "/vendors/products/:id/appointment-config",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostVendorAppointmentConfigSchema)],
+    },
     {
       matcher: "/vendors/products/:id/rental-config",
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(PostVendorRentalConfigSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/products/:id/variants/:variant_id/eoi-config",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorEoiConfigSchema)
       ]
     },
     // Explicit auth entry for /vendors/rentals/:id and its /deposit sub-route.
@@ -999,6 +1127,37 @@ export default defineMiddlewares({
         validateAndTransformBody(PostVendorRentalDepositBodySchema)
       ]
     },
+    // Appointment routes: explicit auth + the server-side "setup approved" gate.
+    // Each entry is listed explicitly rather than relying on "/vendors/*", whose
+    // own comments in this file disagree on whether it matches nested depths -
+    // every handler below reads req.auth_context.actor_id, which only
+    // authenticate() populates. The gate (requireApprovedVendor) must come after
+    // authenticate in the same entry.
+    ...[
+      "/vendors/providers/me",
+      "/vendors/providers/me/*",
+      "/vendors/resources",
+      "/vendors/resources/*",
+      "/vendors/resources/:id/*",
+      // Deep paths, listed explicitly: this file's own comments disagree on
+      // whether "*" matches more than one segment, and the approval gate must not
+      // be skipped on any of them.
+      "/vendors/resources/:id/hours/:ruleId",
+      "/vendors/resources/:id/exceptions/:exceptionId",
+      "/vendors/providers/me/recurring-availability/:id",
+      "/vendors/providers/me/exceptions/:id",
+      "/vendors/pricing-rules",
+      "/vendors/pricing-rules/*",
+      "/vendors/appointments",
+      "/vendors/appointments/*",
+      "/vendors/appointments/:id/*",
+    ].map((matcher) => ({
+      matcher,
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"]),
+        requireApprovedVendor,
+      ],
+    })),
     {
       matcher: "/vendors/providers/me",
       methods: ["POST"],
@@ -1027,11 +1186,122 @@ export default defineMiddlewares({
         validateAndTransformBody(PostVendorAppointmentSlotsSchema)
       ]
     },
+    // ---- multi-resource seller API (Plan 3, phase 4) ----
+    // Validation only; authentication and the approval gate are registered above.
+    {
+      matcher: "/vendors/resources",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostResourceSchema)],
+    },
+    {
+      matcher: "/vendors/resources/:id",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(UpdateResourceSchema)],
+    },
+    {
+      matcher: "/vendors/resources/:id/copy-settings",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(CopySettingsToSchema)],
+    },
+    {
+      matcher: "/vendors/resources/:id/hours",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostHoursSchema)],
+    },
+    {
+      matcher: "/vendors/resources/:id/hours/:ruleId",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(UpdateHoursSchema)],
+    },
+    {
+      matcher: "/vendors/resources/:id/exceptions/:exceptionId",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostExceptionSchema)],
+    },
+    {
+      matcher: "/vendors/resources/:id/exceptions",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostExceptionSchema)],
+    },
+    {
+      matcher: "/vendors/resources/:id/services",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostServicesSchema)],
+    },
+    {
+      matcher: "/vendors/resources/:id/slots-preview",
+      methods: ["GET"],
+      middlewares: [validateAndTransformQuery(GetSlotsPreviewSchema, {})],
+    },
+    {
+      matcher: "/vendors/pricing-rules",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostPricingRuleSchema)],
+    },
+    {
+      matcher: "/vendors/pricing-rules/preview",
+      methods: ["GET"],
+      middlewares: [validateAndTransformQuery(GetPricingPreviewSchema, {})],
+    },
+    {
+      matcher: "/vendors/pricing-rules/:id",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(UpdatePricingRuleSchema)],
+    },
+    {
+      matcher: "/vendors/appointments",
+      methods: ["GET"],
+      middlewares: [validateAndTransformQuery(GetVendorAppointmentsSchema, {})],
+    },
+    {
+      matcher: "/vendors/appointments",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(CreateManualAppointmentSchema)],
+    },
+    {
+      matcher: "/vendors/appointments/:id/cancel",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(CancelAppointmentSchema)],
+    },
+    // ---- admin oversight of resources (Plan 3, phase 8). /admin/* is already
+    // authenticated by the framework; these add validation only.
+    {
+      matcher: "/admin/providers",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostAdminResourceSchema)],
+    },
+    {
+      matcher: "/admin/providers/:id",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(UpdateResourceSchema)],
+    },
+    {
+      matcher: "/admin/providers/:id/services",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostServicesSchema)],
+    },
+    {
+      matcher: "/admin/providers/:id/slots-preview",
+      methods: ["GET"],
+      middlewares: [validateAndTransformQuery(GetSlotsPreviewSchema, {})],
+    },
+    {
+      matcher: "/admin/appointments/:id/cancel",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(CancelAppointmentSchema)],
+    },
     {
       matcher: "/admin/providers/:id/recurring-availability",
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(PostAdminRecurringAvailabilitySchema)
+      ]
+    },
+    {
+      matcher: "/admin/providers/:id/exceptions/:exceptionId",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostAdminAvailabilityExceptionSchema)
       ]
     },
     {
@@ -1046,6 +1316,13 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(PostAdminAppointmentSlotsSchema)
+      ]
+    },
+    {
+      matcher: "/admin/products/:id/appointment-config",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostAppointmentConfigBodySchema)
       ]
     },
     {
