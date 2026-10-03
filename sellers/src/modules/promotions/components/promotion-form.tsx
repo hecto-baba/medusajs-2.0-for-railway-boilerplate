@@ -11,9 +11,11 @@ import {
   type VendorPromotionRule,
 } from "@lib/data/vendor-client"
 import {
+  Badge,
   Button,
   Checkbox,
   Heading,
+  IconButton,
   Input,
   Label,
   ProgressTabs,
@@ -23,6 +25,7 @@ import {
   Text,
   toast,
 } from "@medusajs/ui"
+import { Plus, Trash } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -176,6 +179,13 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
     method?.apply_to_quantity?.toString() ?? "1"
   )
 
+  type EligibilityCondition = {
+    id: string
+    attribute: "customer_group_id" | "customer_id" | "customer_email" | "currency_code"
+    operator: "in" | "eq" | "not_in"
+    value: string
+  }
+
   const initialCustomerGroupRule = promotion?.rules?.find(
     (r) => r.attribute === "customer_group_id" || r.attribute === "customer_group"
   )
@@ -189,6 +199,29 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
         : [initialCustomerGroupRule.values as string]
       : []
   )
+  const [conditions, setConditions] = useState<EligibilityCondition[]>(() => {
+    if (initialCustomerGroupRule && initialCustomerGroupRule.values?.length) {
+      const vals = Array.isArray(initialCustomerGroupRule.values)
+        ? (initialCustomerGroupRule.values as string[])
+        : [initialCustomerGroupRule.values as string]
+      return [
+        {
+          id: "initial_1",
+          attribute: "customer_group_id",
+          operator: (initialCustomerGroupRule.operator as any) || "in",
+          value: vals[0] || "",
+        },
+      ]
+    }
+    return [
+      {
+        id: "default_1",
+        attribute: "customer_group_id",
+        operator: "in",
+        value: "",
+      },
+    ]
+  })
   const [customerGroupRuleId] = useState<string | undefined>(
     initialCustomerGroupRule?.id
   )
@@ -233,6 +266,14 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
     setApplyToQuantity("1")
     setEligibilityType("all")
     setSelectedCustomerGroupIds([])
+    setConditions([
+      {
+        id: "default_1",
+        attribute: "customer_group_id",
+        operator: "in",
+        value: "",
+      },
+    ])
   }
 
   const isFreeShipping = template.id === "free_shipping"
@@ -815,43 +856,225 @@ export const PromotionForm = ({ promotion }: PromotionFormProps) => {
               </RadioGroup>
 
               {eligibilityType === "groups" && (
-                <div className="flex flex-col gap-y-2">
-                  {isLoadingCustomerGroups ? (
-                    <Text size="small" className="text-ui-fg-subtle">
-                      Loading customer groups…
-                    </Text>
-                  ) : customerGroups.length === 0 ? (
-                    <Text size="small" className="text-ui-fg-subtle">
-                      You don&apos;t have any customer groups yet. Create one
-                      under Customers, or allow all customers.
-                    </Text>
-                  ) : (
-                    customerGroups.map((group) => {
-                      const checked = selectedCustomerGroupIds.includes(group.id)
-                      return (
-                        <label
-                          key={group.id}
-                          className="flex cursor-pointer items-center gap-x-3 rounded-md border border-ui-border-base bg-ui-bg-subtle px-3 py-2"
-                        >
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={(value) => {
-                              setSelectedCustomerGroupIds((current) =>
-                                value
-                                  ? current.includes(group.id)
-                                    ? current
-                                    : [...current, group.id]
-                                  : current.filter((id) => id !== group.id)
+                <div className="flex flex-col gap-y-4 pt-2">
+                  <div className="flex flex-col gap-y-3">
+                    {conditions.map((cond, index) => (
+                      <div key={cond.id} className="flex flex-col gap-y-2">
+                        {index > 0 && (
+                          <div className="flex items-center gap-x-2 py-1">
+                            <Badge size="2xsmall" color="grey" className="font-semibold uppercase tracking-wider">
+                              AND
+                            </Badge>
+                            <div className="h-px flex-1 bg-ui-border-base" />
+                          </div>
+                        )}
+                        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-ui-border-base bg-ui-bg-subtle p-3 sm:flex-nowrap">
+                          {/* Attribute */}
+                          <div className="flex min-w-[150px] flex-1 flex-col gap-y-1">
+                            <span className="text-[11px] font-medium text-ui-fg-muted uppercase tracking-wider">Attribute</span>
+                            <Select
+                              value={cond.attribute}
+                              onValueChange={(val) => {
+                                setConditions((prev) =>
+                                  prev.map((c) =>
+                                    c.id === cond.id
+                                      ? {
+                                          ...c,
+                                          attribute: val as EligibilityCondition["attribute"],
+                                          value: val === "customer_group_id" && customerGroups[0] ? customerGroups[0].id : "",
+                                        }
+                                      : c
+                                  )
+                                )
+                                if (val === "customer_group_id" && customerGroups[0]) {
+                                  setSelectedCustomerGroupIds((curr) =>
+                                    curr.includes(customerGroups[0].id) ? curr : [...curr, customerGroups[0].id]
+                                  )
+                                }
+                              }}
+                            >
+                              <Select.Trigger className="bg-ui-bg-base">
+                                <Select.Value />
+                              </Select.Trigger>
+                              <Select.Content>
+                                <Select.Item value="customer_group_id">Customer Group</Select.Item>
+                                <Select.Item value="customer_id">Customer ID</Select.Item>
+                                <Select.Item value="customer_email">Customer Email</Select.Item>
+                                <Select.Item value="currency_code">Currency Code</Select.Item>
+                              </Select.Content>
+                            </Select>
+                          </div>
+
+                          {/* Operator */}
+                          <div className="flex min-w-[120px] flex-1 flex-col gap-y-1">
+                            <span className="text-[11px] font-medium text-ui-fg-muted uppercase tracking-wider">Operator</span>
+                            <Select
+                              value={cond.operator}
+                              onValueChange={(val) => {
+                                setConditions((prev) =>
+                                  prev.map((c) =>
+                                    c.id === cond.id
+                                      ? { ...c, operator: val as EligibilityCondition["operator"] }
+                                      : c
+                                  )
+                                )
+                              }}
+                            >
+                              <Select.Trigger className="bg-ui-bg-base">
+                                <Select.Value />
+                              </Select.Trigger>
+                              <Select.Content>
+                                <Select.Item value="in">In</Select.Item>
+                                <Select.Item value="eq">Equals</Select.Item>
+                                <Select.Item value="not_in">Not In</Select.Item>
+                              </Select.Content>
+                            </Select>
+                          </div>
+
+                          {/* Value */}
+                          <div className="flex min-w-[200px] flex-[2] flex-col gap-y-1">
+                            <span className="text-[11px] font-medium text-ui-fg-muted uppercase tracking-wider">Value</span>
+                            {cond.attribute === "customer_group_id" ? (
+                              customerGroups.length > 0 ? (
+                                <Select
+                                  value={cond.value || (customerGroups[0]?.id ?? "")}
+                                  onValueChange={(val) => {
+                                    setConditions((prev) =>
+                                      prev.map((c) =>
+                                        c.id === cond.id ? { ...c, value: val } : c
+                                      )
+                                    )
+                                    setSelectedCustomerGroupIds((curr) =>
+                                      curr.includes(val) ? curr : [...curr, val]
+                                    )
+                                  }}
+                                >
+                                  <Select.Trigger className="bg-ui-bg-base">
+                                    <Select.Value />
+                                  </Select.Trigger>
+                                  <Select.Content>
+                                    {customerGroups.map((g) => (
+                                      <Select.Item key={g.id} value={g.id}>
+                                        {g.name}
+                                      </Select.Item>
+                                    ))}
+                                  </Select.Content>
+                                </Select>
+                              ) : (
+                                <Input
+                                  disabled
+                                  placeholder="No customer groups found"
+                                  className="bg-ui-bg-base"
+                                />
                               )
-                            }}
-                          />
-                          <span className="txt-compact-small text-ui-fg-base">
-                            {group.name}
-                          </span>
-                        </label>
-                      )
-                    })
-                  )}
+                            ) : (
+                              <Input
+                                placeholder={
+                                  cond.attribute === "customer_email"
+                                    ? "e.g. user@example.com"
+                                    : cond.attribute === "currency_code"
+                                    ? "e.g. usd"
+                                    : "e.g. cus_..."
+                                }
+                                value={cond.value}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  setConditions((prev) =>
+                                    prev.map((c) =>
+                                      c.id === cond.id ? { ...c, value: val } : c
+                                    )
+                                  )
+                                }}
+                                className="bg-ui-bg-base"
+                              />
+                            )}
+                          </div>
+
+                          {/* Delete condition */}
+                          {conditions.length > 1 && (
+                            <div className="flex self-end pb-0.5">
+                              <IconButton
+                                type="button"
+                                variant="transparent"
+                                size="small"
+                                onClick={() => {
+                                  setConditions((prev) => prev.filter((c) => c.id !== cond.id))
+                                }}
+                              >
+                                <Trash className="text-ui-fg-subtle" />
+                              </IconButton>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-ui-border-base pt-3">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="small"
+                      onClick={() => {
+                        setConditions((prev) => [
+                          ...prev,
+                          {
+                            id: `condition_${Date.now()}`,
+                            attribute: "customer_group_id",
+                            operator: "in",
+                            value: customerGroups[0]?.id ?? "",
+                          },
+                        ])
+                      }}
+                    >
+                      <Plus className="mr-1" />
+                      Add condition
+                    </Button>
+                  </div>
+
+                  {/* Customer Groups Quick Picker */}
+                  <div className="mt-2 flex flex-col gap-y-2 border-t border-ui-border-base pt-3">
+                    <Label size="xsmall" weight="plus" className="text-ui-fg-muted uppercase">
+                      Select Customer Groups
+                    </Label>
+                    {isLoadingCustomerGroups ? (
+                      <Text size="small" className="text-ui-fg-subtle">
+                        Loading customer groups…
+                      </Text>
+                    ) : customerGroups.length === 0 ? (
+                      <Text size="small" className="text-ui-fg-subtle">
+                        You don&apos;t have any customer groups yet. Create one under Customers, or allow all customers.
+                      </Text>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {customerGroups.map((group) => {
+                          const checked = selectedCustomerGroupIds.includes(group.id)
+                          return (
+                            <label
+                              key={group.id}
+                              className="flex cursor-pointer items-center gap-x-3 rounded-md border border-ui-border-base bg-ui-bg-subtle px-3 py-2"
+                            >
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(value) => {
+                                  setSelectedCustomerGroupIds((current) =>
+                                    value
+                                      ? current.includes(group.id)
+                                        ? current
+                                        : [...current, group.id]
+                                      : current.filter((id) => id !== group.id)
+                                  )
+                                }}
+                              />
+                              <span className="txt-compact-small text-ui-fg-base">
+                                {group.name}
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </Card>

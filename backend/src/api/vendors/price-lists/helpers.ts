@@ -1,6 +1,6 @@
 import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
-import { getVendorId } from "../shared/vendor-scope"
+import { getVendorId, resolveVendorAdmin } from "../shared/vendor-scope"
 import { getVendorCustomerGroupIds } from "../customers/helpers"
 
 // Single source of truth lives in shared/vendor-scope.ts; re-exported so
@@ -14,15 +14,10 @@ export { getVendorId }
 export const getVendorPriceListIds = async (
   req: AuthenticatedMedusaRequest
 ): Promise<string[]> => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id", "vendor.price_lists.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, [
+    "vendor.id",
+    "vendor.price_lists.id",
+  ])
 
   if (!vendorAdmin?.vendor) {
     throw new MedusaError(

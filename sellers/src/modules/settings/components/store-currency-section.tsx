@@ -136,20 +136,10 @@ export const StoreCurrencySection = () => {
                 onClick={() => setAddModalOpen(true)}
               >
                 <Plus className="text-ui-fg-subtle" />
-                Add
+                Add Currency
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu>
-
-          <Button
-            size="small"
-            variant="secondary"
-            className="flex items-center gap-x-1.5"
-            onClick={() => setAddModalOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-            Add Currency
-          </Button>
         </div>
       </div>
 

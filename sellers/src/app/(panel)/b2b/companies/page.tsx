@@ -215,6 +215,24 @@ export default function CompaniesPage() {
                   />
                 </div>
                 <div>
+                  <Label className="text-xs font-semibold">State / Region</Label>
+                  <Input
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    placeholder="NY"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-semibold">Postal Code</Label>
+                  <Input
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value)}
+                    placeholder="10001"
+                  />
+                </div>
+                <div>
                   <Label className="text-xs font-semibold">Country Code</Label>
                   <Input
                     value={countryCode}
@@ -452,6 +470,16 @@ export default function CompaniesPage() {
               <div>
                 <Label className="text-xs font-semibold">City</Label>
                 <Input value={city} onChange={(e) => setCity(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold">State / Region</Label>
+                <Input value={state} onChange={(e) => setState(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs font-semibold">Postal Code</Label>
+                <Input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
               </div>
               <div>
                 <Label className="text-xs font-semibold">Country Code</Label>

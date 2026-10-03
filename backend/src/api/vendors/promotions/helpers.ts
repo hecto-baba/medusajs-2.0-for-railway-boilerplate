@@ -1,5 +1,9 @@
 import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
+import { getVendorCustomerGroupIds } from "../customers/helpers"
+import { getVendorId, resolveVendorAdmin } from "../shared/vendor-scope"
+
+export { getVendorId }
 
 /**
  * Confirms the promotion behind a URL id belongs to the calling vendor.
@@ -11,18 +15,10 @@ export const assertOwnership = async (
   req: AuthenticatedMedusaRequest,
   promotionId: string
 ): Promise<void> => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.promotions.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, ["vendor.promotions.id"])
 
   const owns = vendorAdmin?.vendor?.promotions?.some(
-    (promotion) => promotion?.id === promotionId
+    (promotion: any) => promotion?.id === promotionId
   )
 
   if (!owns) {
@@ -93,18 +89,10 @@ export const assertProductIdsBelongToVendor = async (
     return
   }
 
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.products.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, ["vendor.products.id"])
 
   const ownedIds = new Set(
-    vendorAdmin?.vendor?.products?.map((product) => product?.id).filter(Boolean) ?? []
+    vendorAdmin?.vendor?.products?.map((product: any) => product?.id).filter(Boolean) ?? []
   )
 
   const foreignId = productIds.find((id) => !ownedIds.has(id))
@@ -116,13 +104,6 @@ export const assertProductIdsBelongToVendor = async (
     )
   }
 }
-
-import { getVendorCustomerGroupIds } from "../customers/helpers"
-import { getVendorId } from "../shared/vendor-scope"
-
-// Single source of truth lives in shared/vendor-scope.ts; re-exported so
-// existing imports from this file keep working.
-export { getVendorId }
 
 export const assertEligibilityRulesBelongToVendor = async (
   req: AuthenticatedMedusaRequest,
@@ -220,18 +201,10 @@ export const assertCampaignBelongsToVendor = async (
     return
   }
 
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.campaigns.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, ["vendor.campaigns.id"])
 
   const owns = vendorAdmin?.vendor?.campaigns?.some(
-    (campaign) => campaign?.id === campaignId
+    (campaign: any) => campaign?.id === campaignId
   )
 
   if (!owns) {
@@ -321,14 +294,7 @@ export const assertPromotionsBelongToVendor = async (
     return
   }
 
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.promotions.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, ["vendor.promotions.id"])
 
   const own = new Set(((vendorAdmin?.vendor as any)?.promotions ?? []).map((promotion: any) => promotion?.id))
 
