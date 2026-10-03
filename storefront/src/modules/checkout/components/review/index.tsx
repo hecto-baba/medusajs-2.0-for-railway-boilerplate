@@ -5,7 +5,7 @@ import { Heading, Text, clx } from "@medusajs/ui"
 import PaymentButton from "../payment-button"
 import { useSearchParams } from "next/navigation"
 import { getStoreName } from "@lib/util/env"
-import { isTicketLineItem } from "types/ticket"
+import { isNoShippingCart } from "types/appointment"
 
 const Review = ({ cart }: { cart: any }) => {
   const searchParams = useSearchParams()
@@ -18,10 +18,8 @@ const Review = ({ cart }: { cart: any }) => {
   // A ticket-only cart never gets a shipping method, because its variants
   // require no shipping and the checkout skips that step. Requiring one here
   // would leave such a cart permanently one step short of reviewable.
-  const items = cart?.items ?? []
-  const isTicketsOnly =
-    items.length > 0 &&
-    items.every((item: any) => isTicketLineItem(item.metadata))
+  // Appointments are the same: they require no shipping either.
+  const isTicketsOnly = isNoShippingCart(cart?.items)
 
   const previousStepsCompleted =
     cart.shipping_address &&

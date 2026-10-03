@@ -26,12 +26,14 @@ const SideMenuGroups: SideMenuGroup[] = [
       { name: "Store", href: "/store" },
       { name: "Digital Products", href: "/digital-products" },
       { name: "Restaurants", href: "/restaurants" },
+      { name: "Book an appointment", href: "/book" },
     ],
   },
   {
     title: "Account",
     items: [
       { name: "Account", href: "/account" },
+      { name: "My bookings", href: "/appointments/my" },
       { name: "My Digital Library", href: "/account/digital-products" },
     ],
   },

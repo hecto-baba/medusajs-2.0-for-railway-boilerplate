@@ -76,8 +76,8 @@ const TicketAddresses = ({
 
           <div className="pb-8">
             <Text className="txt-medium-plus text-ui-fg-subtle mb-6">
-              Your tickets are sent by email, so we only need your billing
-              details.
+              Your tickets and booking confirmations are sent by email, so we
+              only need your billing details.
             </Text>
 
             <BillingAddress cart={cart} />
@@ -96,7 +96,8 @@ const TicketAddresses = ({
                 data-testid="ticket-email-input"
               />
               <Text className="txt-small text-ui-fg-subtle mt-2">
-                We will send your tickets to this address.
+                We will send your tickets or booking confirmation to this
+                address.
               </Text>
             </div>
 

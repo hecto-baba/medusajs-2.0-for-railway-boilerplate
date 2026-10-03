@@ -10,7 +10,7 @@ import Spinner from "@modules/common/icons/spinner"
 import { placeOrder } from "@lib/data/cart"
 import { HttpTypes } from "@medusajs/types"
 import { isManual, isPaypal, isStripe } from "@lib/constants"
-import { isTicketLineItem } from "types/ticket"
+import { isNoShippingCart } from "types/appointment"
 import { B2BApprovalButton } from "../b2b-approval-button"
 
 type PaymentButtonProps = {
@@ -22,12 +22,9 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
   cart,
   "data-testid": dataTestId,
 }) => {
-  // Tickets require no shipping, so a ticket-only cart legitimately has no
-  // shipping method and must not be held back by that check.
-  const items = cart?.items ?? []
-  const isTicketsOnly =
-    items.length > 0 &&
-    items.every((item: any) => isTicketLineItem(item.metadata))
+  // Tickets and appointments require no shipping, so a cart of only those
+  // legitimately has no shipping method and must not be held back by that check.
+  const isTicketsOnly = isNoShippingCart(cart?.items as any)
 
   const notReady =
     !cart ||

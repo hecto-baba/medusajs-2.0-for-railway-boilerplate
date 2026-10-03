@@ -67,6 +67,22 @@ export default async function Nav() {
               >
                 Restaurants
               </LocalizedClientLink>
+              <LocalizedClientLink
+                className="hover:text-ui-fg-base"
+                href="/book"
+                data-testid="nav-book-link"
+              >
+                Book
+              </LocalizedClientLink>
+              {customer && (
+                <LocalizedClientLink
+                  className="hover:text-ui-fg-base"
+                  href="/appointments/my"
+                  data-testid="nav-my-bookings-link"
+                >
+                  My bookings
+                </LocalizedClientLink>
+              )}
               {isSearchEnabled() && (
                 <LocalizedClientLink
                   className="hover:text-ui-fg-base"

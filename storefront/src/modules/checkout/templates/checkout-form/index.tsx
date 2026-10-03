@@ -6,7 +6,7 @@ import Payment from "@modules/checkout/components/payment"
 import Review from "@modules/checkout/components/review"
 import Shipping from "@modules/checkout/components/shipping"
 import TicketAddresses from "@modules/checkout/components/ticket-addresses"
-import { isTicketLineItem } from "types/ticket"
+import { isNoShippingCart } from "types/appointment"
 
 export default async function CheckoutForm({
   cart,
@@ -26,9 +26,11 @@ export default async function CheckoutForm({
   // Deliberately "every item is a ticket" rather than "any item is": a cart
   // mixing tickets with a physical product still has to be shipped, and must
   // keep the full checkout.
-  const items = cart.items ?? []
-  const isTicketsOnly =
-    items.length > 0 && items.every((item) => isTicketLineItem(item.metadata))
+  //
+  // Appointments are the same: they are created with requires_shipping false and
+  // are confirmed by email, so a cart of tickets and/or appointments collects a
+  // billing address only.
+  const isTicketsOnly = isNoShippingCart(cart.items)
 
   const paymentMethods = await listCartPaymentMethods(cart.region?.id ?? "")
 

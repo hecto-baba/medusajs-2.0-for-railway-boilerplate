@@ -14,7 +14,7 @@ import PaymentContainer from "@modules/checkout/components/payment-container"
 import { isStripe as isStripeFunc, paymentInfoMap } from "@lib/constants"
 import { StripeContext } from "@modules/checkout/components/payment-wrapper"
 import { initiatePaymentSession } from "@lib/data/cart"
-import { isTicketLineItem } from "types/ticket"
+import { isNoShippingCart } from "types/appointment"
 
 const Payment = ({
   cart,
@@ -49,10 +49,8 @@ const Payment = ({
 
   // Tickets require no shipping, so a ticket-only cart has no shipping method
   // and would otherwise never count as ready to pay.
-  const items = cart?.items ?? []
-  const isTicketsOnly =
-    items.length > 0 &&
-    items.every((item: any) => isTicketLineItem(item.metadata))
+  // Appointments are the same: they require no shipping either.
+  const isTicketsOnly = isNoShippingCart(cart?.items)
 
   const paymentReady =
     (activeSession && (isTicketsOnly || cart?.shipping_methods.length !== 0)) ||

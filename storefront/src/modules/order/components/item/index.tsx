@@ -4,6 +4,7 @@ import { Table, Text } from "@medusajs/ui"
 import LineItemOptions from "@modules/common/components/line-item-options"
 import LineItemRentalDates from "@modules/common/components/line-item-rental-dates"
 import LineItemSeatInfo from "@modules/common/components/line-item-seat-info"
+import LineItemAppointmentInfo from "@modules/common/components/line-item-appointment-info"
 import LineItemPrice from "@modules/common/components/line-item-price"
 import LineItemUnitPrice from "@modules/common/components/line-item-unit-price"
 import Thumbnail from "@modules/products/components/thumbnail"
@@ -67,6 +68,10 @@ const Item = ({ item }: ItemProps) => {
         <LineItemSeatInfo
           metadata={item.metadata}
           data-testid="product-seat-info"
+        />
+        <LineItemAppointmentInfo
+          metadata={item.metadata}
+          data-testid="product-appointment-info"
         />
       </Table.Cell>
 

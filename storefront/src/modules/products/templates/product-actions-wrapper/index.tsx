@@ -1,6 +1,8 @@
 import { getProductsById } from "@lib/data/products"
+import { getProductAppointmentOffer } from "@lib/data/appointments"
 import { getTicketProductAvailability } from "@lib/data/tickets"
 import { HttpTypes } from "@medusajs/types"
+import BookingPanel from "@modules/appointments/components/booking-panel"
 import ProductActions from "@modules/products/components/product-actions"
 import SeatSelector from "@modules/products/components/seat-selector"
 import { Text } from "@medusajs/ui"
@@ -15,10 +17,14 @@ export default async function ProductActionsWrapper({
   id: string
   region: HttpTypes.StoreRegion
 }) {
-  const [product] = await getProductsById({
-    ids: [id],
-    regionId: region.id,
-  })
+  // Each lookup hits the backend (and its database) separately, so run them
+  // together rather than one after another. A failed lookup resolves to null
+  // and the page falls through to the normal flow.
+  const [[product], ticketAvailability, appointmentOffer] = await Promise.all([
+    getProductsById({ ids: [id], regionId: region.id }),
+    getTicketProductAvailability(id),
+    getProductAppointmentOffer(id, region.id),
+  ])
 
   if (!product) {
     return null
@@ -27,7 +33,6 @@ export default async function ProductActionsWrapper({
   // A show is bought by seat, not by variant, so it replaces the standard
   // actions entirely. Any other product returns no availability here and
   // falls through to the normal flow.
-  const ticketAvailability = await getTicketProductAvailability(id)
 
   if (ticketAvailability?.availability?.length) {
     const { venue } = ticketAvailability.ticket_product
@@ -49,6 +54,29 @@ export default async function ProductActionsWrapper({
           productId={id}
           availability={ticketAvailability.availability}
         />
+      </div>
+    )
+  }
+
+  // An appointment is booked (who, day, time), not added to the cart as an item,
+  // so a bookable product replaces the standard actions. Anything else - including
+  // a service nobody can currently be booked for - keeps the normal flow.
+  if (appointmentOffer?.bookable && appointmentOffer.resources.length) {
+    return <BookingPanel offer={appointmentOffer} />
+  }
+
+  // A service nobody can be booked for right now must not become a plain
+  // "Add to cart": it would be bought with no person and no time.
+  if (appointmentOffer?.is_appointment) {
+    return (
+      <div
+        className="border-ui-border-base rounded-xl border p-5"
+        data-testid="appointment-unavailable"
+      >
+        <Text className="text-ui-fg-base font-medium">Not taking bookings right now</Text>
+        <Text className="text-ui-fg-subtle text-small-regular mt-1">
+          There are no times available for this service at the moment. Please check back soon.
+        </Text>
       </div>
     )
   }

@@ -10,6 +10,8 @@ import DeleteButton from "@modules/common/components/delete-button"
 import LineItemOptions from "@modules/common/components/line-item-options"
 import LineItemRentalDates from "@modules/common/components/line-item-rental-dates"
 import LineItemSeatInfo from "@modules/common/components/line-item-seat-info"
+import LineItemAppointmentInfo from "@modules/common/components/line-item-appointment-info"
+import { isAppointmentLineItem } from "types/appointment"
 import { isTicketLineItem } from "types/ticket"
 import LineItemPrice from "@modules/common/components/line-item-price"
 import LineItemUnitPrice from "@modules/common/components/line-item-unit-price"
@@ -32,7 +34,10 @@ const Item = ({ item, type = "full" }: ItemProps) => {
 
   const { handle } = item.variant?.product ?? {}
 
-  const isTicket = isTicketLineItem(item.metadata)
+  // A ticket is one seat and an appointment is one booking: neither has a
+  // quantity to choose (the backend fixes both at 1).
+  const isTicket =
+    isTicketLineItem(item.metadata) || isAppointmentLineItem(item.metadata)
   const isDeposit = !!item.metadata?.is_rental_deposit
 
   const [localQty, setLocalQty] = useState<string>(String(item.quantity))
@@ -145,6 +150,11 @@ const Item = ({ item, type = "full" }: ItemProps) => {
         <LineItemSeatInfo
           metadata={item.metadata}
           data-testid="product-seat-info"
+        />
+        <LineItemAppointmentInfo
+          metadata={item.metadata}
+          showHold={type === "full"}
+          data-testid="product-appointment-info"
         />
         {typeof item.metadata?.restaurant_name === "string" && (
           <Text className="txt-compact-xsmall text-ui-fg-subtle mt-0.5">
