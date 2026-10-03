@@ -4,6 +4,12 @@ import { NextRequest, NextResponse } from "next/server"
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
 
+// Reads are retried by the user and by polling, so they fail fast. Writes and
+// uploads get far longer: an abort mid-write can leave the change applied on the
+// backend while the seller is told it failed.
+const READ_TIMEOUT_MS = 15_000
+const WRITE_TIMEOUT_MS = 120_000
+
 /**
  * Same-origin proxy for the backend's /vendors/* routes.
  *
@@ -40,26 +46,57 @@ const forward = async (
   const isJson = contentType.includes("application/json")
   const hasBody = method === "POST" || method === "PATCH"
 
-  const res = await fetch(url, {
-    method,
-    headers: {
-      authorization: `Bearer ${token}`,
-      ...(hasBody ? { "content-type": contentType } : {}),
-    },
-    ...(hasBody
-      ? { body: isJson ? await req.text() : await req.arrayBuffer() }
-      : {}),
-    cache: "no-store",
-  })
+  // Read the client's body before contacting the backend, so a malformed
+  // upload is not reported as a backend failure.
+  const requestBody = hasBody
+    ? isJson
+      ? await req.text()
+      : await req.arrayBuffer()
+    : undefined
 
-  const body = await res.text()
+  let status: number
+  let body: string
+  let upstreamContentType: string | null
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(hasBody ? { "content-type": contentType } : {}),
+      },
+      ...(hasBody ? { body: requestBody } : {}),
+      cache: "no-store",
+      // A hung backend would otherwise leave the page spinning indefinitely.
+      signal: AbortSignal.timeout(hasBody ? WRITE_TIMEOUT_MS : READ_TIMEOUT_MS),
+    })
+
+    // The signal also covers reading the body, so it is read inside the try.
+    status = res.status
+    upstreamContentType = res.headers.get("content-type")
+    body = await res.text()
+  } catch (error) {
+    // Connection refused / reset / timeout: answer with a clear gateway error
+    // rather than letting Next.js log a stack trace and return an opaque 500.
+    const timedOut = error instanceof Error && error.name === "TimeoutError"
+    return NextResponse.json(
+      {
+        message: timedOut
+          ? hasBody
+            ? "The store backend took too long to respond. Your change may still have been saved - refresh before trying again."
+            : "The store backend took too long to respond."
+          : "The store backend is unreachable.",
+      },
+      { status: timedOut ? 504 : 502 }
+    )
+  }
 
   // The backend's status and body are passed through unchanged so the client
   // sees the real error rather than a generic proxy failure.
   return new NextResponse(body, {
-    status: res.status,
+    status,
     headers: {
-      "content-type": res.headers.get("content-type") ?? "application/json",
+      "content-type": upstreamContentType ?? "application/json",
     },
   })
 }

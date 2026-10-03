@@ -2,6 +2,7 @@
 
 import { sdk } from "@lib/config"
 import { revalidatePath } from "next/cache"
+import { cache } from "react"
 import { redirect } from "next/navigation"
 import {
   getVendorAuthHeaders,
@@ -230,6 +231,13 @@ export async function vendorLogout() {
  * check that outlives the session it is meant to prove.
  */
 export async function getVendorSession(): Promise<VendorAdmin | null> {
+  return readVendorSession()
+}
+
+// React's cache() dedupes within a single server render only, so the panel
+// layout and the page it wraps share one /vendors/me round trip instead of
+// making two. It never outlives the request, so the "uncached" rule above holds.
+const readVendorSession = cache(async (): Promise<VendorAdmin | null> => {
   const token = await getVendorToken()
 
   if (!token) {
@@ -251,7 +259,7 @@ export async function getVendorSession(): Promise<VendorAdmin | null> {
     // session at all so the caller sends the visitor back to sign in.
     return null
   }
-}
+})
 
 export type SettingsFormState = {
   error: string | null
