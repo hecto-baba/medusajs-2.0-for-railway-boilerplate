@@ -201,6 +201,9 @@ export async function vendorLogin(
   }
 
   // Verify that this account has an active store associated with it
+  let verificationFailed = false
+  let verificationError: any = null
+
   try {
     const { vendor_admin } = await sdk.client.fetch<{
       vendor_admin: VendorAdmin
@@ -211,14 +214,17 @@ export async function vendorLogin(
     })
 
     if (!vendor_admin) {
-      await removeVendorAuthToken()
-      return "This account does not have a store associated with it yet. Please sign up to create your store."
+      verificationFailed = true
     }
   } catch (err: any) {
-    const errorMsg = toMessage(err, "")
-    console.error("[vendorLogin] Session verification failed:", errorMsg, err)
+    verificationFailed = true
+    verificationError = err
+    console.error("[vendorLogin] Session verification failed:", toMessage(err, ""), err)
+  }
 
+  if (verificationFailed) {
     // Decode token payload to inspect if a valid vendor exists in app_metadata/actor
+    let hasRecoverableClaim = false
     try {
       const payloadBase64 = token.split(".")[1]
       if (payloadBase64) {
@@ -227,17 +233,22 @@ export async function vendorLogin(
         )
         const vendorId = payload?.app_metadata?.vendor_id || payload?.actor_id
         if (vendorId) {
-          // Valid vendor token issued; allow session to proceed
+          hasRecoverableClaim = true
           console.log("[vendorLogin] Recovered session from token claims:", vendorId)
-          redirect("/dashboard")
         }
       }
     } catch (decodeErr) {
       console.error("[vendorLogin] Token decode error:", decodeErr)
     }
 
+    if (hasRecoverableClaim) {
+      // Valid vendor token issued; allow session to proceed to dashboard
+      redirect("/dashboard")
+    }
+
     await removeVendorAuthToken()
-    if (errorMsg.includes("No vendor admin found") || err?.status === 404) {
+    const errorMsg = toMessage(verificationError, "")
+    if (errorMsg.includes("No vendor admin found") || verificationError?.status === 404 || !verificationError) {
       return "This account does not have a store associated with it yet. Please sign up to create your store."
     }
     return errorMsg || "Could not verify your store session. Please try again."
@@ -269,7 +280,7 @@ export async function getVendorSession(): Promise<VendorAdmin | null> {
       vendor_admin: VendorAdmin
     }>("/vendors/me", {
       method: "GET",
-      headers: { ...(await getVendorAuthHeaders()) },
+      headers: { authorization: `Bearer ${token}` },
       cache: "no-store",
     })
 

@@ -64,15 +64,45 @@ export const resolveVendorAdmin = async (
     }
   }
 
-  // 3. Fallback: resolve from auth_identity email
+  // 3. Fallback: resolve from auth_identity app_metadata or email
   if (req.auth_context?.auth_identity_id) {
     const {
       data: [authIdentity],
     } = await query.graph({
       entity: "auth_identity",
-      fields: ["provider_identities.*"],
+      fields: ["app_metadata", "provider_identities.*"],
       filters: { id: [req.auth_context.auth_identity_id] },
-    }).catch(() => ({ data: [] }))
+    }).catch((err: any) => {
+      console.warn("[resolveVendorAdmin] query auth_identity failed:", err?.message || err)
+      return { data: [] }
+    })
+
+    const vendorAdminId = (authIdentity?.app_metadata as Record<string, any> | undefined)?.vendor_id
+    if (vendorAdminId) {
+      const {
+        data: [byAppMetadataAdmin],
+      } = await query.graph({
+        entity: "vendor_admin",
+        fields,
+        filters: { id: [vendorAdminId] },
+      }).catch(() => ({ data: [] }))
+
+      if (byAppMetadataAdmin) {
+        return byAppMetadataAdmin
+      }
+
+      const {
+        data: [byAppMetadataVendor],
+      } = await query.graph({
+        entity: "vendor_admin",
+        fields,
+        filters: { vendor_id: [vendorAdminId] },
+      }).catch(() => ({ data: [] }))
+
+      if (byAppMetadataVendor) {
+        return byAppMetadataVendor
+      }
+    }
 
     const email = authIdentity?.provider_identities?.[0]?.entity_id
     if (email) {
@@ -82,7 +112,10 @@ export const resolveVendorAdmin = async (
         entity: "vendor_admin",
         fields,
         filters: { email: [email] },
-      }).catch(() => ({ data: [] }))
+      }).catch((err: any) => {
+        console.warn("[resolveVendorAdmin] query by email failed:", err?.message || err)
+        return { data: [] }
+      })
 
       if (byEmail) {
         return byEmail
