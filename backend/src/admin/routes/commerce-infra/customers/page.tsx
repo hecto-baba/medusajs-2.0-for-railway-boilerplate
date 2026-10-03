@@ -37,7 +37,7 @@ const CommerceCustomersPage = () => {
 
 export const config = defineRouteConfig({
   label: "Customers",
-  rank: 4,
+  rank: 8,
 })
 
 export default CommerceCustomersPage

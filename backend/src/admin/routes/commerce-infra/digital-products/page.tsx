@@ -3,7 +3,7 @@ import DigitalProductsPage from "../../digital-products/page"
 
 export const config = defineRouteConfig({
   label: "Digital Products",
-  rank: 7,
+  rank: 13,
 })
 
 export default DigitalProductsPage
