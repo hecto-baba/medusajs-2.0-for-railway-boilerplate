@@ -76,7 +76,17 @@ const NAV_ITEMS: NavItem[] = [
   },
   { href: "/venues", label: "Venues", icon: Buildings },
   { href: "/shows", label: "Shows", icon: Calendar },
-  { href: "/my-schedule", label: "My Schedule", icon: Calendar },
+  {
+    href: "/appointments",
+    label: "Booking",
+    icon: Calendar,
+    items: [
+      { href: "/appointments", label: "Overview" },
+      { href: "/appointments/resources", label: "Resources" },
+      { href: "/appointments/pricing-rules", label: "Pricing Rules" },
+      { href: "/appointments/bookings", label: "Bookings" },
+    ],
+  },
 ]
 
 type SidebarProps = {
@@ -130,6 +140,7 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
     "/inventory": true,
     "/customers": true,
     "/promotions": true,
+    "/appointments": true,
   })
 
   // Automatically keep parent expanded if child route is active
@@ -203,6 +214,8 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
                         ? pathname === "/promotions" ||
                           (pathname.startsWith("/promotions/") &&
                             !pathname.startsWith("/promotions/campaigns"))
+                        : item.href === "/appointments"
+                        ? pathname === "/appointments"
                         : pathname.startsWith(item.href)
 
                     const isSectionActive =

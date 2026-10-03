@@ -6,6 +6,7 @@ import {
   listVendorProductTags,
   listVendorProductTypes,
   listVendorSalesChannels,
+  type ListResponse,
   type VendorProduct,
 } from "@lib/data/vendor-client"
 import {
@@ -25,7 +26,7 @@ import {
 } from "@medusajs/ui"
 import { Plus } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import Link from "next/link"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import {
@@ -36,7 +37,17 @@ import {
 } from "@modules/common"
 import { ProductExportButton } from "./product-export-button"
 import { ProductImportModal } from "./product-import-modal"
-import { AddProductModal } from "./add-product-modal"
+
+// Only mounted after "Add Product" is clicked, so keep it (and its drag-and-drop
+// dependencies) out of the initial list-page bundle.
+const ProductCreateFlow = dynamic(() =>
+  import("./product-create-flow").then((m) => m.ProductCreateFlow)
+)
+
+// Types, tags and sales channels rarely change while a seller is on this page, so
+// the filter menus reuse them for 5 minutes instead of refetching all three lists
+// on every visit (the app-wide default is 30s).
+const FILTER_OPTIONS_STALE_MS = 5 * 60_000
 
 const columnHelper = createDataTableColumnHelper<VendorProduct>()
 const filterHelper = createDataTableFilterHelper<VendorProduct>()
@@ -154,8 +165,14 @@ const useColumns = (onDelete: (product: VendorProduct) => void) => [
   }),
 ]
 
-export const ProductsTable = () => {
+export const ProductsTable = ({
+  initialData,
+}: {
+  /** First page (20, unfiltered) read on the server; null falls back to a client fetch. */
+  initialData?: ListResponse<{ products: VendorProduct[] }> | null
+}) => {
   const router = useRouter()
+  const [creating, setCreating] = useState(false)
   const queryClient = useQueryClient()
   const prompt = usePrompt()
 
@@ -172,20 +189,22 @@ export const ProductsTable = () => {
 
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
-  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false)
 
   // Fetch filter options
   const { data: typesData } = useQuery({
     queryKey: ["vendor-types-filter"],
     queryFn: () => listVendorProductTypes({ limit: 100, offset: 0 }),
+    staleTime: FILTER_OPTIONS_STALE_MS,
   })
   const { data: tagsData } = useQuery({
     queryKey: ["vendor-tags-filter"],
     queryFn: () => listVendorProductTags({ limit: 100, offset: 0 }),
+    staleTime: FILTER_OPTIONS_STALE_MS,
   })
   const { data: salesChannelsData } = useQuery({
     queryKey: ["vendor-channels-filter"],
     queryFn: () => listVendorSalesChannels({ limit: 100, offset: 0 }),
+    staleTime: FILTER_OPTIONS_STALE_MS,
   })
 
   // Dynamic filter definitions
@@ -286,6 +305,19 @@ export const ProductsTable = () => {
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
+  const isOpeningView =
+    limit === 20 &&
+    offset === 0 &&
+    !search &&
+    !status?.length &&
+    !order &&
+    !collectionId &&
+    !typeId &&
+    !tagId &&
+    !salesChannelId &&
+    !createdAtGte &&
+    !updatedAtGte
+
   const { data, isLoading } = useQuery({
     queryKey: [
       "vendor-products",
@@ -316,6 +348,9 @@ export const ProductsTable = () => {
         updated_at_gte: updatedAtGte,
       }),
     placeholderData: (previous) => previous,
+    // The server-rendered page only matches the table's opening view: first
+    // page, default size, no search, filters or sort. Any other key fetches.
+    initialData: isOpeningView ? initialData ?? undefined : undefined,
   })
 
   const { mutateAsync: remove } = useMutation({
@@ -459,8 +494,8 @@ export const ProductsTable = () => {
             <Button
               size="small"
               variant="primary"
-              onClick={() => setIsAddProductModalOpen(true)}
               className="gap-x-1.5"
+              onClick={() => setCreating(true)}
             >
               <Plus className="size-4" />
               <span>Add Product</span>
@@ -472,7 +507,7 @@ export const ProductsTable = () => {
           emptyState={{
             empty: {
               heading: "No products yet",
-              description: "Browse the Master Catalog or create your first custom product.",
+              description: "Create your first product to get started.",
             },
             filtered: {
               heading: "No matches",
@@ -486,10 +521,9 @@ export const ProductsTable = () => {
         />
       </DataTable>
 
-      <AddProductModal
-        open={isAddProductModalOpen}
-        onOpenChange={setIsAddProductModalOpen}
-      />
+      {creating ? (
+        <ProductCreateFlow open onClose={() => setCreating(false)} />
+      ) : null}
     </>
   )
 }

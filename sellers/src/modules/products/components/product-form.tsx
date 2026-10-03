@@ -4,6 +4,7 @@ import {
   createVendorProduct,
   createVendorProductTag,
   createVendorProductType,
+  getVendorTaxonomy,
   listVendorCollections,
   listVendorProductTags,
   listVendorProductTypes,
@@ -38,8 +39,6 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { PriceFields } from "./detail/variant-drawer"
-import { TrustClawCategoryPicker } from "./detail/trustclaw-category-picker"
-import { TrustClawAttributesSection } from "./detail/trustclaw-attributes-section"
 
 type ProductFormProps = {
   product?: VendorProduct
@@ -198,6 +197,12 @@ export const ProductForm = ({ product }: ProductFormProps) => {
   )
 
   // Fetch organize datasets
+  const { data: taxonomyData } = useQuery({
+    queryKey: ["vendor-taxonomy"],
+    queryFn: getVendorTaxonomy,
+    staleTime: 5 * 60 * 1000,
+  })
+  const categoryOptions = taxonomyData?.categories ?? []
   const { data: typesData } = useQuery({
     queryKey: ["vendor-product-types"],
     queryFn: () => listVendorProductTypes({ limit: 100, offset: 0 }),
@@ -372,6 +377,17 @@ export const ProductForm = ({ product }: ProductFormProps) => {
 
   const { mutateAsync: save, isPending } = useMutation({
     mutationFn: async () => {
+      // The product API links tags by id: look existing ones up by value and
+      // create any that are new.
+      const tagIds = await Promise.all(
+        selectedTags.map(async (value) => {
+          const found = existingTags.find((t) => t.value === value)
+          if (found) return found.id
+          const created = await createVendorProductTag({ value })
+          return created.product_tag.id
+        })
+      )
+
       const base = {
         title: title.trim(),
         subtitle: text(subtitle),
@@ -392,9 +408,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
         sales_channels: selectedSalesChannelIds.length
           ? selectedSalesChannelIds.map((id) => ({ id }))
           : undefined,
-        tags: selectedTags.length
-          ? selectedTags.map((t) => ({ value: t }))
-          : undefined,
+        tags: tagIds.length ? tagIds.map((id) => ({ id })) : undefined,
       }
 
       if (isEdit) {
@@ -561,18 +575,43 @@ export const ProductForm = ({ product }: ProductFormProps) => {
         </div>
       </div>
 
-      {/* 1. Category Classification */}
+      {/* 1. Categories */}
       <Card
-        title="Product Category & Classification"
-        description="Assign a standardized category tailored to your registered business vertical."
+        title="Categories"
+        description="Choose the categories this product is listed under."
       >
-        <TrustClawCategoryPicker
-          selectedMedusaCategoryId={categoryIds[0] ?? null}
-          selectedCategoryName={product?.categories?.[0]?.name ?? null}
-          onSelectCategory={(categoryId) => {
-            setCategoryIds(categoryId ? [categoryId] : [])
-          }}
-        />
+        {categoryOptions.length ? (
+          <div className="flex flex-wrap gap-2">
+            {categoryOptions.map((category) => {
+              const active = categoryIds.includes(category.id)
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  onClick={() =>
+                    setCategoryIds(
+                      active
+                        ? categoryIds.filter((id) => id !== category.id)
+                        : [...categoryIds, category.id]
+                    )
+                  }
+                  className={
+                    "txt-compact-small rounded-md border px-2 py-1 " +
+                    (active
+                      ? "border-ui-border-interactive bg-ui-bg-base text-ui-fg-base"
+                      : "border-ui-border-base text-ui-fg-subtle")
+                  }
+                >
+                  {category.name}
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <Text size="small" className="text-ui-fg-muted">
+            The store has no categories yet.
+          </Text>
+        )}
       </Card>
 
       {/* 2. General */}
@@ -1345,15 +1384,6 @@ export const ProductForm = ({ product }: ProductFormProps) => {
           />
         </Field>
       </Card>
-
-      {product && (
-        <Card
-          title="Specifications & Master Attributes"
-          description="Standardized product attributes imported from TrustClaw Master Catalog or custom specifications."
-        >
-          <TrustClawAttributesSection product={product} embedded />
-        </Card>
-      )}
 
       {error && (
         <Text size="small" className="text-ui-fg-error">
