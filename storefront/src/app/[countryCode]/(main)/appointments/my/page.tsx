@@ -53,10 +53,23 @@ export default async function MyBookingsPage() {
           </div>
           <div className="text-ui-fg-subtle txt-small">{when(b.start_time, b.resource.timezone)}</div>
         </div>
-        <span
-          className={`txt-small ${b.status === "cancelled" ? "text-ui-fg-error" : "text-ui-fg-subtle"}`}
-        >
-          {b.status === "cancelled" ? "Cancelled" : b.can_cancel ? "Manage" : "View"}
+        <span className="flex items-center gap-2">
+          {b.rescheduled_from_start && b.status !== "cancelled" ? (
+            <span className="bg-ui-bg-subtle text-ui-fg-subtle rounded-full px-2 py-0.5 txt-compact-xsmall">
+              Rescheduled
+            </span>
+          ) : null}
+          <span
+            className={`txt-small ${b.status === "cancelled" ? "text-ui-fg-error" : "text-ui-fg-subtle"}`}
+          >
+            {b.status === "cancelled"
+              ? b.cancelled_by === "vendor" || b.cancelled_by === "admin"
+                ? "Cancelled by the business"
+                : "Cancelled"
+              : b.can_cancel || b.can_reschedule
+                ? "Manage"
+                : "View"}
+          </span>
         </span>
       </LocalizedClientLink>
     </li>

@@ -79,6 +79,16 @@ export type BookingAttendee = {
   order_id: string | null
   cancelled_by: string | null
   cancel_reason: string | null
+  rescheduled_from_start: string | null
+  rescheduled_by: string | null
+  reschedule_count: number
+}
+
+export type RescheduleSlot = {
+  start: string
+  end: string
+  capacity: number
+  capacity_remaining: number
 }
 
 export type Booking = {

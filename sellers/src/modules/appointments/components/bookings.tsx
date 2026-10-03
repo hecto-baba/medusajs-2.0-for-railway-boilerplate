@@ -11,6 +11,7 @@ import {
 import {
   Badge,
   Button,
+  Checkbox,
   Container,
   FocusModal,
   Heading,
@@ -25,6 +26,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { formatInZone, formatSlotDateTime, formatTime } from "../lib/format"
 import { NewBookingModal } from "./new-booking-modal"
+import { RescheduleModal, type RescheduleTarget } from "./reschedule-modal"
 
 const PAGE_SIZE = 20
 const EXPORT_PAGE_SIZE = 100
@@ -89,13 +91,17 @@ const CancelModal = ({
 }) => {
   const queryClient = useQueryClient()
   const [reason, setReason] = useState("")
+  const [notify, setNotify] = useState(true)
+  const hasEmail = !!target?.attendee.buyer_email
 
   const cancel = useMutation({
-    mutationFn: () => cancelVendorBooking(target!.attendee.id, reason.trim()),
+    mutationFn: () =>
+      cancelVendorBooking(target!.attendee.id, reason.trim(), notify && hasEmail),
     onSuccess: () => {
       toast.success("Booking cancelled")
       queryClient.invalidateQueries({ queryKey: ["vendor-bookings"] })
       setReason("")
+      setNotify(true)
       onClose()
     },
     onError: (e: any) => toast.error(e?.message || "Could not cancel the booking"),
@@ -120,10 +126,36 @@ const CancelModal = ({
                 <Label size="small" weight="plus">Reason (shown in your records)</Label>
                 <Input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
               </div>
+              <div className="flex items-start gap-x-2">
+                <Checkbox
+                  id="cancel-notify"
+                  checked={notify && hasEmail}
+                  disabled={!hasEmail}
+                  onCheckedChange={(v) => setNotify(v === true)}
+                />
+                <div className="flex flex-col">
+                  <Label htmlFor="cancel-notify" size="small" weight="plus">
+                    Email {target.attendee.buyer_name || "the customer"} that this booking is cancelled
+                  </Label>
+                  <Text size="xsmall" className="text-ui-fg-subtle">
+                    {hasEmail
+                      ? "The reason above is included in the email."
+                      : "No email on file for this customer."}
+                  </Text>
+                </div>
+              </div>
+              {target.attendee.order_id ? (
+                <div className="bg-ui-bg-subtle rounded-md p-3">
+                  <Text size="small">
+                    <strong>Paid online (order {target.attendee.order_id}).</strong> Cancelling
+                    does <strong>not</strong> refund it. Refund the order from Orders if you need
+                    to.
+                  </Text>
+                </div>
+              ) : null}
               <div className="bg-ui-bg-subtle rounded-md p-3">
                 <Text size="small" className="text-ui-fg-subtle">
-                  The place is released straight away. <strong>No refund is issued
-                  automatically</strong> - refund the order from Orders if you need to.
+                  The place is released straight away and can be booked again.
                 </Text>
               </div>
             </div>
@@ -158,6 +190,7 @@ export const Bookings = () => {
     booking: VendorBooking
     attendee: VendorBookingAttendee
   } | null>(null)
+  const [rescheduleTarget, setRescheduleTarget] = useState<RescheduleTarget | null>(null)
 
   const resources = useQuery({ queryKey: ["vendor-resources"], queryFn: listVendorResources })
 
@@ -319,6 +352,8 @@ export const Bookings = () => {
                               <Badge size="2xsmall" color="red">Cancelled</Badge>
                             ) : a.status === "reserved" ? (
                               <Badge size="2xsmall" color="orange">Awaiting payment</Badge>
+                            ) : a.rescheduled_from_start ? (
+                              <Badge size="2xsmall" color="blue">Rescheduled</Badge>
                             ) : null}
                           </div>
                           <Text size="xsmall" className="text-ui-fg-subtle">
@@ -330,7 +365,30 @@ export const Bookings = () => {
                               {a.cancelled_by}: {a.cancel_reason}
                             </Text>
                           ) : null}
-                          {a.status === "confirmed" ? (
+                          {a.status === "confirmed" && a.rescheduled_from_start ? (
+                            <Text size="xsmall" className="text-ui-fg-muted">
+                              Moved from {formatSlotDateTime(a.rescheduled_from_start, tz)}
+                              {a.rescheduled_by === "buyer" ? " by the customer" : ""}
+                            </Text>
+                          ) : null}
+                          {a.status === "confirmed" && !started && b.status !== "completed" ? (
+                            <div className="mt-1 flex gap-x-3">
+                              <button
+                                type="button"
+                                className="text-ui-fg-interactive txt-compact-xsmall w-fit"
+                                onClick={() => setRescheduleTarget({ booking: b, attendee: a })}
+                              >
+                                Reschedule
+                              </button>
+                              <button
+                                type="button"
+                                className="text-ui-fg-error txt-compact-xsmall w-fit"
+                                onClick={() => setCancelTarget({ booking: b, attendee: a })}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : a.status === "confirmed" ? (
                             <button
                               type="button"
                               className="text-ui-fg-error txt-compact-xsmall w-fit"
@@ -387,6 +445,7 @@ export const Bookings = () => {
       ) : null}
 
       <CancelModal target={cancelTarget} onClose={() => setCancelTarget(null)} />
+      <RescheduleModal target={rescheduleTarget} onClose={() => setRescheduleTarget(null)} />
       <NewBookingModal open={creating} onClose={() => setCreating(false)} />
     </Container>
   )

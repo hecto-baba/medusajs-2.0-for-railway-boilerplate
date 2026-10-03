@@ -31,6 +31,19 @@ export const AppointmentAttendee = model.define("appointment_attendee", {
     .enum(["buyer", "vendor", "admin", "system"])
     .nullable(),
   cancel_reason: model.text().nullable(),
+  // Set once the "your booking was cancelled" email has gone out (see
+  // confirmation_sent_at for why).
+  cancellation_sent_at: model.dateTime().nullable(),
+  // Reschedule history. The start time the booking had before its latest move
+  // (kept as a time, not a slot id, because a booking alone in its slot is moved
+  // by editing that slot in place).
+  rescheduled_from_start: model.dateTime().nullable(),
+  rescheduled_by: model
+    .enum(["buyer", "vendor", "admin", "system"])
+    .nullable(),
+  reschedule_count: model.number().default(0),
+  // Set once the "your booking moved" email for the latest move has gone out.
+  reschedule_notified_at: model.dateTime().nullable(),
 })
 .indexes([
   {

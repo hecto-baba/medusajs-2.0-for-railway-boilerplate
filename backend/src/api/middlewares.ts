@@ -41,8 +41,12 @@ import { GetProductOfferSchema } from "./store/appointments/products/[id]/route"
 import { GetResourceSlotsSchema } from "./store/appointments/resources/[id]/slots/route";
 import { GetMyBookingsSchema } from "./store/appointments/my-bookings/route";
 import { PostBuyerCancelSchema } from "./store/appointments/bookings/[id]/cancel/route";
+import { PostBuyerRescheduleSchema } from "./store/appointments/bookings/[id]/reschedule/route";
+import { GetBuyerRescheduleSlotsSchema } from "./store/appointments/bookings/[id]/slots/route";
 import {
   CancelAppointmentSchema,
+  RescheduleAppointmentSchema,
+  GetRescheduleSlotsSchema,
   CopySettingsToSchema,
   GetPricingPreviewSchema,
   GetSlotsPreviewSchema,
@@ -613,6 +617,22 @@ export default defineMiddlewares({
     {
       matcher: "/store/enquiries",
       methods: ["POST"],
+    {
+      matcher: "/store/appointments/bookings/:id/slots",
+      methods: ["GET"],
+      middlewares: [
+        authenticate("customer", ["bearer", "session"], { allowUnauthenticated: true }),
+        validateAndTransformQuery(GetBuyerRescheduleSlotsSchema, {}),
+      ],
+    },
+    {
+      matcher: "/store/appointments/bookings/:id/reschedule",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["bearer", "session"], { allowUnauthenticated: true }),
+        validateAndTransformBody(PostBuyerRescheduleSchema),
+      ],
+    },
       middlewares: [
         enquiryRateLimit,
         validateAndTransformBody(PostStoreEnquirySchema)
@@ -1299,6 +1319,16 @@ export default defineMiddlewares({
     },
     {
       matcher: "/admin/providers/:id/exceptions/:exceptionId",
+    {
+      matcher: "/vendors/appointments/:id/reschedule-slots",
+      methods: ["GET"],
+      middlewares: [validateAndTransformQuery(GetRescheduleSlotsSchema, {})],
+    },
+    {
+      matcher: "/vendors/appointments/:id/reschedule",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(RescheduleAppointmentSchema)],
+    },
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(PostAdminAvailabilityExceptionSchema)
@@ -1325,6 +1355,16 @@ export default defineMiddlewares({
         validateAndTransformBody(PostAppointmentConfigBodySchema)
       ]
     },
+    },
+    {
+      matcher: "/admin/appointments/:id/reschedule-slots",
+      methods: ["GET"],
+      middlewares: [validateAndTransformQuery(GetRescheduleSlotsSchema, {})],
+    },
+    {
+      matcher: "/admin/appointments/:id/reschedule",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(RescheduleAppointmentSchema)],
     {
       matcher:
         "/vendors/products/:id/variants/:variant_id/inventory-levels",

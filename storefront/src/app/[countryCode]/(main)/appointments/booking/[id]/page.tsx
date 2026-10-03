@@ -37,10 +37,10 @@ export default async function BookingPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ token?: string }>
+  searchParams: Promise<{ token?: string; moved?: string }>
 }) {
   const { id } = await params
-  const { token } = await searchParams
+  const { token, moved } = await searchParams
 
   const booking = await getBooking(id, token)
   if (!booking) notFound()
@@ -54,10 +54,22 @@ export default async function BookingPage({
         {cancelled ? "Booking cancelled" : "Your booking"}
       </h1>
 
+      {moved && !cancelled ? (
+        <div className="bg-ui-bg-subtle mb-6 rounded-md p-4" role="status" data-testid="moved-banner">
+          Rescheduled. A confirmation email is on its way.
+        </div>
+      ) : null}
+
       <div className="border-ui-border-base mb-6 rounded-lg border p-5">
         <div className="txt-large-plus">{booking.service.title}</div>
         <div className="text-ui-fg-subtle">with {booking.resource.name}</div>
         <div className="txt-medium-plus mt-3">{when(booking.start_time, tz)}</div>
+        {booking.rescheduled_from_start && !cancelled ? (
+          <div className="text-ui-fg-subtle txt-small">
+            Moved from {when(booking.rescheduled_from_start, tz)}
+            {booking.rescheduled_by && booking.rescheduled_by !== "buyer" ? " by the business" : ""}
+          </div>
+        ) : null}
         {tz ? <div className="text-ui-fg-subtle txt-small">Times are in {tz}</div> : null}
         {booking.order_id ? (
           <div className="text-ui-fg-subtle txt-small mt-3">Order {booking.order_id}</div>
@@ -75,6 +87,8 @@ export default async function BookingPage({
           id={booking.id}
           token={token}
           canCancel={booking.can_cancel}
+          canReschedule={booking.can_reschedule}
+          reschedulesLeft={booking.reschedules_left}
           deadlineLabel={when(booking.cancel_deadline, tz)}
           windowHours={null}
         />

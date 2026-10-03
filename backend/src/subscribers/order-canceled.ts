@@ -3,6 +3,8 @@ import { cancelOrderWorkflow } from "@medusajs/medusa/core-flows"
 import { updateRentalWorkflow } from "../workflows/update-rental"
 import { MARKETPLACE_MODULE } from "../modules/marketplace"
 import { withParentLineItemIds } from "../lib/split-order"
+import { APPOINTMENT_BOOKING_MODULE } from "../modules/appointment-booking"
+import { cancelAppointmentWorkflow } from "../workflows/cancel-appointment"
 
 /**
  * When an order is canceled:
@@ -10,6 +12,9 @@ import { withParentLineItemIds } from "../lib/split-order"
  *    parent's line items, so its rentals are found through
  *    metadata.parent_line_item_id; the parent's are found by order id.
  *  - the seller's payout ledger entry for a canceled child becomes void
+ *  - appointment bookings on the order are cancelled and their places freed. They
+ *    are recorded against the PARENT (the buyer's) order, so only that order
+ *    triggers it. The buyer is emailed; refunds stay manual, as for any cancel.
  *  - canceling the PARENT (the order the buyer paid for) cancels every seller's
  *    child order too, which voids their entries
  * Only entries still "owed" are voided: a paid entry is final and needs a human.
@@ -53,6 +58,28 @@ export default async function orderCanceledHandler({
         }
         if (child.payout_status === "owed") {
           await marketplace.updateVendorOrderSplits({ id: child.id, payout_status: "void" })
+        }
+      }
+    }
+
+    // --- appointment bookings (parent order only)
+    if (!isChild) {
+      const appointments: any = container.resolve(APPOINTMENT_BOOKING_MODULE)
+      const attendees = await appointments.listAppointmentAttendees(
+        { order_id: data.id, status: ["reserved", "confirmed"] },
+        { take: null, select: ["id"] }
+      )
+      for (const attendee of attendees) {
+        try {
+          await cancelAppointmentWorkflow(container).run({
+            input: {
+              appointment_attendee_id: attendee.id,
+              cancelled_by: "system",
+              reason: "The order was cancelled.",
+            },
+          })
+        } catch (error: any) {
+          logger.error(`Could not cancel booking ${attendee.id} for order ${data.id}: ${error.message}`)
         }
       }
     }

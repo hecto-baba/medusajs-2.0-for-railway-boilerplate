@@ -2,6 +2,7 @@ import { Trash } from "@medusajs/icons"
 import {
   Badge,
   Button,
+  Checkbox,
   Container,
   FocusModal,
   Heading,
@@ -15,7 +16,7 @@ import {
   usePrompt,
 } from "@medusajs/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { sdk } from "../lib/sdk"
 import {
   addDaysToKey,
@@ -31,6 +32,7 @@ import {
   OfferedService,
   PreviewSlot,
   Provider,
+  RescheduleSlot,
 } from "../types/appointment-booking"
 
 /* ------------------------------------------------------------- services */
@@ -487,7 +489,10 @@ export const AppointmentBookingsSection = ({ resource }: { resource: Provider })
   const [when, setWhen] = useState<"upcoming" | "past">("upcoming")
   const [offset, setOffset] = useState(0)
   const [target, setTarget] = useState<{ booking: Booking; attendee: BookingAttendee } | null>(null)
+  const [rescheduleTarget, setRescheduleTarget] = useState<{ booking: Booking; attendee: BookingAttendee } | null>(null)
   const [reason, setReason] = useState("")
+  const [notify, setNotify] = useState(true)
+  const cancelHasEmail = !!target?.attendee.buyer_email
 
   const key = [["admin-provider-appointments", resource.id, when, offset]]
 
@@ -505,12 +510,13 @@ export const AppointmentBookingsSection = ({ resource }: { resource: Provider })
     mutationFn: () =>
       sdk.client.fetch(`/admin/appointments/${target!.attendee.id}/cancel`, {
         method: "POST",
-        body: { reason: reason.trim() },
+        body: { reason: reason.trim(), notify: notify && cancelHasEmail },
       }),
     onSuccess: () => {
       toast.success("Booking cancelled")
       setTarget(null)
       setReason("")
+      setNotify(true)
       refresh()
     },
     onError: (e: any) => toast.error(e?.message || "Could not cancel the booking"),
@@ -580,12 +586,28 @@ export const AppointmentBookingsSection = ({ resource }: { resource: Provider })
                             <Text size="small" weight="plus">{a.buyer_name || "Guest"}</Text>
                             {a.status === "cancelled" ? <Badge size="2xsmall" color="red">Cancelled</Badge> : null}
                             {a.status === "reserved" ? <Badge size="2xsmall" color="orange">Awaiting payment</Badge> : null}
+                            {a.status === "confirmed" && a.rescheduled_from_start ? <Badge size="2xsmall" color="blue">Rescheduled</Badge> : null}
                           </div>
                           <Text size="xsmall" className="text-ui-fg-subtle">{[a.buyer_email, a.buyer_phone].filter(Boolean).join(" · ")}</Text>
                           {a.status === "cancelled" && a.cancel_reason ? (
                             <Text size="xsmall" className="text-ui-fg-muted">{a.cancelled_by}: {a.cancel_reason}</Text>
                           ) : null}
-                          {a.status === "confirmed" ? (
+                          {a.status === "confirmed" && a.rescheduled_from_start ? (
+                            <Text size="xsmall" className="text-ui-fg-muted">
+                              Moved from {formatSlotDateTime(a.rescheduled_from_start, b.resource.timezone)}
+                              {a.rescheduled_by === "buyer" ? " by the customer" : ""}
+                            </Text>
+                          ) : null}
+                          {a.status === "confirmed" && !started && b.status !== "completed" ? (
+                            <div className="mt-1 flex gap-x-3">
+                              <button type="button" className="text-ui-fg-interactive txt-compact-xsmall w-fit" onClick={() => setRescheduleTarget({ booking: b, attendee: a })}>
+                                Reschedule
+                              </button>
+                              <button type="button" className="text-ui-fg-error txt-compact-xsmall w-fit" onClick={() => setTarget({ booking: b, attendee: a })}>
+                                Cancel
+                              </button>
+                            </div>
+                          ) : a.status === "confirmed" ? (
                             <button type="button" className="text-ui-fg-error txt-compact-xsmall w-fit" onClick={() => setTarget({ booking: b, attendee: a })}>
                               Cancel
                             </button>
@@ -635,9 +657,35 @@ export const AppointmentBookingsSection = ({ resource }: { resource: Provider })
                   <Label size="small" weight="plus">Reason</Label>
                   <Input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
                 </div>
-                <Text size="small" className="text-ui-fg-subtle">
-                  The place is released straight away. No refund is issued automatically.
-                </Text>
+                <div className="flex items-start gap-x-2">
+                  <Checkbox
+                    id="admin-cancel-notify"
+                    checked={notify && cancelHasEmail}
+                    disabled={!cancelHasEmail}
+                    onCheckedChange={(v) => setNotify(v === true)}
+                  />
+                  <div className="flex flex-col">
+                    <Label htmlFor="admin-cancel-notify" size="small" weight="plus">
+                      Email {target.attendee.buyer_name || "the customer"} that this booking is cancelled
+                    </Label>
+                    <Text size="xsmall" className="text-ui-fg-subtle">
+                      {cancelHasEmail ? "The reason above is included in the email." : "No email on file for this customer."}
+                    </Text>
+                  </div>
+                </div>
+                {target.attendee.order_id ? (
+                  <div className="bg-ui-bg-subtle rounded-md p-3">
+                    <Text size="small">
+                      <strong>Paid online (order {target.attendee.order_id}).</strong> Cancelling does <strong>not</strong> refund
+                      it. Refund the order from Orders if you need to.
+                    </Text>
+                  </div>
+                ) : null}
+                <div className="bg-ui-bg-subtle rounded-md p-3">
+                  <Text size="small" className="text-ui-fg-subtle">
+                    The place is released straight away and can be booked again.
+                  </Text>
+                </div>
               </div>
             ) : null}
           </FocusModal.Body>
@@ -651,6 +699,175 @@ export const AppointmentBookingsSection = ({ resource }: { resource: Provider })
           </FocusModal.Footer>
         </FocusModal.Content>
       </FocusModal>
+
+      <AdminRescheduleModal
+        target={rescheduleTarget}
+        onClose={() => setRescheduleTarget(null)}
+        onDone={refresh}
+      />
     </Container>
+  )
+}
+
+/**
+ * Moves one customer's booking to another time on the same resource and service.
+ * Same behaviour as the seller panel's dialog: the times offered are the ones a
+ * buyer could book except that the minimum-notice rule is waived and the
+ * booking's own neighbouring times are available. Payment does not change.
+ */
+const AdminRescheduleModal = ({
+  target,
+  onClose,
+  onDone,
+}: {
+  target: { booking: Booking; attendee: BookingAttendee } | null
+  onClose: () => void
+  onDone: () => void
+}) => {
+  const queryClient = useQueryClient()
+  const [date, setDate] = useState("")
+  const [start, setStart] = useState("")
+  const [notify, setNotify] = useState(true)
+
+  const timezone = target?.booking.resource.timezone ?? "UTC"
+  const attendeeId = target?.attendee.id
+  const hasEmail = !!target?.attendee.buyer_email
+
+  // Open on the booking's current day, in the resource's timezone.
+  useEffect(() => {
+    if (target) {
+      setDate(localDateKey(target.booking.start_time, timezone))
+      setStart("")
+      setNotify(!!target.attendee.buyer_email)
+    }
+  }, [target, timezone])
+
+  // A little either side of the chosen day, because the day boundary is in the
+  // resource's timezone, not the browser's; slots are filtered to the day below.
+  const slots = useQuery<{ slots: RescheduleSlot[] }>({
+    queryKey: [["admin-reschedule-slots", attendeeId, date]],
+    queryFn: () =>
+      sdk.client.fetch(`/admin/appointments/${attendeeId}/reschedule-slots`, {
+        query: {
+          from: new Date(`${addDaysToKey(date, -1)}T00:00:00Z`).toISOString(),
+          to: new Date(`${addDaysToKey(date, 2)}T00:00:00Z`).toISOString(),
+        },
+      }),
+    enabled: !!attendeeId && !!date,
+  })
+  const daySlots = (slots.data?.slots ?? []).filter(
+    (s) => localDateKey(s.start, timezone) === date && s.capacity_remaining > 0
+  )
+
+  useEffect(() => setStart(""), [date])
+
+  const move = useMutation({
+    mutationFn: () =>
+      sdk.client.fetch(`/admin/appointments/${attendeeId}/reschedule`, {
+        method: "POST",
+        body: { start, notify: notify && hasEmail },
+      }),
+    onSuccess: () => {
+      toast.success("Booking rescheduled")
+      onDone()
+      onClose()
+    },
+    onError: (e: any) => {
+      toast.error(e?.message || "Could not reschedule the booking")
+      // The time may have just been taken; refresh what is on offer.
+      queryClient.invalidateQueries({ queryKey: [["admin-reschedule-slots"]] })
+      setStart("")
+    },
+  })
+
+  return (
+    <FocusModal open={!!target} onOpenChange={(open) => !open && onClose()}>
+      <FocusModal.Content>
+        <FocusModal.Header>
+          <FocusModal.Title>Reschedule booking</FocusModal.Title>
+        </FocusModal.Header>
+        <FocusModal.Body className="mx-auto flex w-full max-w-lg flex-col gap-y-4 overflow-y-auto py-8">
+          {target ? (
+            <>
+              <div className="bg-ui-bg-subtle flex flex-col gap-y-1 rounded-md p-3">
+                <Text size="small" weight="plus">{target.attendee.buyer_name || "Guest"}</Text>
+                <Text size="small" className="text-ui-fg-subtle">
+                  {target.booking.service.title ?? "Appointment"} · {target.booking.resource.display_name ?? "Resource"}
+                </Text>
+                <Text size="small" className="text-ui-fg-muted line-through">
+                  {formatSlotDateTime(target.booking.start_time, timezone)}
+                </Text>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-3">
+                <div className="flex flex-col gap-y-1">
+                  <Label size="small" weight="plus">{`Date (${timezone})`}</Label>
+                  <Input
+                    type="date"
+                    value={date}
+                    min={localDateKey(new Date(), timezone)}
+                    onChange={(e) => setDate(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-y-1">
+                  <Label size="small" weight="plus">Time</Label>
+                  <Select value={start} onValueChange={setStart} disabled={!date}>
+                    <Select.Trigger>
+                      <Select.Value
+                        placeholder={
+                          slots.isLoading
+                            ? "Loading times..."
+                            : daySlots.length
+                              ? "Choose a time"
+                              : "No free times on this day"
+                        }
+                      />
+                    </Select.Trigger>
+                    <Select.Content>
+                      {daySlots.map((s) => (
+                        <Select.Item key={s.start} value={s.start}>
+                          {formatTime(s.start, timezone)} - {formatTime(s.end, timezone)}
+                          {s.capacity > 1 ? ` (${s.capacity_remaining} places left)` : ""}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-x-2">
+                <Checkbox
+                  id="admin-reschedule-notify"
+                  checked={notify && hasEmail}
+                  disabled={!hasEmail}
+                  onCheckedChange={(v) => setNotify(v === true)}
+                />
+                <div className="flex flex-col">
+                  <Label htmlFor="admin-reschedule-notify" size="small" weight="plus">
+                    Email {target.attendee.buyer_name || "the customer"} about the new time
+                  </Label>
+                  <Text size="xsmall" className="text-ui-fg-subtle">
+                    {hasEmail ? "Includes a link to change or cancel it again." : "No email on file for this customer."}
+                  </Text>
+                </div>
+              </div>
+
+              <div className="bg-ui-bg-subtle rounded-md p-3">
+                <Text size="small" className="text-ui-fg-subtle">
+                  You are not limited by the customer&rsquo;s change window. Times offered follow the resource&rsquo;s hours,
+                  holidays and capacity. Payment does not change.
+                </Text>
+              </div>
+            </>
+          ) : null}
+        </FocusModal.Body>
+        <FocusModal.Footer>
+          <Button variant="secondary" onClick={onClose}>Keep booking</Button>
+          <Button disabled={!start || move.isPending} isLoading={move.isPending} onClick={() => move.mutate()}>
+            Reschedule
+          </Button>
+        </FocusModal.Footer>
+      </FocusModal.Content>
+    </FocusModal>
   )
 }

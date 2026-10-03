@@ -1,6 +1,10 @@
 import type { MedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import { verifyCancelToken } from "../../../modules/appointment-booking/lib/cancel-token"
+import {
+  checkReschedule,
+  reschedulesLeft,
+} from "../../../modules/appointment-booking/lib/reschedule-rules"
 import type AppointmentBookingModuleService from "../../../modules/appointment-booking/service"
 
 type Attendee = Awaited<ReturnType<AppointmentBookingModuleService["listAppointmentAttendees"]>>[number]
@@ -71,6 +75,16 @@ export const buildBookingViews = async (
       start.getTime() - (resource?.cancellation_window_hours ?? 24) * 3_600_000
     )
     const active = attendee.status === "confirmed" || attendee.status === "reserved"
+    const rescheduleCount = attendee.reschedule_count ?? 0
+    const reschedule = checkReschedule({
+      actor: "buyer",
+      attendeeStatus: attendee.status,
+      slotStatus: appointment.status,
+      slotStart: appointment.start_time,
+      cancellationWindowHours: resource?.cancellation_window_hours ?? 24,
+      rescheduleCount,
+      now,
+    })
 
     return [
       {
@@ -92,6 +106,10 @@ export const buildBookingViews = async (
         cancel_deadline: deadline.toISOString(),
         can_cancel: active && now.getTime() <= deadline.getTime() && start.getTime() > now.getTime(),
         cancelled_by: attendee.cancelled_by ?? null,
+        can_reschedule: reschedule.ok,
+        reschedules_left: reschedulesLeft(rescheduleCount),
+        rescheduled_from_start: attendee.rescheduled_from_start ?? null,
+        rescheduled_by: attendee.rescheduled_by ?? null,
       },
     ]
   })

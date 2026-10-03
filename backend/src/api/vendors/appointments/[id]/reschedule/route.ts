@@ -4,20 +4,21 @@ import type {
 } from "@medusajs/framework/http"
 import { MedusaError } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
-import { cancelAppointmentWorkflow } from "../../../../../workflows/cancel-appointment"
+import { rescheduleAppointmentWorkflow } from "../../../../../workflows/reschedule-appointment"
 import { getAppointmentService, listOwnedResourceIds } from "../../../resources/helpers"
-import { CancelAppointmentSchema } from "../../../resources/schemas"
+import { RescheduleAppointmentSchema } from "../../../resources/schemas"
 
 /**
- * Cancels ONE attendee's booking (`:id` is the attendee id, not the slot id).
- * Frees their place and issues NO refund - refunds stay a separate, deliberate
- * action on the order.
+ * Moves ONE attendee's booking (`:id` is the attendee id) to another time on the
+ * same resource and service. The business is not held to the customer's change
+ * window or reschedule limit, and may move a booking inside the notice window.
+ * Payment is untouched.
  *
  * Ownership: attendee -> slot -> resource must be the calling vendor's.
  * Anything else is a 404.
  */
 export const POST = async (
-  req: AuthenticatedMedusaRequest<z.infer<typeof CancelAppointmentSchema>>,
+  req: AuthenticatedMedusaRequest<z.infer<typeof RescheduleAppointmentSchema>>,
   res: MedusaResponse
 ) => {
   const service = getAppointmentService(req)
@@ -38,14 +39,14 @@ export const POST = async (
   const owned = await listOwnedResourceIds(req)
   if (!owned.includes(appointment.provider_id)) throw notFound
 
-  const { result } = await cancelAppointmentWorkflow(req.scope).run({
+  const { result } = await rescheduleAppointmentWorkflow(req.scope).run({
     input: {
       appointment_attendee_id: attendee.id,
-      cancelled_by: "vendor",
-      reason: req.validatedBody.reason,
+      new_start: req.validatedBody.start.toISOString(),
+      rescheduled_by: "vendor",
       notify: req.validatedBody.notify,
     },
   })
 
-  res.json({ cancelled: result })
+  res.json({ rescheduled: result })
 }

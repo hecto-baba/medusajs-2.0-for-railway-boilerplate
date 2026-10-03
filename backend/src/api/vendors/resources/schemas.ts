@@ -140,6 +140,8 @@ export const GetVendorAppointmentsSchema = z.object({
 
 export const CancelAppointmentSchema = z.object({
   reason: z.string().trim().min(1).max(500),
+  /** false = do not email the customer. */
+  notify: z.boolean().optional(),
 })
 
 /**
@@ -155,4 +157,17 @@ export const CreateManualAppointmentSchema = z.object({
   email: z.string().trim().email().max(320).optional().or(z.literal("")),
   phone: z.string().trim().max(50).optional(),
   notes: z.string().trim().max(1000).optional(),
+})
+
+/** Moves one booking to another start time on the same resource and service. */
+export const RescheduleAppointmentSchema = z.object({
+  start: z.coerce.date(),
+  /** false = do not email the customer. */
+  notify: z.boolean().optional(),
+})
+
+/** The window of candidate times shown when moving a booking. */
+export const GetRescheduleSlotsSchema = z.object({
+  from: z.coerce.date(),
+  to: z.coerce.date(),
 })

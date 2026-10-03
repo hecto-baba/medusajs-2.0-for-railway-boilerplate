@@ -26,6 +26,7 @@ export const POST = async (
       appointment_attendee_id: attendee.id,
       cancelled_by: "admin",
       reason: req.validatedBody.reason,
+      notify: req.validatedBody.notify,
     },
   })
 

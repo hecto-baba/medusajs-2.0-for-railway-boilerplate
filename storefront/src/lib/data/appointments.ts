@@ -9,6 +9,7 @@ import {
   AppointmentBuyer,
   AppointmentProductOffer,
   AppointmentSlots,
+  RescheduleSlot,
 } from "types/appointment"
 import { getOrSetCart } from "./cart"
 import { getAuthHeaders, revalidateCacheTag } from "./cookies"
@@ -194,6 +195,47 @@ export async function cancelBooking(params: {
       query: { token: params.token },
       headers: { ...(await getAuthHeaders()) },
       body: { reason: params.reason || null },
+    })
+    .catch(medusaError)
+
+  await revalidateCacheTag("orders")
+}
+
+/**
+ * The times a booking could move to: same resource and service. Never cached, for
+ * the same reason as every other slot read.
+ */
+export async function getRescheduleSlots(params: {
+  id: string
+  token?: string
+  from: string
+  to: string
+}) {
+  return sdk.client
+    .fetch<{
+      resource: { id: string; timezone: string }
+      count: number
+      slots: RescheduleSlot[]
+    }>(`/store/appointments/bookings/${encodeURIComponent(params.id)}/slots`, {
+      method: "GET",
+      query: { token: params.token, from: params.from, to: params.to },
+      headers: { ...(await getAuthHeaders()) },
+      cache: "no-store",
+    })
+    .catch(medusaError)
+}
+
+export async function rescheduleBooking(params: {
+  id: string
+  token?: string
+  start: string
+}) {
+  await sdk.client
+    .fetch(`/store/appointments/bookings/${encodeURIComponent(params.id)}/reschedule`, {
+      method: "POST",
+      query: { token: params.token },
+      headers: { ...(await getAuthHeaders()) },
+      body: { start: params.start },
     })
     .catch(medusaError)
 

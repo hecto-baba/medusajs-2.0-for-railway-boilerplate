@@ -110,6 +110,18 @@ export type AppointmentBookingView = {
   cancel_deadline: string
   can_cancel: boolean
   cancelled_by: string | null
+  can_reschedule: boolean
+  reschedules_left: number
+  /** The time the booking had before its latest move, if it was moved. */
+  rescheduled_from_start: string | null
+  rescheduled_by: "buyer" | "vendor" | "admin" | "system" | null
+}
+
+export type RescheduleSlot = {
+  start: string
+  end: string
+  capacity: number
+  spots_left: number
 }
 
 /**

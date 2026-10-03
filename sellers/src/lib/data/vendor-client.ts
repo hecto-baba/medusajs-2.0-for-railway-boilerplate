@@ -3058,6 +3058,9 @@ export type VendorBookingAttendee = {
   order_id: string | null
   cancelled_by: string | null
   cancel_reason: string | null
+  rescheduled_from_start: string | null
+  rescheduled_by: string | null
+  reschedule_count: number
 }
 
 export type VendorBooking = {
@@ -3306,8 +3309,31 @@ export type VendorBookingOverview = {
 export const getVendorBookingOverview = () =>
   request<VendorBookingOverview>("appointments/overview", {})
 
-export const cancelVendorBooking = (attendeeId: string, reason: string) =>
-  mutate<{ cancelled: unknown }>(`appointments/${attendeeId}/cancel`, "POST", { reason })
+export const cancelVendorBooking = (attendeeId: string, reason: string, notify = true) =>
+  mutate<{ cancelled: unknown }>(`appointments/${attendeeId}/cancel`, "POST", { reason, notify })
+
+export type VendorRescheduleSlot = {
+  start: string
+  end: string
+  capacity: number
+  capacity_remaining: number
+}
+
+/** Times one booking could move to (same resource and service). */
+export const getVendorRescheduleSlots = (
+  attendeeId: string,
+  params: { from: string; to: string }
+) =>
+  request<{ timezone: string; count: number; slots: VendorRescheduleSlot[] }>(
+    `appointments/${attendeeId}/reschedule-slots`,
+    params
+  )
+
+export const rescheduleVendorBooking = (attendeeId: string, start: string, notify = true) =>
+  mutate<{ rescheduled: unknown }>(`appointments/${attendeeId}/reschedule`, "POST", {
+    start,
+    notify,
+  })
 
 export const completeVendorBooking = (appointmentId: string) =>
   mutate<{ appointment: unknown }>(`appointments/${appointmentId}/complete`, "POST", {})

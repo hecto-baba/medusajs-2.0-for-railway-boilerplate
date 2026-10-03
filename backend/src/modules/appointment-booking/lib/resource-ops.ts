@@ -268,6 +268,9 @@ export const listBookings = async (
         order_id: t.order_id,
         cancelled_by: t.cancelled_by,
         cancel_reason: t.cancel_reason,
+        rescheduled_from_start: t.rescheduled_from_start ?? null,
+        rescheduled_by: t.rescheduled_by ?? null,
+        reschedule_count: t.reschedule_count ?? 0,
       })),
     })),
   }

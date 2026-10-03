@@ -91,9 +91,12 @@ class AppointmentBookingModuleService extends MedusaService({
     from: Date,
     to: Date,
     product_id?: string | null,
-    now: Date = new Date()
+    now: Date = new Date(),
+    // A booking being moved must not block its own new time. Used only when the
+    // slot being left holds nobody else (see the reschedule step).
+    ignore_appointment_id?: string | null
   ) {
-    const [providers, rules, exceptions, appointments, offerings] = await Promise.all([
+    const [providers, rules, exceptions, allAppointments, offerings] = await Promise.all([
       this.listProviders({ id: provider_id }, { take: 1 }),
       this.listRecurringAvailabilities(
         { provider_id, status: "active" },
@@ -130,6 +133,10 @@ class AppointmentBookingModuleService extends MedusaService({
     if (!provider) {
       throw new MedusaError(MedusaError.Types.NOT_FOUND, "Resource not found.")
     }
+
+    const appointments = ignore_appointment_id
+      ? allAppointments.filter((a) => a.id !== ignore_appointment_id)
+      : allAppointments
 
     const attendees = appointments.length
       ? await this.listAppointmentAttendees(
@@ -218,6 +225,56 @@ class AppointmentBookingModuleService extends MedusaService({
   }
 
   /**
+   * The times one existing booking could move to: same resource and service, as
+   * the buyer-facing engine computes them, except that
+   *  - a booking alone in its slot does not block its own neighbouring times, and
+   *  - its current time is not offered.
+   * `waiveNotice` (the business moving a booking) drops the minimum-notice rule.
+   */
+  async listRescheduleSlots(input: {
+    appointment_attendee_id: string
+    from: Date
+    to: Date
+    waiveNotice: boolean
+    now?: Date
+  }) {
+    const now = input.now ?? new Date()
+    const attendee = await this.retrieveAppointmentAttendee(input.appointment_attendee_id)
+    const old = await this.retrieveAppointment(attendee.appointment_id)
+
+    const slotAttendees = await this.listAppointmentAttendees(
+      { appointment_id: old.id, status: ["reserved", "confirmed"] },
+      { take: null, select: ["id", "status", "expires_at"] }
+    )
+    const solo = !slotAttendees.some((a) => a.id !== attendee.id && isLiveAttendee(a, now))
+
+    const ctx = await this.loadAvailabilityContext(
+      old.provider_id,
+      input.from,
+      input.to,
+      old.service_product_id,
+      now,
+      solo ? old.id : null
+    )
+
+    const slots = computeSlots({
+      resource: input.waiveNotice
+        ? { ...ctx.resource, min_notice_minutes: 0 }
+        : ctx.resource,
+      offering: ctx.offering,
+      product_id: old.service_product_id,
+      rules: ctx.rules,
+      exceptions: ctx.exceptions,
+      existing: ctx.existing,
+      from: input.from,
+      to: input.to,
+      now,
+    }).filter((s) => s.start.getTime() !== new Date(old.start_time).getTime())
+
+    return { slots, appointment: old, provider: ctx.provider }
+  }
+
+  /**
    * Re-validates one exact start time against live data. Used by every
    * reservation so the client can never book a time that is not genuinely
    * offered. Returns the slot (including an existing booking id when the same
@@ -228,6 +285,7 @@ class AppointmentBookingModuleService extends MedusaService({
     product_id?: string | null
     start: Date
     now?: Date
+    ignore_appointment_id?: string | null
   }): Promise<{ slot: Slot | null; ctx: Awaited<ReturnType<AppointmentBookingModuleService["loadAvailabilityContext"]>> }> {
     const now = input.now ?? new Date()
     const ctx = await this.loadAvailabilityContext(
@@ -235,7 +293,8 @@ class AppointmentBookingModuleService extends MedusaService({
       input.start,
       input.start,
       input.product_id,
-      now
+      now,
+      input.ignore_appointment_id
     )
 
     const slot = findBookableSlot({
