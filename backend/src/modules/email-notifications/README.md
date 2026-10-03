@@ -18,7 +18,7 @@ This will start a react-email server at `http://localhost:3002` where you can pr
 | `invite-user` | `src/subscribers/invite-created.ts` | An administrator is invited, or the invite is resent. |
 | `reset-password` | `src/subscribers/password-reset.ts` | Someone asks to reset a password, whether a shopper or an administrator. |
 
-All three need a configured provider: `RESEND_API_KEY` **and** `RESEND_FROM_EMAIL`
+All three need a configured provider: `ZEPTOMAIL_API_KEY` **and** `ZEPTOMAIL_FROM_EMAIL`
 together (or the SendGrid pair). With only one of a pair set, the notification
 module is not registered at all and nothing sends, silently.
 
@@ -174,26 +174,20 @@ await notificationModuleService.createNotifications({
 })
 ```
 
-## Additional Info & Documentation
+## Provider
 
-I based this module off of [@typed-dev/medusa-notification-resend](https://github.com/typed-development/medusa-notification-resend) but added
-the ability to use `react-email` templates and extended the functionality to include more Resend options. 
+Mail is sent through the [ZeptoMail API](https://www.zoho.com/zeptomail/help/api/email-sending.html)
+by `services/zeptomail.ts`. Templates are `react-email` components, rendered to HTML before sending.
 
-In the original module, you're limited to just `subject`, `from`, `to`, the body, and the attachments. You also could
-only send HTML, which means you have to render the email body using `@react-email/render` instead of using the
-`react` email option which renders it for you.
+| Variable | Purpose |
+| --- | --- |
+| `ZEPTOMAIL_API_KEY` | Send Mail token |
+| `ZEPTOMAIL_FROM_EMAIL` | Verified sender address |
+| `ZEPTOMAIL_FROM_NAME` | Sender display name (optional) |
+| `ZEPTOMAIL_API_URL` | Only for non-default data centres, e.g. `https://api.zeptomail.in/v1.1/email` |
 
-### Medusa
-
-* Guide: [How to Create a Notification Provider Module](https://docs.medusajs.com/resources/references/notification-provider-module)
-* Getting Started: [Events & Subscribers](https://docs.medusajs.com/learn/basics/events-and-subscribers) 
+Per-message options read from `emailOptions`: `subject`, `replyTo`, `cc`, `bcc`, `text`.
 
 ### React Email
 
 For more information on how to use `react-email`, refer to the official [documentation](https://react.email/)
-
-You can also use [these example templates](https://demo.react.email/preview/magic-links/aws-verify-email) as a reference.
-
-### Resend
-
-* Docs: [Node.js Quickstart](https://resend.com/docs/send-with-nodejs)

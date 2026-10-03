@@ -2,7 +2,7 @@ import { Modules } from '@medusajs/framework/utils'
 import { INotificationModuleService } from '@medusajs/framework/types'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
 import { EmailTemplates } from '../modules/email-notifications/templates'
-import { RESEND_FROM_EMAIL } from '../lib/constants'
+import { ZEPTOMAIL_FROM_EMAIL } from '../lib/constants'
 
 /**
  * Emails the customer once an admin (or, later, a vendor) replies to their
@@ -41,7 +41,7 @@ export default async function enquiryRespondedHandler({
       template: EmailTemplates.ENQUIRY_RESPONDED,
       data: {
         emailOptions: {
-          replyTo: process.env.ORDER_REPLY_TO_EMAIL || RESEND_FROM_EMAIL,
+          replyTo: process.env.ORDER_REPLY_TO_EMAIL || ZEPTOMAIL_FROM_EMAIL,
           subject: `Re: your question about ${enquiry.product?.title ?? 'a product'}`
         },
         productTitle: enquiry.product?.title ?? 'this product',

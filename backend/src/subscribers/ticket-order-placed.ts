@@ -2,7 +2,7 @@ import { Modules } from '@medusajs/framework/utils'
 import { INotificationModuleService } from '@medusajs/framework/types'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
 import { EmailTemplates } from '../modules/email-notifications/templates'
-import { RESEND_FROM_EMAIL } from '../lib/constants'
+import { ZEPTOMAIL_FROM_EMAIL } from '../lib/constants'
 import { TICKET_BOOKING_MODULE } from '../modules/ticket-booking'
 import TicketBookingModuleService from '../modules/ticket-booking/service'
 
@@ -74,7 +74,7 @@ export default async function ticketOrderPlacedHandler({
       template: EmailTemplates.TICKET_ORDER_PLACED,
       data: {
         emailOptions: {
-          replyTo: process.env.ORDER_REPLY_TO_EMAIL || RESEND_FROM_EMAIL,
+          replyTo: process.env.ORDER_REPLY_TO_EMAIL || ZEPTOMAIL_FROM_EMAIL,
           subject: `Your tickets for ${
             firstPurchase?.ticket_product?.product?.title ?? 'your event'
           }`

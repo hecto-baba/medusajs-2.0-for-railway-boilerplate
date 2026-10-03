@@ -1,7 +1,7 @@
 import { INotificationModuleService } from '@medusajs/framework/types'
 import { Modules } from '@medusajs/framework/utils'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/framework'
-import { BACKEND_URL, IS_DEV, RESEND_FROM_EMAIL, STOREFRONT_URL } from '../lib/constants'
+import { BACKEND_URL, IS_DEV, ZEPTOMAIL_FROM_EMAIL, STOREFRONT_URL } from '../lib/constants'
 import { EmailTemplates } from '../modules/email-notifications/templates'
 
 /**
@@ -86,7 +86,7 @@ export default async function passwordResetHandler({
       template: EmailTemplates.RESET_PASSWORD,
       data: {
         emailOptions: {
-          replyTo: process.env.ORDER_REPLY_TO_EMAIL || RESEND_FROM_EMAIL,
+          replyTo: process.env.ORDER_REPLY_TO_EMAIL || ZEPTOMAIL_FROM_EMAIL,
           subject: `Reset your ${process.env.STORE_NAME || 'store'} password`,
         },
         resetLink,
@@ -99,7 +99,7 @@ export default async function passwordResetHandler({
   } catch (error) {
     // Same shape as the other subscribers: a failed send must not take down the
     // workflow that emitted the event. The provider itself throws with the
-    // reason attached, so this line is where a misconfigured Resend key shows
+    // reason attached, so this line is where a misconfigured ZeptoMail key shows
     // up in the deploy log.
     console.error('Error sending password reset notification:', error)
   }

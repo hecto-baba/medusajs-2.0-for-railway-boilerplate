@@ -2,7 +2,7 @@ import { ContainerRegistrationKeys, Modules } from '@medusajs/framework/utils'
 import { INotificationModuleService } from '@medusajs/framework/types'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
 import { EmailTemplates } from '../modules/email-notifications/templates'
-import { RESEND_FROM_EMAIL, STOREFRONT_URL } from '../lib/constants'
+import { ZEPTOMAIL_FROM_EMAIL, STOREFRONT_URL } from '../lib/constants'
 import { APPOINTMENT_BOOKING_MODULE } from '../modules/appointment-booking'
 import type AppointmentBookingModuleService from '../modules/appointment-booking/service'
 import { signCancelToken } from '../modules/appointment-booking/lib/cancel-token'
@@ -79,7 +79,7 @@ export default async function appointmentBookedHandler({
   const vendorById = new Map((vendors as any[]).map((v) => [v.id, v]))
   const order = (orders as any[])[0]
 
-  const replyTo = process.env.ORDER_REPLY_TO_EMAIL || RESEND_FROM_EMAIL
+  const replyTo = process.env.ORDER_REPLY_TO_EMAIL || ZEPTOMAIL_FROM_EMAIL
   const sent: string[] = []
 
   // The storefront's routes are country-prefixed, so the link carries the
