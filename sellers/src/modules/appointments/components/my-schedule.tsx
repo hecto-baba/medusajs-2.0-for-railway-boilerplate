@@ -325,7 +325,7 @@ export const MySchedule = () => {
 
       <Section
         title="Appointments"
-        action={
+        actions={
           <Button
             size="small"
             variant="secondary"

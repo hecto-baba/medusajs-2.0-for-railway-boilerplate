@@ -123,6 +123,50 @@ export const resolveVendorAdmin = async (
     }
   }
 
+  // 4. Direct vendor match fallback (when actor_id or app_metadata vendor_id directly identifies the vendor)
+  const candidateVendorIds = [
+    req.auth_context?.actor_id,
+    (req.auth_context as any)?.app_metadata?.vendor_id,
+  ].filter((id): id is string => typeof id === "string" && id.length > 0)
+
+  for (const vId of candidateVendorIds) {
+    const {
+      data: [directVendor],
+    } = await query.graph({
+      entity: "vendor",
+      fields: [
+        "id",
+        "name",
+        "handle",
+        "logo",
+        "metadata",
+        "admins.id",
+        "admins.email",
+        "admins.first_name",
+        "admins.last_name",
+      ],
+      filters: { id: [vId] },
+    }).catch(() => ({ data: [] }))
+
+    if (directVendor) {
+      const admin = directVendor.admins?.[0]
+      return {
+        id: admin?.id || vId,
+        email: admin?.email || "vendor@store.com",
+        first_name: admin?.first_name || null,
+        last_name: admin?.last_name || null,
+        vendor_id: directVendor.id,
+        vendor: {
+          id: directVendor.id,
+          name: directVendor.name,
+          handle: directVendor.handle,
+          logo: directVendor.logo,
+          metadata: directVendor.metadata,
+        },
+      }
+    }
+  }
+
   return null
 }
 

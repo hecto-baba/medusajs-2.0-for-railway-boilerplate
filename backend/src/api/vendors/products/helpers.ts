@@ -6,7 +6,7 @@ import { getVendorId, resolveVendorAdmin } from "../shared/vendor-scope"
 
 // Single source of truth lives in shared/vendor-scope.ts; re-exported so
 // existing imports from this file keep working.
-export { getVendorId }
+export { getVendorId, resolveVendorAdmin }
 
 /**
  * Confirms the product behind a URL id belongs to the calling vendor.

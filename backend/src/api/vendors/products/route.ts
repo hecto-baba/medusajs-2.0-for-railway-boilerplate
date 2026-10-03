@@ -55,7 +55,7 @@ import {
   createInventoryLevelsWorkflow,
   updateInventoryLevelsWorkflow,
 } from "@medusajs/medusa/core-flows"
-import { ensureVariantInventoryItem, getVendorId } from "./helpers"
+import { ensureVariantInventoryItem, getVendorId, resolveVendorAdmin } from "./helpers"
 import {
   assertVendorCanUseStockLocation,
   getVisibleStockLocations,
@@ -213,13 +213,7 @@ export const GET = async (
     order,
   } = req.validatedQuery as unknown as z.infer<typeof GetVendorProductsSchema>
 
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.products.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, ["vendor.products.id"])
 
   const productIds =
     vendorAdmin?.vendor?.products?.map((product) => product?.id).filter(Boolean) ??

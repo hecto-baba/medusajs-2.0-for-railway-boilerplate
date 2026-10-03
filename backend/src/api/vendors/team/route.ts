@@ -5,6 +5,7 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
+import { resolveVendorAdmin } from "../shared/vendor-scope"
 
 export const GetVendorTeamSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -30,13 +31,7 @@ export const GET = async (
     req.validatedQuery as unknown as z.infer<typeof GetVendorTeamSchema>
 
   // Get vendor id of current user
-  const {
-    data: [currentAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const currentAdmin = await resolveVendorAdmin(req, ["vendor.id"])
 
   const vendorId = currentAdmin?.vendor?.id
 
@@ -100,13 +95,7 @@ export const POST = async (
   const marketplaceService = req.scope.resolve(MARKETPLACE_MODULE)
   const { email, first_name, last_name } = req.validatedBody
 
-  const {
-    data: [currentAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const currentAdmin = await resolveVendorAdmin(req, ["vendor.id"])
 
   const vendorId = currentAdmin?.vendor?.id
 
