@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev --turbopack -p 7001",
     "build": "next build",
+    "check:bundle": "node scripts/check-bundle-size.mjs",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"

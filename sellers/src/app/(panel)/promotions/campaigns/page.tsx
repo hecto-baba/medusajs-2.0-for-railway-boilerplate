@@ -1,4 +1,4 @@
-import { CampaignsTable } from "@modules/campaigns"
+import { CampaignsTable } from "@modules/campaigns/components/campaigns-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = {

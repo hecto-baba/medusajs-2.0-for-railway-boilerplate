@@ -1,4 +1,4 @@
-import { ProductOptionsTable } from "@modules/product-options"
+import { ProductOptionsTable } from "@modules/product-options/components/product-options-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = {

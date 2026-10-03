@@ -1,4 +1,4 @@
-import { DraftOrderDetail } from "@modules/draft-orders"
+import { DraftOrderDetail } from "@modules/draft-orders/components/detail/draft-order-detail"
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
