@@ -111,7 +111,7 @@ export const MediaSection = ({ product }: { product: VendorProduct }) => {
           <input
             ref={inputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.svg,.avif"
             multiple
             className="hidden"
             onChange={(event) => {

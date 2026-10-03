@@ -700,7 +700,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
                     <input
                       ref={mediaInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.svg,.avif"
                       multiple
                       className="hidden"
                       onChange={async (e) => {
@@ -1466,7 +1466,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
             <input
               ref={mediaInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.svg,.avif"
               multiple
               className="hidden"
               onChange={async (e) => {
