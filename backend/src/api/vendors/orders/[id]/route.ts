@@ -4,7 +4,7 @@ import type {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { getOrdersListWorkflow } from "@medusajs/medusa/core-flows"
-import { assertVendorOwns } from "../../shared/vendor-scope"
+import { assertVendorOwns, resolveVendorAdmin } from "../../shared/vendor-scope"
 import { decorateSplitChildren, scopeOrderToVendor } from "../helpers"
 
 /**
@@ -22,15 +22,7 @@ export const GET = async (
   const { id } = req.params
   await assertVendorOwns(req, "orders", id, "Order not found.")
 
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.products.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, ["vendor.products.id"])
 
   const vendorProductIds = new Set<string>(
     (vendorAdmin?.vendor?.products || [])
