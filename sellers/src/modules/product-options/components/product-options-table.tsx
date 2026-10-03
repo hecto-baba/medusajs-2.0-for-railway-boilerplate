@@ -32,7 +32,13 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
-import { ActionMenu, DataTableAddFilter, PlaceholderCell } from "@modules/common"
+import {
+  ActionMenu,
+  DataTableAddFilter,
+  PlaceholderCell,
+  createMedusaDateFilter,
+  resolveMedusaDateFilter,
+} from "@modules/common"
 import { ProductOptionDrawer } from "./forms/product-option-drawer"
 
 const columnHelper = createDataTableColumnHelper<VendorProductOptionItem>()
@@ -50,60 +56,6 @@ const extractFilterVal = (val: unknown): string | undefined => {
   return undefined
 }
 
-const resolveDateFilter = (val: any): string | undefined => {
-  if (!val || val === "all") return undefined
-  if (typeof val === "object") {
-    if (val.$gte) return typeof val.$gte === "string" ? val.$gte : new Date(val.$gte).toISOString()
-    const flat = Object.values(val).flat()
-    val = flat[0]
-  }
-  if (Array.isArray(val)) val = val[0]
-  if (typeof val !== "string" || val === "all") return undefined
-  const now = new Date()
-  if (val === "7d") {
-    now.setDate(now.getDate() - 7)
-    return now.toISOString()
-  }
-  if (val === "30d") {
-    now.setDate(now.getDate() - 30)
-    return now.toISOString()
-  }
-  if (val === "90d") {
-    now.setDate(now.getDate() - 90)
-    return now.toISOString()
-  }
-  if (!isNaN(Date.parse(val))) {
-    return new Date(val).toISOString()
-  }
-  return undefined
-}
-
-const dateFilterOptions = [
-  {
-    label: "Today",
-    value: {
-      $gte: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
-    },
-  },
-  {
-    label: "Last 7 days",
-    value: {
-      $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-  {
-    label: "Last 30 days",
-    value: {
-      $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-  {
-    label: "Last 90 days",
-    value: {
-      $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-]
 
 export const ProductOptionsTable = () => {
   const router = useRouter()
@@ -143,8 +95,19 @@ export const ProductOptionsTable = () => {
       ? false
       : undefined
 
-  const created_at_gte = resolveDateFilter(filtering.created_at)
-  const updated_at_gte = resolveDateFilter(filtering.updated_at)
+  const created_at_gte = useMemo(() => {
+    return (
+      resolveMedusaDateFilter(filtering.created_at) ??
+      resolveMedusaDateFilter(filtering.created_at_gte)
+    )
+  }, [filtering.created_at, filtering.created_at_gte])
+
+  const updated_at_gte = useMemo(() => {
+    return (
+      resolveMedusaDateFilter(filtering.updated_at) ??
+      resolveMedusaDateFilter(filtering.updated_at_gte)
+    )
+  }, [filtering.updated_at, filtering.updated_at_gte])
 
   const { data, isLoading } = useQuery({
     queryKey: [
@@ -194,9 +157,10 @@ export const ProductOptionsTable = () => {
 
   const filters = useMemo(
     () => [
-      filterHelper.accessor("is_exclusive", {
-        type: "radio",
+      filterHelper.custom({
+        id: "is_exclusive",
         label: "Type",
+        type: "select",
         options: [
           {
             label: "Product-specific",
@@ -208,16 +172,8 @@ export const ProductOptionsTable = () => {
           },
         ],
       }),
-      filterHelper.accessor("created_at", {
-        type: "date",
-        label: "Created",
-        options: dateFilterOptions,
-      }),
-      filterHelper.accessor("updated_at", {
-        type: "date",
-        label: "Updated",
-        options: dateFilterOptions,
-      }),
+      createMedusaDateFilter(filterHelper, "created_at", "Created"),
+      createMedusaDateFilter(filterHelper, "updated_at", "Updated"),
     ],
     []
   )
