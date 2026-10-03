@@ -18,4 +18,10 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+// `ANALYZE=true pnpm build` writes bundle reports to .next/analyze. A no-op otherwise.
+const withBundleAnalyzer = require("@next/bundle-analyzer")({
+  enabled: process.env.ANALYZE === "true",
+  analyzerMode: process.env.ANALYZE_MODE || "static",
+})
+
+module.exports = withBundleAnalyzer(nextConfig)

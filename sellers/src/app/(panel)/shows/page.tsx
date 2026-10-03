@@ -1,4 +1,4 @@
-import { ShowsTable } from "@modules/shows"
+import { ShowsTable } from "@modules/shows/components/shows-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Shows" }

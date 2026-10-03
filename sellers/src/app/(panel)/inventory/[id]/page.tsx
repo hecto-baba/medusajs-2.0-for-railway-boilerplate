@@ -1,4 +1,4 @@
-import { InventoryDetail } from "@modules/inventory"
+import { InventoryDetail } from "@modules/inventory/components/detail/inventory-detail"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Inventory Item" }

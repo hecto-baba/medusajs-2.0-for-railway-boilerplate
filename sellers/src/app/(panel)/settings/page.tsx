@@ -1,11 +1,9 @@
 import { requireVendorSession } from "@lib/data/vendor"
 import { Text } from "@medusajs/ui"
-import {
-  StoreGeneralSection,
-  StoreCurrencySection,
-  StoreMetadataSection,
-  StoreJsonDrawer,
-} from "@modules/settings"
+import { StoreGeneralSection } from "@modules/settings/components/store-general-section"
+import { StoreCurrencySection } from "@modules/settings/components/store-currency-section"
+import { StoreMetadataSection } from "@modules/settings/components/store-metadata-section"
+import { StoreJsonDrawer } from "@modules/settings/components/store-json-drawer"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Store" }

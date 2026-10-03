@@ -1,5 +1,6 @@
 import { requireVendorSession } from "@lib/data/vendor"
-import { ProfileGeneralSection, ProfileMfaSection } from "@modules/settings"
+import { ProfileGeneralSection } from "@modules/settings/components/profile-general-section"
+import { ProfileMfaSection } from "@modules/settings/components/profile-mfa-section"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Profile" }

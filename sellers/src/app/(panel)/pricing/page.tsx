@@ -1,4 +1,4 @@
-import { PriceListsTable } from "@modules/pricing"
+import { PriceListsTable } from "@modules/pricing/components/price-lists-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Price Lists" }

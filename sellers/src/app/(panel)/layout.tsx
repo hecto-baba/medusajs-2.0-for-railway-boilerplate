@@ -1,5 +1,5 @@
 import { requireVendorSession } from "@lib/data/vendor"
-import { QueryProvider } from "@modules/common"
+import { QueryProvider } from "@modules/common/components/query-provider"
 import { PanelShell } from "@modules/layout"
 
 /**

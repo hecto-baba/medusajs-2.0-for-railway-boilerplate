@@ -1,4 +1,4 @@
-import { WorkflowsTable } from "@modules/settings"
+import { WorkflowsTable } from "@modules/settings/components/workflows"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Workflows" }
