@@ -5,6 +5,7 @@ import {
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { createRestaurantProductsWorkflow } from "../../../../../workflows/restaurant/workflows/create-restaurant-products"
 import { MARKETPLACE_MODULE } from "../../../../../modules/marketplace"
+import { RESTAURANT_MODULE } from "../../../../../modules/restaurant"
 import { assertVendorOwnsRestaurant } from "../route"
 import { getVendorId } from "../../../shared/vendor-scope"
 
@@ -45,6 +46,11 @@ export async function POST(req: AuthenticatedMedusaRequest, res: MedusaResponse)
     ...p,
     shipping_profile_id: p.shipping_profile_id || defaultShippingProfileId,
     sales_channels: p.sales_channels || (defaultSalesChannelId ? [{ id: defaultSalesChannelId }] : undefined),
+    metadata: {
+      ...(p.metadata || {}),
+      restaurant_id: req.params.id,
+      is_restaurant_item: true,
+    },
   }))
 
   const { result: restaurantProducts } = await createRestaurantProductsWorkflow(req.scope).run({
@@ -54,13 +60,21 @@ export async function POST(req: AuthenticatedMedusaRequest, res: MedusaResponse)
     },
   })
 
-  // Link each created food product to the vendor
-  if (Array.isArray(restaurantProducts) && vendorId) {
+  // Link each created food product to the vendor and restaurant
+  if (Array.isArray(restaurantProducts)) {
     for (const prod of restaurantProducts) {
       if (prod?.id) {
+        if (vendorId) {
+          await remoteLink.create([
+            {
+              [MARKETPLACE_MODULE]: { vendor_id: vendorId },
+              [Modules.PRODUCT]: { product_id: prod.id },
+            },
+          ]).catch(() => {})
+        }
         await remoteLink.create([
           {
-            [MARKETPLACE_MODULE]: { vendor_id: vendorId },
+            [RESTAURANT_MODULE]: { restaurant_id: req.params.id },
             [Modules.PRODUCT]: { product_id: prod.id },
           },
         ]).catch(() => {})

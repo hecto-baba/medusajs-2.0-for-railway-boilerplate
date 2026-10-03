@@ -45,6 +45,10 @@ export const GET = async (
         "description",
         "image_url",
         "admins.*",
+        "products.*",
+        "products.variants.*",
+        "products.variants.prices.*",
+        "products.options.*",
       ],
       filters: {
         admins: { email: vendorAdmin.email },
@@ -59,7 +63,15 @@ export const GET = async (
   try {
     const { data: [vendorWithRestaurants] } = await query.graph({
       entity: "vendor",
-      fields: ["id", "restaurants.*"],
+      fields: [
+        "id",
+        "restaurants.*",
+        "restaurants.admins.*",
+        "restaurants.products.*",
+        "restaurants.products.variants.*",
+        "restaurants.products.variants.prices.*",
+        "restaurants.products.options.*",
+      ],
       filters: { id: [vendorAdmin.vendor.id] },
     })
     if (vendorWithRestaurants?.restaurants?.length) {
@@ -70,6 +82,59 @@ export const GET = async (
       }
     }
   } catch {}
+
+  // 3. For any restaurant found, ensure its products are loaded if empty
+  for (const r of restaurants) {
+    if (!r.products || !r.products.length) {
+      try {
+        const { data: [detail] } = await query.graph({
+          entity: "restaurant",
+          fields: [
+            "id",
+            "products.*",
+            "products.variants.*",
+            "products.variants.prices.*",
+            "products.options.*",
+          ],
+          filters: { id: r.id },
+        })
+        if (detail?.products?.length) {
+          r.products = detail.products
+        }
+      } catch {}
+    }
+  }
+
+  // 4. Also merge any vendor products designated as restaurant dishes
+  if (vendorAdmin?.vendor?.id && restaurants.length > 0) {
+    try {
+      const { data: [vendorWithProds] } = await query.graph({
+        entity: "vendor",
+        fields: [
+          "id",
+          "products.*",
+          "products.variants.*",
+          "products.variants.prices.*",
+          "products.options.*",
+        ],
+        filters: { id: [vendorAdmin.vendor.id] },
+      })
+      const vProds = vendorWithProds?.products || []
+      for (const r of restaurants) {
+        r.products = r.products || []
+        for (const vp of vProds) {
+          const isDish =
+            vp.metadata?.is_restaurant_item === true ||
+            vp.metadata?.restaurant_id === r.id ||
+            vp.metadata?.dietary ||
+            vp.metadata?.dietary_type
+          if (isDish && !r.products.some((existing: any) => existing.id === vp.id)) {
+            r.products.push(vp)
+          }
+        }
+      }
+    } catch {}
+  }
 
   // Fallback: if no restaurants found, list via module if email matches or return empty
   if (!restaurants.length) {

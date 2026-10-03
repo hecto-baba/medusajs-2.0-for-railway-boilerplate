@@ -24,6 +24,7 @@ import { JsonSection, MetadataSection } from "./metadata-section"
 import { OptionsSection } from "./options-section"
 import { RentalSection } from "./rental-section"
 import { AppointmentSection } from "./appointment-section"
+import { RestaurantDishSection } from "./restaurant-dish-section"
 import { VariantsSection } from "./variants-section"
 
 /**
@@ -85,6 +86,9 @@ export const ProductDetail = ({ id }: { id: string }) => {
             </LayoutComposer.Entry>
             <LayoutComposer.Entry id="ProductAppointmentSection">
               <AppointmentSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductRestaurantDishSection">
+              <RestaurantDishSection product={product} />
             </LayoutComposer.Entry>
           </>
         ),

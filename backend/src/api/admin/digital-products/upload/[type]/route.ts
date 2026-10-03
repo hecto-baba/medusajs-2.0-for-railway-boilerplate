@@ -10,7 +10,12 @@ export const POST = async (
   res: MedusaResponse
 ) => {
   const access = req.params.type === "main" ? "private" : "public"
-  const input = req.files as Express.Multer.File[]
+  type UploadedFile = {
+    originalname: string
+    mimetype: string
+    buffer: Buffer
+  }
+  const input = (req as unknown as { files?: UploadedFile[] }).files
 
   if (!input?.length) {
     throw new MedusaError(
