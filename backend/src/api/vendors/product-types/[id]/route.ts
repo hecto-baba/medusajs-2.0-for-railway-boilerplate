@@ -8,6 +8,13 @@ import {
   updateProductTypesWorkflow,
   deleteProductTypesWorkflow,
 } from "@medusajs/medusa/core-flows"
+import { assertVendorCanSee, getVisibleIds, ScopedEntity } from "../../shared/platform-scope"
+import { assertVendorOwns } from "../../shared/vendor-scope"
+
+const PRODUCT_TYPES: ScopedEntity = {
+  linkField: "product_types",
+  entity: "product_type",
+}
 
 export const UpdateVendorProductTypeSchema = z.object({
   value: z.string().optional(),
@@ -20,6 +27,9 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const typeId = req.params.id
+
+  // Own or shared platform type; another seller's type is a 404.
+  await assertVendorCanSee(req, PRODUCT_TYPES, typeId, "Product type not found.")
 
   const { data: types } = await query.graph({
     entity: "product_type",
@@ -41,6 +51,8 @@ export const POST = async (
 ) => {
   const typeId = req.params.id
 
+  await assertVendorOwns(req, "product_types", typeId, "Product type not found.")
+
   const { result } = await updateProductTypesWorkflow(req.scope).run({
     input: {
       selector: { id: typeId },
@@ -56,6 +68,8 @@ export const DELETE = async (
   res: MedusaResponse
 ) => {
   const typeId = req.params.id
+
+  await assertVendorOwns(req, "product_types", typeId, "Product type not found.")
 
   await deleteProductTypesWorkflow(req.scope).run({
     input: { ids: [typeId] },

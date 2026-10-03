@@ -11,6 +11,7 @@ import {
 } from "@lib/data/vendor-client"
 import {
   Button,
+  Container,
   createDataTableColumnHelper,
   createDataTableCommandHelper,
   createDataTableFilterHelper,
@@ -24,16 +25,19 @@ import {
   useDataTable,
   usePrompt,
 } from "@medusajs/ui"
-import { Plus } from "@medusajs/icons"
+import { Sparkles } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import {
+  DataTableAddFilter,
   ListSummaryCell,
   PlaceholderCell,
   ProductCell,
   ProductStatusCell,
+  createMedusaDateFilter,
+  resolveMedusaDateFilter,
 } from "@modules/common"
 import { ProductExportButton } from "./product-export-button"
 import { ProductImportModal } from "./product-import-modal"
@@ -64,8 +68,8 @@ const useColumns = (onDelete: (product: VendorProduct) => void) => [
     header: "Product",
     enableSorting: true,
     sortLabel: "Title",
-    sortAscLabel: "A-Z",
-    sortDescLabel: "Z-A",
+    sortAscLabel: "Ascending",
+    sortDescLabel: "Descending",
     cell: ({ row }) => (
       <ProductCell
         thumbnail={row.original.thumbnail}
@@ -104,8 +108,6 @@ const useColumns = (onDelete: (product: VendorProduct) => void) => [
   columnHelper.accessor("status", {
     id: "status",
     header: "Status",
-    enableSorting: true,
-    sortLabel: "Status",
     cell: ({ row }) => <ProductStatusCell status={row.original.status} />,
   }),
   columnHelper.accessor("created_at", {
@@ -167,7 +169,10 @@ export const ProductsTable = () => {
   const [rowSelection, setRowSelection] = useState<DataTableRowSelectionState>(
     {}
   )
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "title",
+    desc: false,
+  })
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -178,13 +183,13 @@ export const ProductsTable = () => {
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false)
 
   // Fetch filter options
-  const { data: collectionsData } = useQuery({
-    queryKey: ["vendor-collections-filter"],
-    queryFn: () => listVendorCollections({ limit: 100, offset: 0 }),
-  })
   const { data: typesData } = useQuery({
     queryKey: ["vendor-types-filter"],
     queryFn: () => listVendorProductTypes({ limit: 100, offset: 0 }),
+  })
+  const { data: collectionsData } = useQuery({
+    queryKey: ["vendor-collections-filter"],
+    queryFn: () => listVendorCollections({ limit: 100, offset: 0 }),
   })
   const { data: tagsData } = useQuery({
     queryKey: ["vendor-tags-filter"],
@@ -198,9 +203,10 @@ export const ProductsTable = () => {
   // Dynamic filter definitions
   const filters = useMemo(() => {
     const list: any[] = [
-      filterHelper.accessor("status", {
+      filterHelper.custom({
+        id: "status",
         label: "Status",
-        type: "multiselect",
+        type: "select",
         options: [
           { label: "Draft", value: "draft" },
           { label: "Proposed", value: "proposed" },
@@ -208,122 +214,77 @@ export const ProductsTable = () => {
           { label: "Rejected", value: "rejected" },
         ],
       }),
+      filterHelper.custom({
+        id: "collection_id",
+        label: "Collection",
+        type: "select",
+        options: (collectionsData?.collections ?? []).map((c) => ({
+          label: c.title,
+          value: c.id,
+        })),
+      }),
+      filterHelper.custom({
+        id: "sales_channel_id",
+        label: "Sales Channel",
+        type: "select",
+        options: (salesChannelsData?.sales_channels ?? []).map((sc) => ({
+          label: sc.name,
+          value: sc.id,
+        })),
+      }),
+      filterHelper.custom({
+        id: "type_id",
+        label: "Type",
+        type: "select",
+        options: (typesData?.product_types ?? []).map((t) => ({
+          label: t.value,
+          value: t.id,
+        })),
+      }),
+      filterHelper.custom({
+        id: "tag_id",
+        label: "Tag",
+        type: "select",
+        options: (tagsData?.product_tags ?? []).map((t) => ({
+          label: t.value,
+          value: t.id,
+        })),
+      }),
+      createMedusaDateFilter(filterHelper, "created_at", "Created"),
+      createMedusaDateFilter(filterHelper, "updated_at", "Updated"),
     ]
 
-    const collections = collectionsData?.collections ?? []
-    if (collections.length > 0) {
-      list.push(
-        filterHelper.custom({
-          id: "collection_id",
-          label: "Collection",
-          type: "select",
-          options: collections.map((c) => ({
-            label: c.title,
-            value: c.id,
-          })),
-        })
-      )
-    }
-
-    const types = typesData?.product_types ?? []
-    if (types.length > 0) {
-      list.push(
-        filterHelper.custom({
-          id: "type_id",
-          label: "Type",
-          type: "select",
-          options: types.map((t) => ({
-            label: t.value,
-            value: t.id,
-          })),
-        })
-      )
-    }
-
-    const tags = tagsData?.product_tags ?? []
-    if (tags.length > 0) {
-      list.push(
-        filterHelper.custom({
-          id: "tag_id",
-          label: "Tag",
-          type: "select",
-          options: tags.map((t) => ({
-            label: t.value,
-            value: t.id,
-          })),
-        })
-      )
-    }
-
-    const channels = salesChannelsData?.sales_channels ?? []
-    if (channels.length > 0) {
-      list.push(
-        filterHelper.custom({
-          id: "sales_channel_id",
-          label: "Sales Channel",
-          type: "select",
-          options: channels.map((sc) => ({
-            label: sc.name,
-            value: sc.id,
-          })),
-        })
-      )
-    }
-
-    list.push(
-      filterHelper.custom({
-        id: "created_at_gte",
-        label: "Created",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      })
-    )
-
-    list.push(
-      filterHelper.custom({
-        id: "updated_at_gte",
-        label: "Updated",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      })
-    )
-
     return list
-  }, [collectionsData, typesData, tagsData, salesChannelsData])
+  }, [typesData, tagsData, salesChannelsData, collectionsData])
 
   // A select filter's value arrives either as a bare array or wrapped in an
   // operator object depending on how it was set, so it is normalised here.
   const statusFilter = filtering.status
+  const rawStatus = extractFilterVal(statusFilter)
   const status = Array.isArray(statusFilter)
     ? (statusFilter as string[])
-    : statusFilter
-      ? (Object.values(statusFilter).flat() as string[])
+    : rawStatus
+      ? [rawStatus]
       : undefined
 
   const collectionId = extractFilterVal(filtering.collection_id)
   const typeId = extractFilterVal(filtering.type_id)
   const tagId = extractFilterVal(filtering.tag_id)
   const salesChannelId = extractFilterVal(filtering.sales_channel_id)
-  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
-  const updatedFilterVal = extractFilterVal(filtering.updated_at_gte)
+
   const createdAtGte = useMemo(() => {
-    if (!dateFilterVal) return undefined
-    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [dateFilterVal])
+    return (
+      resolveMedusaDateFilter(filtering.created_at) ??
+      resolveMedusaDateFilter(filtering.created_at_gte)
+    )
+  }, [filtering.created_at, filtering.created_at_gte])
+
   const updatedAtGte = useMemo(() => {
-    if (!updatedFilterVal) return undefined
-    const days = updatedFilterVal === "7d" ? 7 : updatedFilterVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [updatedFilterVal])
+    return (
+      resolveMedusaDateFilter(filtering.updated_at) ??
+      resolveMedusaDateFilter(filtering.updated_at_gte)
+    )
+  }, [filtering.updated_at, filtering.updated_at_gte])
 
   // The backend reads a leading "-" as descending, matching the admin.
   const order = sorting
@@ -491,44 +452,56 @@ export const ProductsTable = () => {
 
   return (
     <>
-      <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-          <Heading level="h2">Products</Heading>
-          <div className="flex items-center gap-x-2">
-            <DataTable.Search placeholder="Search products..." />
-            <DataTable.FilterMenu tooltip="Filter" />
-            <DataTable.SortingMenu tooltip="Sort" />
+      <Container className="divide-y p-0">
+        <div className="flex items-center justify-between px-6 py-4">
+          <Heading level="h1">Products</Heading>
+          <div className="flex items-center justify-center gap-x-2">
             <ProductExportButton />
             <ProductImportModal />
             <Button
               size="small"
-              variant="primary"
+              variant="secondary"
               onClick={() => setIsAddProductModalOpen(true)}
               className="gap-x-1.5"
             >
-              <Plus className="size-4" />
-              <span>Add Product</span>
+              <Sparkles className="size-4 text-ui-fg-interactive" />
+              <span>Master Catalog</span>
+            </Button>
+            <Button size="small" variant="secondary" asChild>
+              <Link href="/products/new">Create</Link>
             </Button>
           </div>
-        </DataTable.Toolbar>
-        <DataTable.FilterBar />
-        <DataTable.Table
-          emptyState={{
-            empty: {
-              heading: "No products yet",
-              description: "Browse the Master Catalog or create your first custom product.",
-            },
-            filtered: {
-              heading: "No matches",
-              description: "No products match that search.",
-            },
-          }}
-        />
-        <DataTable.Pagination />
-        <DataTable.CommandBar
-          selectedLabel={(count) => count + " selected"}
-        />
-      </DataTable>
+        </div>
+
+        <DataTable instance={table}>
+          <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-x-2">
+              <DataTableAddFilter table={table} />
+            </div>
+            <div className="flex items-center gap-x-2">
+              <DataTable.Search placeholder="Search" />
+              <DataTable.SortingMenu tooltip="Sort" />
+            </div>
+          </DataTable.Toolbar>
+          <DataTable.FilterBar />
+          <DataTable.Table
+            emptyState={{
+              empty: {
+                heading: "No records",
+                description: "No products found. Create a product or browse the Master Catalog.",
+              },
+              filtered: {
+                heading: "No matches",
+                description: "No products match that search.",
+              },
+            }}
+          />
+          <DataTable.Pagination />
+          <DataTable.CommandBar
+            selectedLabel={(count) => count + " selected"}
+          />
+        </DataTable>
+      </Container>
 
       <AddProductModal
         open={isAddProductModalOpen}

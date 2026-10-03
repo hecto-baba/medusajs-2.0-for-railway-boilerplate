@@ -40,8 +40,19 @@ export const GET = async (
       .map((e: any) => e.customer_id)
       .filter(Boolean)
 
+    // Only the approvals of carts that belong to this company (was: every approval of
+    // every company, filtered in memory afterwards).
+    const { data: companyCarts } = companyCustomerIds.length
+      ? await query.graph({ entity: "cart", fields: ["id"], filters: { customer_id: companyCustomerIds } })
+      : { data: [] as any[] }
+    const companyCartIds = (companyCarts || []).map((cart: any) => cart.id)
+    if (!companyCartIds.length) {
+      return res.json({ approvals: [] })
+    }
+
     const { data: approvals } = await query.graph({
       entity: "approval",
+      filters: { cart_id: companyCartIds },
       fields: [
         "id",
         "cart_id",
@@ -81,6 +92,7 @@ export const POST = async (
   const approvalModule = req.scope.resolve(APPROVAL_MODULE) as any
 
   // Verify caller is a company manager
+  let callerCompanyId: string | null = null
   try {
     const { data: [caller] } = await query.graph({
       entity: "customer",
@@ -89,6 +101,7 @@ export const POST = async (
     })
 
     const isManager = Boolean((caller as any)?.employee?.is_admin)
+    callerCompanyId = (caller as any)?.employee?.company?.id ?? null
     if (!isManager) {
       return res.status(403).json({
         message: "Only company managers can approve or reject spending requests.",
@@ -103,6 +116,38 @@ export const POST = async (
 
   if (!approval_id) {
     return res.status(400).json({ message: "approval_id is required" })
+  }
+
+  if (!["approved", "rejected"].includes(status)) {
+    return res.status(400).json({ message: "status must be approved or rejected" })
+  }
+
+  // A manager decides only their OWN company's spending requests: the approval's cart
+  // must belong to a customer of the caller's company. Anything else is "not found".
+  const { data: [target] } = await query.graph({
+    entity: "approval",
+    fields: ["id", "cart_id", "created_by"],
+    filters: { id: approval_id },
+  })
+  let sameCompany = false
+  if (target && callerCompanyId) {
+    const { data: [cart] } = await query.graph({
+      entity: "cart",
+      fields: ["id", "customer_id"],
+      filters: { id: target.cart_id },
+    })
+    const ownerId = cart?.customer_id || target.created_by
+    if (ownerId) {
+      const { data: [owner] } = await query.graph({
+        entity: "customer",
+        fields: ["id", "employee.company.id"],
+        filters: { id: ownerId },
+      })
+      sameCompany = (owner as any)?.employee?.company?.id === callerCompanyId
+    }
+  }
+  if (!sameCompany) {
+    return res.status(404).json({ message: "Approval not found" })
   }
 
   const approvalStatus = await approvalModule.createApprovalStatuses({

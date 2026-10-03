@@ -2,6 +2,11 @@ import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError, Modules } from "@medusajs/framework/utils"
 import { createInventoryItemsWorkflow } from "@medusajs/medusa/core-flows"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
+import { getVendorId, resolveVendorAdmin } from "../shared/vendor-scope"
+
+// Single source of truth lives in shared/vendor-scope.ts; re-exported so
+// existing imports from this file keep working.
+export { getVendorId, resolveVendorAdmin }
 
 /**
  * Confirms the product behind a URL id belongs to the calling vendor.
@@ -23,18 +28,10 @@ export const assertOwnership = async (
   req: AuthenticatedMedusaRequest,
   productId: string
 ): Promise<void> => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.products.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, ["vendor.products.id"])
 
   const owns = vendorAdmin?.vendor?.products?.some(
-    (product) => product?.id === productId
+    (product: any) => product?.id === productId
   )
 
   if (!owns) {
@@ -68,36 +65,6 @@ export const assertVariantBelongsToProduct = async (
   }
 }
 
-/**
- * Returns the vendor id behind the calling admin.
- *
- * Used by routes that create products (batch, import) and therefore need to
- * write vendor links for rows that do not exist yet.
- */
-export const getVendorId = async (
-  req: AuthenticatedMedusaRequest
-): Promise<string> => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
-
-  const vendorId = vendorAdmin?.vendor?.id
-
-  if (!vendorId) {
-    throw new MedusaError(
-      MedusaError.Types.NOT_FOUND,
-      "No vendor found for the authenticated session."
-    )
-  }
-
-  return vendorId
-}
 
 
 /**

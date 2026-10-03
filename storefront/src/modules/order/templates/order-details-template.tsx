@@ -9,14 +9,18 @@ import OrderDetails from "@modules/order/components/order-details"
 import OrderSummary from "@modules/order/components/order-summary"
 import ShippingDetails from "@modules/order/components/shipping-details"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import SellerOrders from "@modules/order/components/seller-orders"
+import type { SellerOrder } from "@lib/data/orders"
 import { HttpTypes } from "@medusajs/types"
 
 type OrderDetailsTemplateProps = {
   order: HttpTypes.StoreOrder
+  sellerOrders?: SellerOrder[]
 }
 
 const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
   order,
+  sellerOrders = [],
 }) => {
   return (
     <div className="flex flex-col justify-center gap-y-4">
@@ -36,6 +40,7 @@ const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
       >
         <OrderDetails order={order} showStatus />
         <Items items={order.items} />
+        <SellerOrders sellerOrders={sellerOrders} />
         <ShippingDetails order={order} />
         <OrderSummary order={order} />
         <Help />

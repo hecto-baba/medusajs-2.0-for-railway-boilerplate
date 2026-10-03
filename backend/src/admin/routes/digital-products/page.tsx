@@ -1,4 +1,3 @@
-import { defineRouteConfig } from "@medusajs/admin-sdk"
 import {
   PhotoSolid,
   EllipsisHorizontal,
@@ -710,9 +709,5 @@ const DigitalProductsPage = () => {
   )
 }
 
-export const config = defineRouteConfig({
-  label: "Digital Products",
-  icon: PhotoSolid,
-})
 
 export default DigitalProductsPage

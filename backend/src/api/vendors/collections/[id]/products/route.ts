@@ -5,6 +5,12 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { batchProductsWorkflow } from "@medusajs/medusa/core-flows"
+import { assertVendorCanSee, ScopedEntity } from "../../../shared/platform-scope"
+
+const COLLECTIONS: ScopedEntity = {
+  linkField: "product_collections",
+  entity: "product_collection",
+}
 
 export const ManageCollectionProductsSchema = z.object({
   add: z.array(z.string()).optional(),
@@ -17,6 +23,9 @@ export const POST = async (
 ) => {
   const collectionId = req.params.id
   const { add = [], remove = [] } = req.validatedBody
+
+  // The seller's products may only go into their own or a shared platform collection.
+  await assertVendorCanSee(req, COLLECTIONS, collectionId, "Collection not found.")
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   // Verify vendor ownership of the products being added/removed

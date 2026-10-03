@@ -11,6 +11,7 @@ import {
 import {
   Badge,
   Button,
+  Container,
   createDataTableColumnHelper,
   createDataTableFilterHelper,
   DataTable,
@@ -29,7 +30,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
-import { ActionMenu, PlaceholderCell } from "@modules/common"
+import {
+  ActionMenu,
+  PlaceholderCell,
+  createMedusaDateFilter,
+  resolveMedusaDateFilter,
+} from "@modules/common"
 import { DraftOrderModal } from "./forms/draft-order-modal"
 
 const columnHelper = createDataTableColumnHelper<VendorDraftOrder>()
@@ -52,7 +58,10 @@ export const DraftOrdersTable = () => {
   const prompt = usePrompt()
 
   const [search, setSearch] = useState("")
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "display_id",
+    desc: true,
+  })
   const [filtering, setFiltering] = useState<DataTableFilteringState>({})
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
@@ -73,6 +82,11 @@ export const DraftOrdersTable = () => {
     staleTime: 5 * 60 * 1000,
   })
 
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
+    sales_channel: false,
+    region: false,
+  })
+
   // Dynamic filters matching Backend Production
   const filters = useMemo(() => {
     const list: any[] = [
@@ -85,57 +99,27 @@ export const DraftOrdersTable = () => {
           { label: "Has customer account", value: "has_customer" },
         ],
       }),
+      filterHelper.custom({
+        id: "sales_channel_id",
+        label: "Sales Channel",
+        type: "select",
+        options: (salesChannelsData?.sales_channels ?? []).map((sc) => ({
+          label: sc.name,
+          value: sc.id,
+        })),
+      }),
+      filterHelper.custom({
+        id: "region_id",
+        label: "Region",
+        type: "select",
+        options: (regionsData?.regions ?? []).map((r) => ({
+          label: r.name,
+          value: r.id,
+        })),
+      }),
+      createMedusaDateFilter(filterHelper, "created_at", "Created At"),
+      createMedusaDateFilter(filterHelper, "updated_at", "Updated At"),
     ]
-
-    const channels = salesChannelsData?.sales_channels ?? []
-    if (channels.length > 0) {
-      list.push(
-        filterHelper.custom({
-          id: "sales_channel_id",
-          label: "Sales Channel",
-          type: "select",
-          options: channels.map((sc) => ({ label: sc.name, value: sc.id })),
-        })
-      )
-    }
-
-    const regions = regionsData?.regions ?? []
-    if (regions.length > 0) {
-      list.push(
-        filterHelper.custom({
-          id: "region_id",
-          label: "Region",
-          type: "select",
-          options: regions.map((r) => ({ label: r.name, value: r.id })),
-        })
-      )
-    }
-
-    list.push(
-      filterHelper.custom({
-        id: "created_at_gte",
-        label: "Created At",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      })
-    )
-
-    list.push(
-      filterHelper.custom({
-        id: "updated_at_gte",
-        label: "Updated At",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      })
-    )
 
     return list
   }, [salesChannelsData, regionsData])
@@ -147,27 +131,34 @@ export const DraftOrdersTable = () => {
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
-  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
-  const updatedFilterVal = extractFilterVal(filtering.updated_at_gte)
   const salesChannelId = extractFilterVal(filtering.sales_channel_id)
   const regionId = extractFilterVal(filtering.region_id)
+  const qCustomer = extractFilterVal(filtering.q_customer)
 
-  const createdAtGte = useMemo(() => {
-    if (!dateFilterVal) return undefined
-    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [dateFilterVal])
+  const createdAtGte = useMemo(
+    () => resolveMedusaDateFilter(filtering.created_at),
+    [filtering.created_at]
+  )
 
-  const updatedAtGte = useMemo(() => {
-    if (!updatedFilterVal) return undefined
-    const days = updatedFilterVal === "7d" ? 7 : updatedFilterVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [updatedFilterVal])
+  const updatedAtGte = useMemo(
+    () => resolveMedusaDateFilter(filtering.updated_at),
+    [filtering.updated_at]
+  )
 
   const { data, isLoading } = useQuery({
     queryKey: [
       "vendor-draft-orders",
-      { limit, offset, q: search, order, created_at_gte: createdAtGte, updated_at_gte: updatedAtGte, sales_channel_id: salesChannelId, region_id: regionId },
+      {
+        limit,
+        offset,
+        q: search,
+        order,
+        created_at_gte: createdAtGte,
+        updated_at_gte: updatedAtGte,
+        sales_channel_id: salesChannelId,
+        region_id: regionId,
+        q_customer: qCustomer,
+      },
     ],
     queryFn: () =>
       listVendorDraftOrders({
@@ -179,6 +170,7 @@ export const DraftOrdersTable = () => {
         updated_at_gte: updatedAtGte,
         sales_channel_id: salesChannelId,
         region_id: regionId,
+        q_customer: qCustomer,
       }),
     placeholderData: (previous) => previous,
   })
@@ -239,6 +231,7 @@ export const DraftOrdersTable = () => {
   const columns = useMemo(
     () => [
       columnHelper.accessor("display_id", {
+        id: "display_id",
         header: "Order #",
         enableSorting: true,
         sortLabel: "Display ID",
@@ -256,12 +249,34 @@ export const DraftOrdersTable = () => {
           )
         },
       }),
+      columnHelper.accessor("created_at", {
+        id: "created_at",
+        header: "Date",
+        enableSorting: true,
+        sortLabel: "Date",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ getValue }) => {
+          const date = getValue()
+          if (!date) return <PlaceholderCell />
+          return (
+            <Text size="small" className="text-ui-fg-subtle">
+              {new Date(date).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </Text>
+          )
+        },
+      }),
       columnHelper.accessor("customer", {
+        id: "customer",
         header: "Customer",
         enableSorting: true,
         sortLabel: "Customer",
-        sortAscLabel: "A-Z",
-        sortDescLabel: "Z-A",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
         cell: ({ row }) => {
           const d = row.original
           const customer = d.customer
@@ -283,11 +298,31 @@ export const DraftOrdersTable = () => {
           )
         },
       }),
+      columnHelper.accessor("sales_channel" as any, {
+        id: "sales_channel",
+        header: "Sales Channel",
+        enableSorting: true,
+        sortLabel: "Sales Channel",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => (row.original as any).sales_channel?.name || "-",
+      }),
+      columnHelper.accessor("region" as any, {
+        id: "region",
+        header: "Region",
+        enableSorting: true,
+        sortLabel: "Region",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => (row.original as any).region?.name || "-",
+      }),
       columnHelper.accessor("status", {
+        id: "status",
         header: "Status",
         cell: () => <StatusBadge color="grey">Draft</StatusBadge>,
       }),
       columnHelper.accessor("items", {
+        id: "items",
         header: "Items",
         cell: ({ getValue }) => {
           const items = getValue() ?? []
@@ -299,34 +334,14 @@ export const DraftOrdersTable = () => {
         },
       }),
       columnHelper.accessor("total", {
+        id: "total",
         header: "Total",
-        enableSorting: true,
         cell: ({ row }) => {
           const d = row.original
           return (
             <Text size="small" weight="plus">
               {(d.currency_code || "USD").toUpperCase()}{" "}
               {(d.total ?? 0).toFixed(2)}
-            </Text>
-          )
-        },
-      }),
-      columnHelper.accessor("created_at", {
-        header: "Date",
-        enableSorting: true,
-        sortLabel: "Date",
-        sortAscLabel: "Ascending",
-        sortDescLabel: "Descending",
-        cell: ({ getValue }) => {
-          const date = getValue()
-          if (!date) return <PlaceholderCell />
-          return (
-            <Text size="small" className="text-ui-fg-subtle">
-              {new Date(date).toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
             </Text>
           )
         },
@@ -394,6 +409,10 @@ export const DraftOrdersTable = () => {
       },
     },
     filters,
+    columnVisibility: {
+      state: columnVisibility,
+      onColumnVisibilityChange: setColumnVisibility,
+    },
     search: {
       state: search,
       onSearchChange: (value) => {
@@ -404,31 +423,37 @@ export const DraftOrdersTable = () => {
   })
 
   return (
-    <div className="flex flex-col gap-y-3 p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <Heading level="h1">Draft Orders</Heading>
-          <Text size="small" className="text-ui-fg-subtle">
-            Create and manage custom draft orders for customers before payment and conversion.
-          </Text>
-        </div>
-        <Button size="small" onClick={() => setIsCreateOpen(true)}>
-          <Plus />
-          Create Draft Order
-        </Button>
-      </div>
-
+    <Container className="divide-y p-0">
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between">
-          <DataTable.Search placeholder="Search draft orders..." />
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <Heading level="h2">Draft Orders</Heading>
           <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search draft orders..." />
             <DataTable.FilterMenu tooltip="Filter" />
             <DataTable.SortingMenu tooltip="Sort" />
+            <Button
+              size="small"
+              variant="primary"
+              onClick={() => setIsCreateOpen(true)}
+            >
+              Create
+            </Button>
           </div>
         </DataTable.Toolbar>
         <DataTable.FilterBar />
 
-        <DataTable.Table />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No draft orders found",
+              description: "Create a new draft order to get started.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No draft orders match the selected filters or search query.",
+            },
+          }}
+        />
 
         <DataTable.Pagination />
       </DataTable>
@@ -438,6 +463,6 @@ export const DraftOrdersTable = () => {
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
       />
-    </div>
+    </Container>
   )
 }

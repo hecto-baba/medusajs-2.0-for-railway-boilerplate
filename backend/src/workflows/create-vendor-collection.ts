@@ -58,7 +58,7 @@ export const createVendorCollectionWorkflow = createWorkflow(
 
     const { data: collections } = useQueryGraphStep({
       entity: "product_collection",
-      fields: ["id", "title", "handle", "metadata", "created_at", "updated_at", "products.*"],
+      fields: ["id", "title", "handle", "metadata", "created_at", "updated_at"],
       filters: { id: createdCollections[0].id },
     }).config({ name: "retrieve-created-collection" })
 

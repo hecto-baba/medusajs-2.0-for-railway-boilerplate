@@ -1,6 +1,7 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { QUOTE_MODULE } from "../../../modules/quote"
+import { getVisibleCustomerIds } from "../helpers/quote-access"
 
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const customerId = (req as any).auth_context?.actor_id
@@ -72,6 +73,13 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
       ],
       filters: filterConditions.length === 1 ? filterConditions[0] : { $or: filterConditions },
     })
+
+    // A cart id alone must not open someone else's quotes: keep only the ones nobody
+    // owns yet (a guest's own) or the caller's, and their company's.
+    const visible = await getVisibleCustomerIds(req)
+    const allowed = (quotes || []).filter((q: any) => !q.customer_id || visible.includes(q.customer_id))
+    quotes.length = 0
+    quotes.push(...allowed)
 
     // Ensure items and totals are clean and accurate for storefront
     for (const q of (quotes || [])) {

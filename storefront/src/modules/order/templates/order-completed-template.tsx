@@ -6,14 +6,18 @@ import Items from "@modules/order/components/items"
 import OrderDetails from "@modules/order/components/order-details"
 import ShippingDetails from "@modules/order/components/shipping-details"
 import PaymentDetails from "@modules/order/components/payment-details"
+import SellerOrders from "@modules/order/components/seller-orders"
+import type { SellerOrder } from "@lib/data/orders"
 import { HttpTypes } from "@medusajs/types"
 
 type OrderCompletedTemplateProps = {
   order: HttpTypes.StoreOrder
+  sellerOrders?: SellerOrder[]
 }
 
 export default function OrderCompletedTemplate({
   order,
+  sellerOrders = [],
 }: OrderCompletedTemplateProps) {
   return (
     <div className="py-6 min-h-[calc(100vh-64px)]">
@@ -34,6 +38,7 @@ export default function OrderCompletedTemplate({
             Summary
           </Heading>
           <Items items={order.items} />
+          <SellerOrders sellerOrders={sellerOrders} />
           <CartTotals totals={order} />
           <ShippingDetails order={order} />
           <PaymentDetails order={order} />

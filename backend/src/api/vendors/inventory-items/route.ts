@@ -11,6 +11,7 @@ import {
   createInventoryItemsWorkflow,
   createInventoryLevelsWorkflow,
 } from "@medusajs/medusa/core-flows"
+import { assertVendorCanUseStockLocations } from "../shared/inventory-scope"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import {
   getVendorId,
@@ -222,6 +223,12 @@ export const POST = async (
 ) => {
   const vendorId = await getVendorId(req)
   const { location_levels, locations, ...itemData } = req.validatedBody
+
+  // Every location named must be one this seller can use, before anything is created.
+  await assertVendorCanUseStockLocations(req, [
+    ...(location_levels ?? []).map((level) => level.location_id),
+    ...Object.keys(locations ?? {}),
+  ])
 
   // 1. Create the inventory item
   const { result } = await createInventoryItemsWorkflow(req.scope).run({

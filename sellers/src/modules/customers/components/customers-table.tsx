@@ -25,6 +25,7 @@ import {
   AccountCell,
   AccountHeader,
   ActionMenu,
+  DataTableAddFilter,
   DateCell,
   EmailCell,
   EmailHeader,
@@ -92,7 +93,10 @@ export const CustomersTable = () => {
 
   const [search, setSearch] = useState("")
   const [filtering, setFiltering] = useState<DataTableFilteringState>({})
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "created_at",
+    desc: true,
+  })
   const [columnVisibility, setColumnVisibility] = useState<
     Record<string, boolean>
   >({
@@ -233,14 +237,6 @@ export const CustomersTable = () => {
         type: "select",
         options: groupOptions,
       }),
-      filterHelper.accessor("has_account", {
-        type: "select",
-        label: "Account",
-        options: [
-          { label: "Registered", value: "true" },
-          { label: "Guest", value: "false" },
-        ],
-      }),
       filterHelper.custom({
         id: "created_at",
         label: "Account Created",
@@ -267,6 +263,7 @@ export const CustomersTable = () => {
   const columns = useMemo(
     () => [
       columnHelper.accessor("email", {
+        id: "email",
         header: () => <EmailHeader />,
         enableSorting: true,
         sortLabel: "Email",
@@ -312,6 +309,7 @@ export const CustomersTable = () => {
         cell: ({ getValue }) => <AccountCell hasAccount={getValue()} />,
       }),
       columnHelper.accessor("created_at", {
+        id: "created_at",
         header: () => <FirstSeenHeader />,
         enableSorting: true,
         sortLabel: "Account Created",
@@ -403,10 +401,12 @@ export const CustomersTable = () => {
 
       {/* Data Table */}
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between">
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-x-2">
+            <DataTableAddFilter table={table} />
+          </div>
           <div className="flex items-center gap-x-2">
             <DataTable.Search placeholder="Search" />
-            <DataTable.FilterMenu tooltip="Filter" />
             <DataTable.SortingMenu tooltip="Sort" />
           </div>
         </DataTable.Toolbar>

@@ -8,6 +8,13 @@ import {
   updateCollectionsWorkflow,
   deleteCollectionsWorkflow,
 } from "@medusajs/medusa/core-flows"
+import { assertVendorCanSee, ScopedEntity } from "../../shared/platform-scope"
+import { assertVendorOwns } from "../../shared/vendor-scope"
+
+const COLLECTIONS: ScopedEntity = {
+  linkField: "product_collections",
+  entity: "product_collection",
+}
 
 export const UpdateVendorCollectionSchema = z.object({
   title: z.string().optional(),
@@ -25,6 +32,9 @@ export const GET = async (
   }
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const collectionId = req.params.id
+
+  // Own or shared platform collection; another seller's collection is a 404.
+  await assertVendorCanSee(req, COLLECTIONS, collectionId, "Collection not found.")
 
   const {
     data: [vendorAdmin],
@@ -91,6 +101,8 @@ export const POST = async (
   }
   const collectionId = req.params.id
 
+  await assertVendorOwns(req, "product_collections", collectionId, "Collection not found.")
+
   const { result } = await updateCollectionsWorkflow(req.scope).run({
     input: {
       selector: { id: collectionId },
@@ -110,6 +122,8 @@ export const DELETE = async (
     return
   }
   const collectionId = req.params.id
+
+  await assertVendorOwns(req, "product_collections", collectionId, "Collection not found.")
 
   await deleteCollectionsWorkflow(req.scope).run({
     input: { ids: [collectionId] },

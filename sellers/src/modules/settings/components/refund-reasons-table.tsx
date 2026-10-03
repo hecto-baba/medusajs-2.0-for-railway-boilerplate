@@ -20,7 +20,7 @@ import {
 } from "@medusajs/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 
 const columnHelper = createDataTableColumnHelper<VendorRefundReason>()
 
@@ -64,59 +64,78 @@ export const RefundReasonsTable = () => {
     },
   })
 
-  const handleDelete = async (reason: VendorRefundReason) => {
-    const confirmed = await prompt({
-      title: "Delete refund reason",
-      description: `Are you sure you want to delete "${reason.label}"? This cannot be undone.`,
-      confirmText: "Delete",
-      cancelText: "Cancel",
-      variant: "danger",
-    })
+  const handleDelete = useCallback(
+    async (reason: VendorRefundReason) => {
+      const confirmed = await prompt({
+        title: "Delete refund reason",
+        description: `Are you sure you want to delete "${reason.label}"? This cannot be undone.`,
+        confirmText: "Delete",
+        cancelText: "Cancel",
+        variant: "danger",
+      })
 
-    if (!confirmed) {
-      return
-    }
+      if (!confirmed) {
+        return
+      }
 
-    try {
-      await remove(reason.id)
-      toast.success(`"${reason.label}" was deleted.`)
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not delete the refund reason."
-      )
-    }
-  }
+      try {
+        await remove(reason.id)
+        toast.success(`"${reason.label}" was deleted.`)
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not delete the refund reason."
+        )
+      }
+    },
+    [prompt, remove]
+  )
 
-  const columns = [
-    columnHelper.accessor("label", {
-      header: "Label",
-      enableSorting: true,
-    }),
-    columnHelper.accessor("code", {
-      header: "Code",
-      enableSorting: true,
-    }),
-    columnHelper.accessor("description", {
-      header: "Description",
-      cell: ({ row }) => row.original.description || "-",
-    }),
-    columnHelper.action({
-      actions: (ctx) => [
-        {
-          label: "Edit",
-          icon: <PencilSquare />,
-          onClick: () => {
-            router.push(`/settings/refund-reasons/${ctx.row.original.id}/edit`)
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("label", {
+        id: "label",
+        header: "Label",
+        enableSorting: true,
+        sortLabel: "Label",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+      }),
+      columnHelper.accessor("code", {
+        id: "code",
+        header: "Code",
+        enableSorting: true,
+        sortLabel: "Value",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+      }),
+      columnHelper.accessor("description", {
+        id: "description",
+        header: "Description",
+        enableSorting: true,
+        sortLabel: "Description",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => row.original.description || "-",
+      }),
+      columnHelper.action({
+        actions: (ctx) => [
+          {
+            label: "Edit",
+            icon: <PencilSquare />,
+            onClick: () => {
+              router.push(`/settings/refund-reasons/${ctx.row.original.id}/edit`)
+            },
           },
-        },
-        {
-          label: "Delete",
-          icon: <Trash />,
-          onClick: () => handleDelete(ctx.row.original),
-        },
-      ],
-    }),
-  ]
+          {
+            label: "Delete",
+            icon: <Trash />,
+            onClick: () => handleDelete(ctx.row.original),
+          },
+        ],
+      }),
+    ],
+    [handleDelete, router]
+  )
 
   const table = useDataTable({
     columns,
@@ -136,6 +155,7 @@ export const RefundReasonsTable = () => {
           <Heading>Refund Reasons</Heading>
           <div className="flex items-center gap-x-2 w-full sm:w-auto">
             <DataTable.Search placeholder="Search refund reasons..." />
+            <DataTable.SortingMenu tooltip="Sort" />
             <Button
               size="small"
               variant="secondary"

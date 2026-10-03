@@ -6,6 +6,8 @@ import {
   type VendorPromotion,
 } from "@lib/data/vendor-client"
 import {
+  Button,
+  Container,
   createDataTableColumnHelper,
   createDataTableCommandHelper,
   createDataTableFilterHelper,
@@ -24,7 +26,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { PlaceholderCell } from "@modules/common"
+import { DataTableAddFilter, PlaceholderCell } from "@modules/common"
 
 const columnHelper = createDataTableColumnHelper<VendorPromotion>()
 const filterHelper = createDataTableFilterHelper<VendorPromotion>()
@@ -63,41 +65,66 @@ const formatValue = (promotion: VendorPromotion) => {
 }
 
 const filters = [
-  filterHelper.accessor("status", {
-    label: "Status",
-    type: "multiselect",
-    options: [
-      { label: "Draft", value: "draft" },
-      { label: "Active", value: "active" },
-      { label: "Inactive", value: "inactive" },
-    ],
-  }),
-  filterHelper.accessor("type", {
-    label: "Type",
-    type: "multiselect",
-    options: [
-      { label: "Standard (Amount off)", value: "standard" },
-      { label: "Buy X, get Y", value: "buyget" },
-    ],
-  }),
   filterHelper.accessor("created_at", {
+    type: "date",
     label: "Created",
-    type: "radio",
     options: [
-      { label: "All time", value: "all" },
-      { label: "Past 7 days", value: "7d" },
-      { label: "Past 30 days", value: "30d" },
-      { label: "Past 90 days", value: "90d" },
+      {
+        label: "Today",
+        value: {
+          $gte: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+          $lte: new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+        },
+      },
+      {
+        label: "Last 7 days",
+        value: {
+          $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      {
+        label: "Last 30 days",
+        value: {
+          $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      {
+        label: "Last 90 days",
+        value: {
+          $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
     ],
   }),
   filterHelper.accessor("updated_at", {
+    type: "date",
     label: "Updated",
-    type: "radio",
     options: [
-      { label: "All time", value: "all" },
-      { label: "Past 7 days", value: "7d" },
-      { label: "Past 30 days", value: "30d" },
-      { label: "Past 90 days", value: "90d" },
+      {
+        label: "Today",
+        value: {
+          $gte: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+          $lte: new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+        },
+      },
+      {
+        label: "Last 7 days",
+        value: {
+          $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      {
+        label: "Last 30 days",
+        value: {
+          $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      {
+        label: "Last 90 days",
+        value: {
+          $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
     ],
   }),
 ]
@@ -106,19 +133,11 @@ const useColumns = (onDelete: (promotion: VendorPromotion) => void) => [
   columnHelper.accessor("code", {
     id: "code",
     header: "Code",
-    enableSorting: true,
-    sortLabel: "Code",
-    sortAscLabel: "Ascending",
-    sortDescLabel: "Descending",
     cell: ({ row }) => <span className="truncate font-medium">{row.original.code}</span>,
   }),
   columnHelper.accessor("type", {
     id: "type",
     header: "Type",
-    enableSorting: true,
-    sortLabel: "Type",
-    sortAscLabel: "Ascending",
-    sortDescLabel: "Descending",
     cell: ({ row }) =>
       row.original.type === "buyget" ? "Buy X, get Y" : "Amount off",
   }),
@@ -130,10 +149,6 @@ const useColumns = (onDelete: (promotion: VendorPromotion) => void) => [
   columnHelper.accessor("status", {
     id: "status",
     header: "Status",
-    enableSorting: true,
-    sortLabel: "Status",
-    sortAscLabel: "Ascending",
-    sortDescLabel: "Descending",
     cell: ({ row }) => <PromotionStatusCell status={row.original.status} />,
   }),
   columnHelper.accessor("created_at", {
@@ -194,7 +209,10 @@ export const PromotionsTable = () => {
   const [rowSelection, setRowSelection] = useState<DataTableRowSelectionState>(
     {}
   )
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "created_at",
+    desc: true,
+  })
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -396,36 +414,40 @@ export const PromotionsTable = () => {
   })
 
   return (
-    <DataTable instance={table}>
-      <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-        <Heading level="h2">Promotions</Heading>
-        <div className="flex items-center gap-x-2">
-          <DataTable.Search placeholder="Search promotions..." />
-          <DataTable.FilterMenu tooltip="Filter" />
-          <DataTable.SortingMenu tooltip="Sort" />
-          <Link
-            href="/promotions/new"
-            className="bg-ui-button-inverted text-ui-contrast-fg-primary shadow-buttons-inverted txt-compact-small-plus rounded-md px-3 py-1.5"
-          >
-            Create
-          </Link>
-        </div>
-      </DataTable.Toolbar>
-      <DataTable.FilterBar />
-      <DataTable.Table
-        emptyState={{
-          empty: {
-            heading: "No promotions yet",
-            description: "Create your first promotion to offer a discount.",
-          },
-          filtered: {
-            heading: "No matches",
-            description: "No promotions match that search.",
-          },
-        }}
-      />
-      <DataTable.Pagination />
-      <DataTable.CommandBar selectedLabel={(count) => count + " selected"} />
-    </DataTable>
+    <Container className="divide-y p-0">
+      <div className="flex items-center justify-between px-6 py-4">
+        <Heading level="h1">Promotions</Heading>
+        <Button size="small" variant="secondary" asChild>
+          <Link href="/promotions/new">Create</Link>
+        </Button>
+      </div>
+
+      <DataTable instance={table}>
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-x-2">
+            <DataTableAddFilter table={table} />
+          </div>
+          <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search" />
+            <DataTable.SortingMenu tooltip="Sort" />
+          </div>
+        </DataTable.Toolbar>
+        <DataTable.FilterBar />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No promotions yet",
+              description: "Create your first promotion to offer a discount.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No promotions match that search.",
+            },
+          }}
+        />
+        <DataTable.Pagination />
+        <DataTable.CommandBar selectedLabel={(count) => count + " selected"} />
+      </DataTable>
+    </Container>
   )
 }

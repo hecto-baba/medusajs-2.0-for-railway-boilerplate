@@ -7,6 +7,7 @@ import { z } from "@medusajs/framework/zod"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import type MarketplaceModuleService from "../../../modules/marketplace/service"
 import { DEFAULT_CURRENCIES } from "./currency-data"
+import { resolveVendorAdmin } from "../shared/vendor-scope"
 
 export const PostVendorCurrencySchema = z.object({
   code: z.string().min(2).max(5),
@@ -20,13 +21,10 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id", "vendor.metadata"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, [
+    "vendor.id",
+    "vendor.metadata",
+  ])
 
   if (!vendorAdmin?.vendor) {
     throw new MedusaError(
@@ -86,13 +84,10 @@ export const POST = async (
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const marketplace = req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
 
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id", "vendor.metadata"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, [
+    "vendor.id",
+    "vendor.metadata",
+  ])
 
   if (!vendorAdmin?.vendor) {
     throw new MedusaError(

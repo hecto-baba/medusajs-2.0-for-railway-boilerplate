@@ -5,6 +5,8 @@ import { RENTAL_MODULE } from "../../modules/rental";
 import hasCartOverlap from "../../utils/has-cart-overlap";
 import validateRentalDates from "../../utils/validate-rental-dates";
 import countRentalDays from "../../utils/count-rental-days";
+import countRentalUnits from "../../utils/count-rental-units";
+import { RentalUnit } from "../../utils/rental-unit";
 
 completeCartWorkflow.hooks.validate(
   async ({ cart }, { container }) => {
@@ -49,15 +51,24 @@ completeCartWorkflow.hooks.validate(
       }
     }
 
+    // Pass 1: every synchronous, in-memory check. The DB-backed overlap
+    // check is deferred to a single batched call after this loop instead of
+    // one hasRentalOverlap query per item - see hasAnyRentalOverlap.
+    const dbOverlapChecks: {
+      variant_id: string
+      start_date: Date
+      end_date: Date
+    }[] = []
+
     for (let i = 0; i < rentalItems.length; i++) {
       const rentalItem = rentalItems[i]
-      const { 
-        line_item_id, 
-        variant_id, 
-        quantity, 
-        rental_configuration, 
-        rental_start_date, 
-        rental_end_date, 
+      const {
+        line_item_id,
+        variant_id,
+        quantity,
+        rental_configuration,
+        rental_start_date,
+        rental_end_date,
         rental_days
       } = rentalItem
 
@@ -89,15 +100,26 @@ completeCartWorkflow.hooks.validate(
       // Recomputed here too: this hook also guards the standard line-item
       // route, where nothing has validated the metadata beforehand.
       const derivedRentalDays = countRentalDays(startDate, endDate)
-      
+
+      const configuredUnit: RentalUnit =
+        ((rental_configuration as any).rental_unit as RentalUnit) ?? "day"
+      const derivedUnitsCount =
+        configuredUnit === "day" || configuredUnit === "custom"
+          ? derivedRentalDays
+          : countRentalUnits(startDate, endDate, configuredUnit)
+
       validateRentalDates(
-        startDate, 
-        endDate, 
+        startDate,
+        endDate,
         {
           min_rental_days: (rental_configuration as any).min_rental_days,
           max_rental_days: (rental_configuration as any).max_rental_days,
-        }, 
-        derivedRentalDays
+          rental_unit: configuredUnit,
+          min_rental_units: (rental_configuration as any).min_rental_units,
+          max_rental_units: (rental_configuration as any).max_rental_units,
+        },
+        derivedRentalDays,
+        derivedUnitsCount
       )
 
       const hasCartOverlapResult = hasCartOverlap(
@@ -125,12 +147,22 @@ completeCartWorkflow.hooks.validate(
         )
       }
 
-      if (await rentalModuleService.hasRentalOverlap(variant_id as string, startDate, endDate)) {
-        throw new MedusaError(
-          MedusaError.Types.NOT_ALLOWED,
-          `Variant ${variant_id} is already rented during the requested period (${startDate.toISOString()} to ${endDate.toISOString()})`
-        )
-      }
+      dbOverlapChecks.push({ variant_id: variant_id as string, start_date: startDate, end_date: endDate })
+    }
+
+    // Pass 2: one batched query for every item's DB-backed overlap check,
+    // instead of the previous N sequential hasRentalOverlap calls.
+    const overlappingIndexes = await rentalModuleService.hasAnyRentalOverlap(
+      dbOverlapChecks
+    )
+
+    if (overlappingIndexes.size > 0) {
+      const firstOverlapIndex = Math.min(...overlappingIndexes)
+      const { variant_id, start_date, end_date } = dbOverlapChecks[firstOverlapIndex]
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        `Variant ${variant_id} is already rented during the requested period (${start_date.toISOString()} to ${end_date.toISOString()})`
+      )
     }
 
     // B2B Employee Spending Limit Check

@@ -12,11 +12,13 @@ import {
   assertVariantBelongsToProduct,
   VENDOR_VARIANT_FIELDS,
 } from "../../../../../helpers"
+import { assertVendorOwnsInventoryItem } from "../../../../../../inventory-items/helpers"
 
 const assertBoth = async (req: AuthenticatedMedusaRequest) => {
-  const { id, variant_id } = req.params
+  const { id, variant_id, inventory_item_id } = req.params
   await assertOwnership(req, id)
   await assertVariantBelongsToProduct(req, id, variant_id)
+  await assertVendorOwnsInventoryItem(req, inventory_item_id)
 }
 
 /** Updates the required quantity on an existing variant-inventory link. */

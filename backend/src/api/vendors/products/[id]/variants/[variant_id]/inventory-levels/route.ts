@@ -13,6 +13,7 @@ import {
   assertVariantBelongsToProduct,
   ensureVariantInventoryItem,
 } from "../../../../helpers"
+import { assertVendorCanUseStockLocations } from "../../../../../shared/inventory-scope"
 
 /**
  * Stock levels for one of the vendor's variants, per location.
@@ -119,21 +120,9 @@ export const POST = async (
 
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
-  // The location id comes from the request, so it is checked against the
-  // store's own locations - an unknown id would otherwise create a level
-  // pointing at nothing.
-  const { data: locations } = await query.graph({
-    entity: "stock_location",
-    fields: ["id"],
-    filters: { id: [location_id] },
-  })
-
-  if (!locations.length) {
-    throw new MedusaError(
-      MedusaError.Types.NOT_FOUND,
-      "Stock location not found."
-    )
-  }
+  // The location id comes from the request: it must be the seller's own or a
+  // shared platform location, never another seller's.
+  await assertVendorCanUseStockLocations(req, [location_id])
 
   const { data: existing } = await query.graph({
     entity: "inventory_level",

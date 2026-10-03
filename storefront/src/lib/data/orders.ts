@@ -55,3 +55,27 @@ export const listOrders = cache(async function (
       return medusaError(err)
     })
 })
+
+export type SellerOrder = {
+  id: string
+  display_id: number | null
+  seller: { id: string; name: string | null }
+  status: string | null
+  fulfillment_status: "not_fulfilled" | "fulfilled" | "shipped" | "delivered"
+  currency_code: string
+  total: number
+  items: { title: string; thumbnail: string | null; quantity: number }[]
+}
+
+// Who ships what when one order holds several sellers' items. Empty when the
+// order has a single seller: the order itself is theirs.
+export const retrieveSellerOrders = cache(async function (id: string) {
+  return sdk.client
+    .fetch<{ seller_orders: SellerOrder[] }>(`/store/orders/${id}/seller-orders`, {
+      method: "GET",
+      headers: await getAuthHeaders(),
+      ...(await getCacheDirectives("orders")),
+    })
+    .then(({ seller_orders }) => seller_orders)
+    .catch(() => [] as SellerOrder[])
+})

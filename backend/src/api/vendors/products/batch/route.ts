@@ -9,6 +9,8 @@ import {
 } from "@medusajs/medusa/core-flows"
 import { MARKETPLACE_MODULE } from "../../../../modules/marketplace"
 import { assertOwnership, getVendorId } from "../helpers"
+import { assertVendorCanUseShippingProfiles } from "../../shared/shipping-profile-scope"
+import { assertVendorCanUseProductReferences } from "../../shared/product-reference-scope"
 
 /**
  * Creates, updates and deletes several of the vendor's products in one call.
@@ -53,6 +55,16 @@ export const POST = async (
   for (const productId of new Set(touchedIds)) {
     await assertOwnership(req, productId)
   }
+
+  await assertVendorCanUseShippingProfiles(req, [
+    ...((body.create as any[] | undefined) ?? []).map((product) => product?.shipping_profile_id),
+    ...((body.update as any[] | undefined) ?? []).map((product) => product?.shipping_profile_id),
+  ])
+
+  await assertVendorCanUseProductReferences(req, [
+    ...((body.create as any[] | undefined) ?? []),
+    ...((body.update as any[] | undefined) ?? []),
+  ])
 
   const vendorId = await getVendorId(req)
 

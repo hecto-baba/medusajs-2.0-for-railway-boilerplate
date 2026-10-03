@@ -3,8 +3,9 @@ import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/util
 
 /**
  * Generic vendor-ownership helpers for entities linked directly off `vendor`
- * (return reasons, refund reasons, regions, sales channels, stock locations,
- * shipping profiles, tax regions, ...).
+ * (return reasons, refund reasons, orders, stock locations, sales channels, ...).
+ * The field must be an existing vendor link in src/links/. Regions and country
+ * tax regions are platform-owned and have no vendor link.
  *
  * `assertOwnership` in products/helpers.ts is not reused here on purpose: it
  * walks a fixed `vendor.products.id` path. These entities each hang off
@@ -20,36 +21,193 @@ import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/util
  */
 
 /**
+ * Robustly resolves the vendor admin record for the authenticated session.
+ * 
+ * In Medusa 2.0, req.auth_context.actor_id may be:
+ * 1. The vendor_admin.id (standard)
+ * 2. The vendor.id (when token was minted directly with vendor_id)
+ * 3. Or auth_identity may be linked to vendor_admin by email
+ * 
+ * Checking all three ensures the seller session resolves reliably.
+ */
+export const resolveVendorAdmin = async (
+  req: AuthenticatedMedusaRequest,
+  fields: string[] = ["id", "vendor.id"]
+): Promise<any> => {
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+
+  // 1. Match vendor_admin by id (standard when actor_id is vendor_admin.id)
+  if (req.auth_context?.actor_id) {
+    const {
+      data: [byAdminId],
+    } = await query.graph({
+      entity: "vendor_admin",
+      fields,
+      filters: { id: [req.auth_context.actor_id] },
+    }).catch(() => ({ data: [] }))
+
+    if (byAdminId) {
+      return byAdminId
+    }
+
+    // 2. Match vendor_admin by vendor_id (when actor_id is vendor.id)
+    const {
+      data: [byVendorId],
+    } = await query.graph({
+      entity: "vendor_admin",
+      fields,
+      filters: { vendor_id: [req.auth_context.actor_id] },
+    }).catch(() => ({ data: [] }))
+
+    if (byVendorId) {
+      return byVendorId
+    }
+  }
+
+  // 3. Fallback: resolve from auth_identity app_metadata or email
+  if (req.auth_context?.auth_identity_id) {
+    const {
+      data: [authIdentity],
+    } = await query.graph({
+      entity: "auth_identity",
+      fields: ["app_metadata", "provider_identities.*"],
+      filters: { id: [req.auth_context.auth_identity_id] },
+    }).catch((err: any) => {
+      console.warn("[resolveVendorAdmin] query auth_identity failed:", err?.message || err)
+      return { data: [] }
+    })
+
+    const vendorAdminId = (authIdentity?.app_metadata as Record<string, any> | undefined)?.vendor_id
+    if (vendorAdminId) {
+      const {
+        data: [byAppMetadataAdmin],
+      } = await query.graph({
+        entity: "vendor_admin",
+        fields,
+        filters: { id: [vendorAdminId] },
+      }).catch(() => ({ data: [] }))
+
+      if (byAppMetadataAdmin) {
+        return byAppMetadataAdmin
+      }
+
+      const {
+        data: [byAppMetadataVendor],
+      } = await query.graph({
+        entity: "vendor_admin",
+        fields,
+        filters: { vendor_id: [vendorAdminId] },
+      }).catch(() => ({ data: [] }))
+
+      if (byAppMetadataVendor) {
+        return byAppMetadataVendor
+      }
+    }
+
+    const email = authIdentity?.provider_identities?.[0]?.entity_id
+    if (email) {
+      const {
+        data: [byEmail],
+      } = await query.graph({
+        entity: "vendor_admin",
+        fields,
+        filters: { email: [email] },
+      }).catch((err: any) => {
+        console.warn("[resolveVendorAdmin] query by email failed:", err?.message || err)
+        return { data: [] }
+      })
+
+      if (byEmail) {
+        return byEmail
+      }
+    }
+  }
+
+  // 4. Direct vendor match fallback (when actor_id or app_metadata vendor_id directly identifies the vendor)
+  const candidateVendorIds = [
+    req.auth_context?.actor_id,
+    (req.auth_context as any)?.app_metadata?.vendor_id,
+  ].filter((id): id is string => typeof id === "string" && id.length > 0)
+
+  for (const vId of candidateVendorIds) {
+    const {
+      data: [directVendor],
+    } = await query.graph({
+      entity: "vendor",
+      fields: [
+        "id",
+        "name",
+        "handle",
+        "logo",
+        "metadata",
+        "admins.id",
+        "admins.email",
+        "admins.first_name",
+        "admins.last_name",
+      ],
+      filters: { id: [vId] },
+    }).catch(() => ({ data: [] }))
+
+    if (directVendor) {
+      const admin = directVendor.admins?.[0]
+      return {
+        id: admin?.id || vId,
+        email: admin?.email || "vendor@store.com",
+        first_name: admin?.first_name || null,
+        last_name: admin?.last_name || null,
+        vendor_id: directVendor.id,
+        vendor: {
+          id: directVendor.id,
+          name: directVendor.name,
+          handle: directVendor.handle,
+          logo: directVendor.logo,
+          metadata: directVendor.metadata,
+        },
+      }
+    }
+  }
+
+  return null
+}
+
+/**
  * Returns the vendor id behind the calling admin.
  *
- * Duplicated from products/helpers.ts' getVendorId rather than imported: that
- * file is scoped to the products feature, and importing across feature
- * folders here would make the two drift in step for the wrong reason. Kept
- * identical on purpose - if one changes, so should the other.
+ * The single source of truth for resolving the vendor from the session. Every
+ * feature's helpers.ts re-exports this rather than keeping its own copy, so a
+ * fix here reaches every route. The vendor id is always derived from
+ * `actor_id`, never from the request.
  */
 export const getVendorId = async (
   req: AuthenticatedMedusaRequest
 ): Promise<string> => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
-
+  const vendorAdmin = await resolveVendorAdmin(req, ["id", "vendor.id"])
   const vendorId = vendorAdmin?.vendor?.id
 
-  if (!vendorId) {
-    throw new MedusaError(
-      MedusaError.Types.NOT_FOUND,
-      "No vendor found for the authenticated session."
-    )
+  if (vendorId) {
+    return vendorId
   }
 
-  return vendorId
+  // Fallback: check if actor_id itself is a vendor id directly
+  if (req.auth_context?.actor_id) {
+    const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+    const {
+      data: [vendor],
+    } = await query.graph({
+      entity: "vendor",
+      fields: ["id"],
+      filters: { id: [req.auth_context.actor_id] },
+    }).catch(() => ({ data: [] }))
+
+    if (vendor?.id) {
+      return vendor.id
+    }
+  }
+
+  throw new MedusaError(
+    MedusaError.Types.NOT_FOUND,
+    "No vendor found for the authenticated session."
+  )
 }
 
 /**
@@ -67,21 +225,36 @@ export const getOwnedIds = async (
   req: AuthenticatedMedusaRequest,
   linkField: string
 ): Promise<string[]> => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: [`vendor.${linkField}.id`],
-    filters: { id: [req.auth_context.actor_id] },
-  })
-
+  const vendorAdmin = await resolveVendorAdmin(req, [`vendor.${linkField}.id`])
   const linked = (vendorAdmin?.vendor as Record<string, unknown> | undefined)?.[
     linkField
   ] as { id?: string }[] | undefined
 
-  return (linked ?? []).map((row) => row?.id).filter((id): id is string => !!id)
+  if (linked) {
+    return linked.map((row) => row?.id).filter((id): id is string => !!id)
+  }
+
+  // Fallback: if actor_id is vendor id
+  if (req.auth_context?.actor_id) {
+    const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+    const {
+      data: [vendor],
+    } = await query.graph({
+      entity: "vendor",
+      fields: [`${linkField}.id`],
+      filters: { id: [req.auth_context.actor_id] },
+    }).catch(() => ({ data: [] }))
+
+    const vendorLinked = (vendor as Record<string, unknown> | undefined)?.[
+      linkField
+    ] as { id?: string }[] | undefined
+
+    if (vendorLinked) {
+      return vendorLinked.map((row) => row?.id).filter((id): id is string => !!id)
+    }
+  }
+
+  return []
 }
 
 /**

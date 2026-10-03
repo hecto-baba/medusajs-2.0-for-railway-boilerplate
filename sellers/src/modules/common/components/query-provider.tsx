@@ -3,7 +3,8 @@
 import { Toaster, TooltipProvider } from "@medusajs/ui"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { I18nProvider } from "@i18n/provider"
-import { useState } from "react"
+import { installUnauthorizedRedirect } from "@lib/data/unauthorized-redirect"
+import { useEffect, useState } from "react"
 
 /**
  * Created in state rather than at module scope: a module-level client is
@@ -23,6 +24,12 @@ export const QueryProvider = ({ children }: { children: React.ReactNode }) => {
         },
       })
   )
+
+  // An expired session answers 401 from the API proxy: send the seller to /login
+  // instead of leaving a page where every action fails.
+  useEffect(() => {
+    installUnauthorizedRedirect()
+  }, [])
 
   // TooltipProvider is required, not decorative: DataTable's toolbar controls
   // render Radix tooltips, which throw on mount without a provider above them

@@ -1,4 +1,3 @@
-import { defineRouteConfig } from "@medusajs/admin-sdk"
 import {
   BuildingStorefront,
   CheckCircleSolid,
@@ -544,10 +543,5 @@ const VendorApplicationsPage = () => {
     </Container>
   )
 }
-
-export const config = defineRouteConfig({
-  label: "Vendor Applications",
-  icon: ShieldCheck,
-})
 
 export default VendorApplicationsPage

@@ -83,8 +83,9 @@ const RestaurantDeliveryOverviewPage = () => {
 }
 
 export const config = defineRouteConfig({
-  label: "Restaurant-Delivery",
+  label: "Restaurant Delivery",
   icon: ChefHat,
+  rank: 5,
 })
 
 export default RestaurantDeliveryOverviewPage

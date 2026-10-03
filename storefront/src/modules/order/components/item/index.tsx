@@ -13,6 +13,35 @@ type ItemProps = {
 }
 
 const Item = ({ item }: ItemProps) => {
+  const isDeposit = !!item.metadata?.is_rental_deposit
+
+  // Same reasoning as the cart row: a deposit line has no catalog
+  // product/variant behind it, so it gets a plain row instead of a
+  // thumbnail/variant treatment that has nothing real to show.
+  if (isDeposit) {
+    return (
+      <Table.Row className="w-full" data-testid="product-row">
+        <Table.Cell className="!pl-0 p-4 w-24" />
+        <Table.Cell className="text-left">
+          <Text
+            className="txt-medium-plus text-ui-fg-base"
+            data-testid="product-name"
+          >
+            Security Deposit
+          </Text>
+          <Text className="txt-small text-ui-fg-subtle">
+            Refundable, held separately from the rental fee.
+          </Text>
+        </Table.Cell>
+        <Table.Cell className="!pr-0">
+          <span className="!pr-0 flex flex-col items-end h-full justify-center">
+            <LineItemPrice item={item} style="tight" />
+          </span>
+        </Table.Cell>
+      </Table.Row>
+    )
+  }
+
   return (
     <Table.Row className="w-full" data-testid="product-row">
       <Table.Cell className="!pl-0 p-4 w-24">

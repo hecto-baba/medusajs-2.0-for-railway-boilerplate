@@ -14,6 +14,7 @@ import {
   Select,
   Switch,
   Text,
+  Textarea,
   toast,
 } from "@medusajs/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -43,6 +44,7 @@ export const InventoryCreateForm = () => {
   // Form State
   const [title, setTitle] = useState("")
   const [sku, setSku] = useState("")
+  const [description, setDescription] = useState("")
   const [hsCode, setHsCode] = useState("")
   const [midCode, setMidCode] = useState("")
   const [originCountry, setOriginCountry] = useState("")
@@ -123,6 +125,7 @@ export const InventoryCreateForm = () => {
     await createItem({
       title: txt(title),
       sku: txt(sku),
+      description: txt(description),
       hs_code: txt(hsCode),
       mid_code: txt(midCode),
       origin_country: txt(originCountry),
@@ -181,6 +184,18 @@ export const InventoryCreateForm = () => {
                   onChange={(e) => setSku(e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className="flex flex-col gap-y-1.5">
+              <Label size="small" weight="plus">
+                Description
+              </Label>
+              <Textarea
+                placeholder="Item description..."
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

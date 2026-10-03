@@ -4,6 +4,7 @@ import type {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { deleteDraftOrdersWorkflow } from "@medusajs/medusa/core-flows"
+import { assertVendorOwnsDraftOrder } from "../helpers"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
@@ -11,6 +12,8 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const draftOrderId = req.params.id
+
+  await assertVendorOwnsDraftOrder(req, draftOrderId)
 
   const { data: orders } = await query.graph({
     entity: "order",
@@ -56,6 +59,8 @@ export const DELETE = async (
   res: MedusaResponse
 ) => {
   const draftOrderId = req.params.id
+
+  await assertVendorOwnsDraftOrder(req, draftOrderId)
 
   await deleteDraftOrdersWorkflow(req.scope).run({
     input: { order_ids: [draftOrderId] },

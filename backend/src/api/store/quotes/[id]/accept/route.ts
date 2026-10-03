@@ -3,6 +3,7 @@ import { ContainerRegistrationKeys, Modules, OrderStatus } from "@medusajs/frame
 import { confirmOrderEditRequestWorkflow } from "@medusajs/medusa/core-flows"
 import { QUOTE_MODULE } from "../../../../../modules/quote"
 import { customerAcceptQuoteWorkflow } from "../../../../../workflows/customer-accept-quote"
+import { canAccessQuote } from "../../../helpers/quote-access"
 
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const quoteModule = req.scope.resolve(QUOTE_MODULE) as any
@@ -27,7 +28,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     filters: { id: req.params.id },
   })
 
-  if (!quote) {
+  if (!quote || !(await canAccessQuote(req, quote))) {
     return res.status(404).json({ message: "Quote not found" })
   }
 
@@ -36,7 +37,12 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
 
   if (!customerId) {
     const customerModuleService = req.scope.resolve(Modules.CUSTOMER) as any
-    const email = quote.draft_order?.email || quote.cart?.email || "guest@buyer.com"
+    // A guest quote is bound to the buyer named on it. With no email there is no one
+    // to bind it to (it used to fall back to a shared "guest@buyer.com" account).
+    const email = quote.draft_order?.email || quote.cart?.email
+    if (!email) {
+      return res.status(400).json({ message: "This quote has no buyer email to accept it for." })
+    }
     try {
       const { data: [existingCust] } = await query.graph({
         entity: "customer",

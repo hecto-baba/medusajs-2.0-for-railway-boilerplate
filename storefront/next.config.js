@@ -49,6 +49,15 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  experimental: {
+    // Default static-generation concurrency spawns multiple workers that all
+    // hit the Medusa backend on localhost at once. On Windows this reliably
+    // exhausts local sockets/connections mid-build, failing random product
+    // pages with "fetch failed" even though the backend is healthy. Building
+    // one page at a time trades build speed for a build that actually
+    // finishes.
+    cpus: 1,
+  },
   images: {
     unoptimized: true,
     // Thumbnails request quality 50. Next 16 requires every quality used to be

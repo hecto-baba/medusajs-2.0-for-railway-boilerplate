@@ -45,6 +45,10 @@ export const createOrderStep = createStep(
         unit_price: item.unit_price,
         product_id: item.product_id || "",
       })),
+      // Marks this as the delivery module's own copy of the buyer's order. It has
+      // no payment and is never announced as placed, so it is not split or linked
+      // to a seller here; restaurant sellers get their deliveries in Phase 5.
+      metadata: { delivery_order: true, delivery_id: delivery.id },
       region_id: cart.region_id || "",
       customer_id: cart.customer_id || "",
       sales_channel_id: cart.sales_channel_id || "",

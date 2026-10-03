@@ -46,6 +46,7 @@ import {
   PriceListCustomerGroupRuleForm,
   type CustomerGroupItem,
 } from "./price-list-customer-group-rule-form"
+import { createMedusaDateFilter, resolveMedusaDateFilter } from "@modules/common"
 
 const extractFilterVal = (val: any): string | undefined => {
   if (!val) return undefined
@@ -129,7 +130,10 @@ export const PriceListCreateModal = ({
     pageSize: 20,
   })
   const [productFiltering, setProductFiltering] = useState<DataTableFilteringState>({})
-  const [productSorting, setProductSorting] = useState<DataTableSortingState | null>(null)
+  const [productSorting, setProductSorting] = useState<DataTableSortingState | null>({
+    id: "title",
+    desc: false,
+  })
   const [selectedProducts, setSelectedProducts] = useState<VendorProduct[]>([])
 
   // Tab 3: Prices
@@ -229,11 +233,17 @@ export const PriceListCreateModal = ({
   }
 
   const createdDateFilter = useMemo(() => {
-    return resolveDateFilter(productFiltering["created_at_gte"] ?? productFiltering["created_at"])
+    return (
+      resolveMedusaDateFilter(productFiltering["created_at"]) ??
+      resolveMedusaDateFilter(productFiltering["created_at_gte"])
+    )
   }, [productFiltering])
 
   const updatedDateFilter = useMemo(() => {
-    return resolveDateFilter(productFiltering["updated_at_gte"] ?? productFiltering["updated_at"])
+    return (
+      resolveMedusaDateFilter(productFiltering["updated_at"]) ??
+      resolveMedusaDateFilter(productFiltering["updated_at_gte"])
+    )
   }, [productFiltering])
 
   const productOrder = useMemo(() => {
@@ -296,7 +306,10 @@ export const PriceListCreateModal = ({
     setPricesState({})
     setIsCgModalOpen(false)
     setProductFiltering({})
-    setProductSorting(null)
+    setProductSorting({
+      id: "title",
+      desc: false,
+    })
     setProductSearch("")
   }
 
@@ -443,9 +456,10 @@ export const PriceListCreateModal = ({
           value: sc.id,
         })),
       }),
-      productFilterHelper.accessor("status", {
+      productFilterHelper.custom({
+        id: "status",
         label: "Status",
-        type: "multiselect",
+        type: "select",
         options: [
           { label: "Draft", value: "draft" },
           { label: "Proposed", value: "proposed" },
@@ -453,26 +467,8 @@ export const PriceListCreateModal = ({
           { label: "Rejected", value: "rejected" },
         ],
       }),
-      productFilterHelper.custom({
-        id: "created_at_gte",
-        label: "Created",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
-      productFilterHelper.custom({
-        id: "updated_at_gte",
-        label: "Updated",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
+      createMedusaDateFilter(productFilterHelper, "created_at", "Created"),
+      createMedusaDateFilter(productFilterHelper, "updated_at", "Updated"),
     ]
 
     return list

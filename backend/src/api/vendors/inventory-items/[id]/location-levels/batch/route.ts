@@ -13,6 +13,7 @@ import {
   assertVendorOwnsInventoryItem,
   refetchVendorInventoryItem,
 } from "../../../helpers"
+import { assertVendorCanUseStockLocations } from "../../../../shared/inventory-scope"
 
 export const PostVendorBatchInventoryItemLocationLevelsSchema = z.object({
   create: z
@@ -48,6 +49,11 @@ export const POST = async (
   await assertVendorOwnsInventoryItem(req, id)
 
   const { create, update, delete: toDelete } = req.validatedBody
+
+  await assertVendorCanUseStockLocations(req, [
+    ...(create ?? []).map((row) => row.location_id),
+    ...(update ?? []).map((row) => row.location_id),
+  ])
 
   // 1. Handle deletes
   if (toDelete?.length) {

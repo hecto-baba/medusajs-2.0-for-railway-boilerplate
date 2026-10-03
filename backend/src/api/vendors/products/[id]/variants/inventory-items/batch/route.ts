@@ -8,6 +8,7 @@ import {
   assertOwnership,
   assertVariantIdsBelongToProduct,
 } from "../../../../helpers"
+import { assertVendorOwnsAllInventoryItems } from "../../../../../inventory-items/helpers"
 
 type VariantInventoryInput = {
   variant_id: string
@@ -54,6 +55,16 @@ export const POST = async (
     ...(body.update?.map((row) => row.variant_id) ?? []),
     ...(body.delete?.map((row) => row.variant_id) ?? []),
   ])
+
+  await assertVendorOwnsAllInventoryItems(
+    req,
+    [
+      ...(body.create?.map((row) => row.inventory_item_id) ?? []),
+      ...(body.update?.map((row) => row.inventory_item_id) ?? []),
+      ...(body.delete?.map((row) => row.inventory_item_id) ?? []),
+    ],
+    "Inventory item not found."
+  )
 
   const { result } = await batchLinksWorkflow(req.scope).run({
     input: {

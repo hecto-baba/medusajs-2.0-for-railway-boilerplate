@@ -96,7 +96,35 @@ export type VendorOrder = {
   customer?: { email: string | null } | null
   sales_channel?: { name: string | null } | null
   payment_collections?: { status: string }[]
-  fulfillments?: { id: string; delivered_at: string | null; shipped_at: string | null }[]
+  fulfillments?: VendorFulfillment[]
+  // True for an older order that holds other sellers' items too: only this
+  // seller's items are shown and whole-order figures are withheld.
+  is_mixed?: boolean
+}
+
+/** A single order's full detail, scoped to the vendor's own line items. */
+export type VendorOrderDetail = VendorOrder & {
+  subtotal: number
+  shipping_total: number
+  tax_total: number
+  customer?: {
+    email: string | null
+    first_name?: string | null
+    last_name?: string | null
+  } | null
+  shipping_address?: Record<string, unknown> | null
+  billing_address?: Record<string, unknown> | null
+  items?: {
+    id: string
+    title: string
+    variant_title?: string | null
+    quantity: number
+    unit_price: number
+    metadata?: Record<string, unknown> | null
+    // How many of this line are already packed (see fulfillments).
+    detail?: { quantity?: number | { value?: string } ; fulfilled_quantity?: number | { value?: string } } | null
+  }[]
+  shipping_methods?: { shipping_option_id?: string | null; name?: string }[]
 }
 
 export type ListResponse<T> = {
@@ -229,6 +257,9 @@ export const listVendorOrders = (params: {
     "orders",
     params as Record<string, string | number | undefined>
   )
+
+export const getVendorOrder = (orderId: string) =>
+  request<{ order: VendorOrderDetail }>("orders/" + orderId, {})
 
 const mutate = async <T>(
   path: string,
@@ -366,11 +397,23 @@ export const uploadVendorImages = async (files: File[]) => {
 
 /* ------------------------------------------------------------------ rental */
 
+export type VendorRentalUnit = "hour" | "day" | "week" | "month" | "custom"
+export type VendorRentalDepositType = "fixed" | "percentage"
+
 export type VendorRentalConfig = {
   id: string
   product_id: string
+  // Legacy day-only fields, kept for backward compatibility with configs
+  // saved before unit/deposit support - min_rental_units/max_rental_units
+  // are the fields new saves read and write.
   min_rental_days: number
   max_rental_days: number | null
+  rental_unit: VendorRentalUnit
+  min_rental_units: number
+  max_rental_units: number | null
+  security_deposit_amount: number
+  security_deposit_type: VendorRentalDepositType
+  requires_time_selection: boolean
   status: "active" | "inactive"
 }
 
@@ -383,8 +426,12 @@ export const getVendorRentalConfig = (productId: string) =>
 export const upsertVendorRentalConfig = (
   productId: string,
   body: {
-    min_rental_days?: number
-    max_rental_days?: number | null
+    rental_unit?: VendorRentalUnit
+    min_rental_units?: number
+    max_rental_units?: number | null
+    security_deposit_amount?: number
+    security_deposit_type?: VendorRentalDepositType
+    requires_time_selection?: boolean
     status?: "active" | "inactive"
   }
 ) =>
@@ -392,6 +439,68 @@ export const upsertVendorRentalConfig = (
     "products/" + productId + "/rental-config",
     "POST",
     body
+  )
+
+/* -------------------------------------------------------- rentals (bookings) */
+
+export type VendorRentalDepositStatus =
+  | "held"
+  | "refunded"
+  | "partially_refunded"
+  | "forfeited"
+
+export type VendorRental = {
+  id: string
+  variant_id: string
+  customer_id: string
+  order_id: string
+  line_item_id: string
+  rental_start_date: string
+  rental_end_date: string
+  actual_return_date: string | null
+  rental_days: number
+  rental_unit: VendorRentalUnit
+  rental_units_count: number | null
+  pickup_time: string | null
+  return_time: string | null
+  security_deposit_amount: number
+  security_deposit_status: VendorRentalDepositStatus | null
+  status: "pending" | "active" | "returned" | "cancelled"
+  product_variant?: {
+    id: string
+    title: string
+    product?: {
+      id: string
+      title: string
+      thumbnail: string | null
+    }
+  }
+}
+
+export const listVendorOrderRentals = (orderId: string) =>
+  request<{ rentals: VendorRental[] }>(
+    "orders/" + orderId + "/rentals",
+    {}
+  )
+
+export const updateVendorRentalStatus = (
+  rentalId: string,
+  status: "active" | "returned" | "cancelled"
+) =>
+  mutate<{ rental: VendorRental }>(
+    "rentals/" + rentalId,
+    "POST",
+    { status }
+  )
+
+export const updateVendorRentalDeposit = (
+  rentalId: string,
+  status: "refunded" | "partially_refunded" | "forfeited"
+) =>
+  mutate<{ rental: VendorRental }>(
+    "rentals/" + rentalId + "/deposit",
+    "POST",
+    { status }
   )
 
 /**
@@ -1353,6 +1462,7 @@ export const listVendorCustomerGroups = (params: {
   offset: number
   q?: string
   created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ customer_groups: VendorCustomerGroup[] }>>(
@@ -1455,6 +1565,7 @@ export const listVendorPriceLists = (params: {
   status?: string | string[]
   type?: string | string[]
   created_at_gte?: string
+  updated_at_gte?: string
   order?: string
 }) =>
   request<ListResponse<{ price_lists: VendorPriceList[] }>>(
@@ -2018,7 +2129,8 @@ export type VendorDraftOrder = {
   billing_address?: Record<string, any> | null
   items?: any[]
   shipping_methods?: any[]
-  summary?: any
+  sales_channel?: { id: string; name: string } | null
+  region?: { id: string; name: string } | null
   created_at: string
   updated_at?: string
 }
@@ -2033,6 +2145,7 @@ export const listVendorDraftOrders = (params: {
   currency_code?: string
   sales_channel_id?: string
   region_id?: string
+  q_customer?: string
 }) =>
   request<ListResponse<{ draft_orders: VendorDraftOrder[] }>>(
     "draft-orders",
@@ -2080,6 +2193,8 @@ export const listVendorTeam = (params: {
   offset: number
   q?: string
   order?: string
+  created_at_gte?: string
+  updated_at_gte?: string
 }) =>
   request<ListResponse<{ members: VendorTeamMember[] }>>(
     "team",
@@ -2600,6 +2715,8 @@ export const listVendorRegions = (
     q?: string
     currency_code?: string
     order?: string
+    created_at_gte?: string
+    updated_at_gte?: string
   } = {}
 ) => request<{ regions: VendorRegion[] }>("regions", params)
 
@@ -2646,6 +2763,131 @@ export const deleteVendorTaxRegion = (id: string) =>
   mutate<{ id: string; object: "tax_region"; deleted: boolean }>(
     `tax-regions/${id}`,
     "DELETE"
+  )
+
+/* ---------------------------------------------------------- appointments */
+
+export type VendorProvider = {
+  id: string
+  vendor_admin_id: string
+  display_name: string | null
+  bio: string | null
+  timezone: string
+  status: "active" | "inactive"
+}
+
+export type VendorRecurringAvailability = {
+  id: string
+  provider_id: string
+  day_of_week: number
+  start_time: string
+  end_time: string
+  effective_from: string
+  effective_until: string | null
+  status: "active" | "inactive"
+}
+
+export type VendorAvailabilityException = {
+  id: string
+  provider_id: string
+  date: string
+  type: "blackout" | "extra_hours"
+  start_time: string | null
+  end_time: string | null
+  reason: string | null
+}
+
+export type VendorAppointmentAttendee = {
+  id: string
+  appointment_id: string
+  customer_id: string
+  order_id: string | null
+  status: "reserved" | "confirmed" | "cancelled"
+}
+
+export type VendorAppointment = {
+  id: string
+  provider_id: string
+  service_product_id: string
+  start_time: string
+  end_time: string
+  max_capacity: number
+  status: "available" | "booked" | "cancelled" | "completed"
+  service_product?: { id: string; title: string } | null
+  attendees?: VendorAppointmentAttendee[]
+}
+
+export const getVendorProviderMe = () =>
+  request<{ provider: VendorProvider | null }>("providers/me", {})
+
+export const createVendorProvider = (body: {
+  display_name?: string | null
+  bio?: string | null
+  timezone: string
+}) => mutate<{ provider: VendorProvider }>("providers/me", "POST", body)
+
+export const listVendorRecurringAvailability = () =>
+  request<{ recurring_availabilities: VendorRecurringAvailability[] }>(
+    "providers/me/recurring-availability",
+    {}
+  )
+
+export const createVendorRecurringAvailability = (body: {
+  day_of_week: number
+  start_time: string
+  end_time: string
+  effective_from: string
+  effective_until?: string | null
+}) =>
+  mutate<{ recurring_availability: VendorRecurringAvailability }>(
+    "providers/me/recurring-availability",
+    "POST",
+    body
+  )
+
+export const deleteVendorRecurringAvailability = (id: string) =>
+  mutate<{ id: string; deleted: boolean }>(
+    `providers/me/recurring-availability/${id}`,
+    "DELETE"
+  )
+
+export const listVendorAvailabilityExceptions = () =>
+  request<{ availability_exceptions: VendorAvailabilityException[] }>(
+    "providers/me/exceptions",
+    {}
+  )
+
+export const createVendorAvailabilityException = (body: {
+  date: string
+  type: "blackout" | "extra_hours"
+  start_time?: string | null
+  end_time?: string | null
+  reason?: string | null
+}) =>
+  mutate<{ availability_exception: VendorAvailabilityException }>(
+    "providers/me/exceptions",
+    "POST",
+    body
+  )
+
+export const listVendorAppointments = () =>
+  request<{ appointments: VendorAppointment[] }>(
+    "providers/me/appointments",
+    {}
+  )
+
+export const createVendorAppointmentSlots = (body: {
+  service_product_id: string
+  service_variant_id?: string | null
+  service_duration_minutes: number
+  max_capacity?: number
+  date_from: string
+  date_to: string
+}) =>
+  mutate<{ appointments: VendorAppointment[] }>(
+    "providers/me/slots",
+    "POST",
+    body
   )
 
 /* ---------------------------------------------------------------- search */
@@ -2918,4 +3160,586 @@ export const deleteVendorCurrency = (code: string) =>
     `currencies/${code}`,
     "DELETE"
   )
+
+/* ------------------------------------------------------- shipping options */
+
+export type VendorShippingOption = {
+  id: string
+  name: string
+  price_type: string
+  service_zone_id: string
+  shipping_profile_id: string
+  provider_id: string
+  shipping_option_type_id: string
+  type?: { id: string; label: string; code: string } | null
+  prices?: Array<{ id: string; currency_code?: string | null; amount: number }>
+  service_zone?: {
+    id: string
+    name: string
+    fulfillment_set?: { location?: { id: string; name: string } | null } | null
+  } | null
+  created_at: string
+}
+
+export const listVendorShippingOptions = (params?: {
+  limit?: number
+  offset?: number
+  q?: string
+  stock_location_id?: string
+}) =>
+  request<{ shipping_options: VendorShippingOption[]; count?: number }>(
+    "shipping-options",
+    params || {}
+  )
+
+export const createVendorShippingOption = (body: {
+  name: string
+  service_zone_id: string
+  shipping_profile_id: string
+  shipping_option_type_id: string
+  prices: Array<{ currency_code: string; amount: number }>
+}) =>
+  mutate<{ shipping_option: VendorShippingOption }>("shipping-options", "POST", body)
+
+export const updateVendorShippingOption = (
+  id: string,
+  body: {
+    name?: string
+    prices?: Array<{ id: string; amount: number }>
+  }
+) =>
+  mutate<{ shipping_option: VendorShippingOption }>(`shipping-options/${id}`, "POST", body)
+
+export const deleteVendorShippingOption = (id: string) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(
+    `shipping-options/${id}`,
+    "DELETE"
+  )
+
+/* ------------------------------------------------------------- tax rates */
+
+export type VendorTaxRate = {
+  id: string
+  name: string
+  code: string
+  rate: number | null
+  is_default: boolean
+  tax_region_id: string
+  tax_region?: { id: string; country_code: string; province_code: string | null } | null
+  created_at: string
+}
+
+export const listVendorTaxRates = (params?: {
+  limit?: number
+  offset?: number
+  tax_region_id?: string
+}) =>
+  request<{ tax_rates: VendorTaxRate[]; count?: number }>("tax-rates", params || {})
+
+export const createVendorTaxRate = (body: {
+  tax_region_id: string
+  name: string
+  code?: string
+  rate: number
+}) => mutate<{ tax_rate: VendorTaxRate }>("tax-rates", "POST", body)
+
+export const updateVendorTaxRateById = (
+  id: string,
+  body: { name?: string; code?: string; rate?: number }
+) => mutate<{ tax_rate: VendorTaxRate }>(`tax-rates/${id}`, "POST", body)
+
+export const deleteVendorTaxRate = (id: string) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(`tax-rates/${id}`, "DELETE")
+
+/* ------------------------------------------------------ order fulfilment */
+
+export type VendorFulfillment = {
+  id: string
+  shipped_at: string | null
+  delivered_at: string | null
+  canceled_at: string | null
+  labels?: { tracking_number: string; tracking_url?: string | null }[]
+  items?: { line_item_id: string; title?: string; quantity: number }[]
+}
+
+export const fulfillVendorOrder = (
+  orderId: string,
+  body: {
+    items: { id: string; quantity: number }[]
+    shipping_option_id: string
+    location_id?: string
+    no_notification?: boolean
+  }
+) =>
+  mutate<{ fulfillment: { id: string } }>(`orders/${orderId}/fulfillments`, "POST", body)
+
+export const shipVendorFulfillment = (
+  orderId: string,
+  fulfillmentId: string,
+  body: {
+    labels?: { tracking_number: string; tracking_url?: string }[]
+    no_notification?: boolean
+  }
+) =>
+  mutate<{ shipped: boolean }>(
+    `orders/${orderId}/fulfillments/${fulfillmentId}/shipments`,
+    "POST",
+    body
+  )
+
+export const deliverVendorFulfillment = (orderId: string, fulfillmentId: string) =>
+  mutate<{ delivered: boolean }>(
+    `orders/${orderId}/fulfillments/${fulfillmentId}/mark-as-delivered`,
+    "POST",
+    {}
+  )
+
+export const cancelVendorFulfillment = (orderId: string, fulfillmentId: string) =>
+  mutate<{ canceled: boolean }>(
+    `orders/${orderId}/fulfillments/${fulfillmentId}/cancel`,
+    "POST",
+    {}
+  )
+
+export const cancelVendorOrder = (orderId: string) =>
+  mutate<{ canceled: boolean }>(`orders/${orderId}/cancel`, "POST", {})
+
+export const refundVendorOrder = (orderId: string, body: { amount: number; note?: string }) =>
+  mutate<{ refunded: number }>(`orders/${orderId}/refunds`, "POST", body)
+
+export const returnVendorOrderItems = (
+  orderId: string,
+  body: {
+    items: { id: string; quantity: number }[]
+    note?: string
+    receive_now?: boolean
+    location_id?: string
+  }
+) => mutate<{ return: { id: string } }>(`orders/${orderId}/returns`, "POST", body)
+
+/** The seller's own payout ledger (what the platform owes them). */
+export type VendorPayoutEntry = {
+  id: string
+  parent_order_id: string
+  child_order_id: string
+  currency_code: string
+  items_total: number
+  shipping_total: number
+  tax_total: number
+  total: number
+  refunded_total: number
+  payout_status: "owed" | "paid" | "void"
+  paid_at: string | null
+  payout_reference: string | null
+  created_at: string
+}
+
+export const listVendorPayouts = (params?: {
+  limit?: number
+  offset?: number
+  payout_status?: "owed" | "paid" | "void"
+}) =>
+  request<{
+    payouts: VendorPayoutEntry[]
+    count: number
+    totals: Record<string, { owed: number; paid: number; void: number; refunded: number }>
+  }>("payouts", params || {})
+
+/* ---------------------------------------------------------------- digital products */
+
+export enum VendorMediaType {
+  MAIN = "main",
+  PREVIEW = "preview",
+}
+
+export type VendorDigitalProductMedia = {
+  id: string
+  fileId: string
+  mimeType: string
+  type: VendorMediaType | string
+  url?: string
+  created_at?: string
+}
+
+export type VendorDigitalProduct = {
+  id: string
+  name: string
+  created_at: string
+  updated_at: string
+  medias?: VendorDigitalProductMedia[]
+  product_variant?: any
+}
+
+export const listVendorDigitalProducts = (params?: {
+  limit?: number
+  offset?: number
+  product_id?: string
+}) =>
+  request<{
+    digital_products: VendorDigitalProduct[]
+    count: number
+    limit: number
+    offset: number
+  }>(
+    "digital-products",
+    (params || {}) as Record<string, string | number | undefined>
+  )
+
+export const createVendorDigitalProduct = (body: {
+  name: string
+  medias: { type: string; file_id: string; mime_type: string }[]
+  product: any
+}) =>
+  mutate<{ digital_product: VendorDigitalProduct }>(
+    "digital-products",
+    "POST",
+    body
+  )
+
+export const getVendorDigitalProduct = (id: string) =>
+  request<{ digital_product: VendorDigitalProduct }>(
+    `digital-products/${id}`,
+    {}
+  )
+
+export const attachVendorDigitalProductMedia = (
+  id: string,
+  medias: { type: string; file_id: string; mime_type: string }[]
+) =>
+  mutate<{ medias: VendorDigitalProductMedia[] }>(
+    `digital-products/${id}`,
+    "POST",
+    { medias }
+  )
+
+export const deleteVendorDigitalProduct = (id: string) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(
+    `digital-products/${id}`,
+    "DELETE"
+  )
+
+export const deleteVendorDigitalProductMedia = (
+  productId: string,
+  mediaId: string
+) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(
+    `digital-products/${productId}/medias/${mediaId}`,
+    "DELETE"
+  )
+
+export const uploadVendorFiles = async (
+  files: File[]
+): Promise<{ id: string; url: string }[]> => {
+  const formData = new FormData()
+  files.forEach((f) => formData.append("files", f))
+  const res = await fetch("/api/vendors/uploads", {
+    method: "POST",
+    body: formData,
+    credentials: "same-origin",
+  })
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}))
+    throw new Error(payload?.message ?? "File upload failed")
+  }
+  const data = await res.json()
+  return data.files || []
+}
+
+/* ---------------------------------------------------------------- restaurants & deliveries */
+
+export type VendorRestaurantAdmin = {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+}
+
+export type VendorRestaurant = {
+  id: string
+  name: string
+  handle: string
+  is_open: boolean
+  description?: string | null
+  phone?: string
+  email?: string
+  address?: string
+  image_url?: string | null
+  admins?: VendorRestaurantAdmin[]
+  products?: any[]
+  deliveries?: any[]
+}
+
+export enum VendorDeliveryStatus {
+  PENDING = "pending",
+  RESTAURANT_ACCEPTED = "restaurant_accepted",
+  RESTAURANT_PREPARING = "restaurant_preparing",
+  READY_FOR_PICKUP = "ready_for_pickup",
+  PICKUP_CLAIMED = "pickup_claimed",
+  IN_TRANSIT = "in_transit",
+  DELIVERED = "delivered",
+  RESTAURANT_DECLINED = "restaurant_declined",
+}
+
+export type VendorDriver = {
+  id: string
+  first_name: string
+  last_name: string
+  phone?: string
+  email?: string
+}
+
+export type VendorDelivery = {
+  id: string
+  transaction_id?: string | null
+  delivery_status: VendorDeliveryStatus | string
+  eta?: string | null
+  delivered_at?: string | null
+  driver?: VendorDriver | null
+  restaurant?: VendorRestaurant | null
+  order?: {
+    id: string
+    display_id?: number
+    total?: number
+    currency_code?: string
+    shipping_address?: any
+    items?: any[]
+  } | null
+}
+
+export const listVendorRestaurants = (params?: {
+  limit?: number
+  offset?: number
+}) =>
+  request<{ restaurants: VendorRestaurant[]; count: number }>(
+    "restaurants",
+    (params || {}) as Record<string, string | number | undefined>
+  )
+
+export const createVendorRestaurant = (body: Partial<VendorRestaurant>) =>
+  mutate<{ restaurant: VendorRestaurant }>("restaurants", "POST", body)
+
+export const getVendorRestaurant = (id: string) =>
+  request<{ restaurant: VendorRestaurant }>(`restaurants/${id}`, {})
+
+export const updateVendorRestaurant = (
+  id: string,
+  body: Partial<VendorRestaurant>
+) => mutate<{ restaurant: VendorRestaurant }>(`restaurants/${id}`, "POST", body)
+
+export const createVendorRestaurantProduct = (
+  restaurantId: string,
+  body: any
+) =>
+  mutate<{ restaurant_products: any[] }>(
+    `restaurants/${restaurantId}/products`,
+    "POST",
+    body
+  )
+
+export const createVendorRestaurantAdmin = (
+  restaurantId: string,
+  body: { first_name?: string; last_name?: string; email: string }
+) =>
+  mutate<{ admin: VendorRestaurantAdmin }>(
+    `restaurants/${restaurantId}/admins`,
+    "POST",
+    body
+  )
+
+export const listVendorDeliveries = (params?: {
+  limit?: number
+  offset?: number
+  status?: string
+}) =>
+  request<{
+    deliveries: VendorDelivery[]
+    count: number
+    limit: number
+    offset: number
+  }>(
+    "deliveries",
+    (params || {}) as Record<string, string | number | undefined>
+  )
+
+export const getVendorDelivery = (id: string) =>
+  request<{ delivery: VendorDelivery }>(`deliveries/${id}`, {})
+
+export const updateVendorDelivery = (
+  id: string,
+  body: {
+    delivery_status?: VendorDeliveryStatus | string
+    driver_id?: string | null
+    eta?: string | null
+    delivered_at?: string | null
+  }
+) => mutate<{ delivery: VendorDelivery }>(`deliveries/${id}`, "POST", body)
+
+export const listVendorDrivers = () =>
+  request<{ drivers: VendorDriver[] }>("drivers", {})
+
+/* ---------------------------------------------------------------- b2b */
+
+export type VendorCompany = {
+  id: string
+  name: string
+  email: string
+  phone?: string | null
+  address?: string | null
+  city?: string | null
+  state?: string | null
+  postal_code?: string | null
+  country_code?: string | null
+  currency_code: string
+  customer_group?: { id: string; name: string } | null
+  employees?: any[]
+}
+
+export type VendorQuoteItem = {
+  id: string
+  title: string
+  quantity: number
+  unit_price: number
+  total?: number
+  product_id?: string
+}
+
+export type VendorQuote = {
+  id: string
+  status:
+    | "accepted"
+    | "customer_rejected"
+    | "merchant_rejected"
+    | "pending_merchant"
+    | "pending_customer"
+    | string
+  customer_id?: string | null
+  draft_order_id?: string | null
+  order_change_id?: string | null
+  cart_id?: string | null
+  created_at: string
+  metadata?: Record<string, any> | null
+  customer?: {
+    first_name?: string | null
+    last_name?: string | null
+    email?: string | null
+    employee?: {
+      company?: VendorCompany
+    }
+  } | null
+  draft_order?: {
+    total?: number
+    subtotal?: number
+    shipping_total?: number
+    currency_code?: string
+    items?: VendorQuoteItem[]
+    shipping_address?: any
+    payment_status?: string
+    fulfillment_status?: string
+  } | null
+  cart?: {
+    total?: number
+    subtotal?: number
+    currency_code?: string
+    items?: VendorQuoteItem[]
+  } | null
+}
+
+export type VendorApproval = {
+  id: string
+  cart_id: string
+  created_by: string
+  created_at: string
+  statuses?: { id: string; status: string; type: string }[]
+  cart?: {
+    total?: number
+    currency_code?: string
+    customer?: {
+      first_name?: string | null
+      last_name?: string | null
+      email?: string | null
+    } | null
+    items?: {
+      id: string
+      title?: string
+      quantity?: number
+      unit_price?: number
+    }[]
+  } | null
+}
+
+export const listVendorCompanies = (params?: {
+  limit?: number
+  offset?: number
+}) =>
+  request<{
+    companies: VendorCompany[]
+    count: number
+    limit: number
+    offset: number
+  }>("companies", (params || {}) as Record<string, string | number | undefined>)
+
+export const createVendorCompany = (
+  body: Partial<VendorCompany> & { customer_group_id?: string }
+) => mutate<{ company: VendorCompany }>("companies", "POST", body)
+
+export const getVendorCompany = (id: string) =>
+  request<{ company: VendorCompany }>(`companies/${id}`, {})
+
+export const updateVendorCompany = (
+  id: string,
+  body: Partial<VendorCompany>
+) => mutate<{ company: VendorCompany }>(`companies/${id}`, "POST", body)
+
+export const deleteVendorCompany = (id: string) =>
+  mutate<{ id: string; object: string; deleted: boolean }>(
+    `companies/${id}`,
+    "DELETE"
+  )
+
+export const listVendorQuotes = (params?: { limit?: number; offset?: number }) =>
+  request<{
+    quotes: VendorQuote[]
+    count: number
+    limit: number
+    offset: number
+  }>("quotes", (params || {}) as Record<string, string | number | undefined>)
+
+export const getVendorQuote = (id: string) =>
+  request<{ quote: VendorQuote; order_preview?: any }>(`quotes/${id}`, {})
+
+export const updateVendorQuoteStatus = (quoteId: string, status: string) =>
+  mutate<{ quote: VendorQuote }>("quotes", "POST", {
+    quote_id: quoteId,
+    status,
+  })
+
+export const negotiateVendorQuote = (
+  quoteId: string,
+  body: {
+    status?: string
+    items_negotiated?: {
+      id: string
+      title: string
+      quantity: number
+      unit_price: number
+    }[]
+    vendor_shipping_price?: number
+  }
+) => mutate<{ quote: VendorQuote }>(`quotes/${quoteId}`, "POST", body)
+
+export const listVendorApprovals = (params?: {
+  limit?: number
+  offset?: number
+}) =>
+  request<{
+    approvals: VendorApproval[]
+    count: number
+    limit: number
+    offset: number
+  }>("approvals", (params || {}) as Record<string, string | number | undefined>)
+
+export const decideVendorApproval = (body: {
+  approval_id: string
+  status: "approved" | "rejected"
+}) => mutate<{ approval_status: any }>("approvals", "POST", body)
 

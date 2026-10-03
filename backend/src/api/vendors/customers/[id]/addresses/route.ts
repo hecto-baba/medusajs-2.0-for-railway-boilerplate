@@ -6,7 +6,7 @@ import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { createCustomerAddressesWorkflow } from "@medusajs/medusa/core-flows"
 import {
-  assertVendorOwnsCustomer,
+  assertVendorManagesCustomer,
   refetchVendorCustomer,
 } from "../../helpers"
 
@@ -32,7 +32,7 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const customerId = req.params.id
-  await assertVendorOwnsCustomer(req, customerId)
+  await assertVendorManagesCustomer(req, customerId)
 
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const { data: addresses } = await query.graph({
@@ -54,7 +54,7 @@ export const POST = async (
   res: MedusaResponse
 ) => {
   const customerId = req.params.id
-  await assertVendorOwnsCustomer(req, customerId)
+  await assertVendorManagesCustomer(req, customerId)
 
   const addressData = req.validatedBody
 

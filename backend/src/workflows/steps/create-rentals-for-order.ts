@@ -3,6 +3,7 @@ import { RENTAL_MODULE } from "../../modules/rental"
 import RentalModuleService from "../../modules/rental/service"
 import { OrderDTO } from "@medusajs/framework/types"
 import countRentalDays from "../../utils/count-rental-days"
+import { RentalUnit } from "../../utils/rental-unit"
 
 export type CreateRentalsForOrderInput = {
   order: OrderDTO
@@ -24,11 +25,20 @@ export const createRentalsForOrderStep = createStep(
 
     const rentals = await rentalModuleService.createRentals(
       rentalItems.map((item) => {
-        const { 
+        const {
           variant_id,
           metadata,
         } = item
         const rentalConfiguration = (item as any).variant?.product?.rental_configuration
+
+        // rental_unit/rental_units_count/pickup_time/return_time/deposit are
+        // written to line item metadata by add-to-cart-with-rental at the
+        // point the price was quoted, so the persisted Rental snapshots
+        // exactly what the shopper was charged - not whatever the product's
+        // configuration happens to say by the time checkout completes.
+        const rentalUnit = (metadata?.rental_unit as RentalUnit) ?? "day"
+        const rentalUnitsCount = metadata?.rental_units_count as number | undefined
+        const depositAmount = metadata?.rental_deposit_amount as number | undefined
 
         return {
           variant_id: variant_id!,
@@ -43,6 +53,14 @@ export const createRentalsForOrderStep = createStep(
             new Date(metadata?.rental_start_date as string),
             new Date(metadata?.rental_end_date as string)
           ),
+          rental_unit: rentalUnit,
+          rental_units_count: rentalUnitsCount ?? null,
+          pickup_time: (metadata?.rental_pickup_time as string) ?? null,
+          return_time: (metadata?.rental_return_time as string) ?? null,
+          security_deposit_amount: depositAmount ?? 0,
+          security_deposit_status: (depositAmount ? "held" : null) as
+            | "held"
+            | null,
           rental_configuration_id: rentalConfiguration?.id as string,
         }
       })

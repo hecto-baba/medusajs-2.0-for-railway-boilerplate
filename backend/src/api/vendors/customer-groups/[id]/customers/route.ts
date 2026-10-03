@@ -2,6 +2,7 @@ import type {
   AuthenticatedMedusaRequest,
   MedusaResponse,
 } from "@medusajs/framework/http"
+import { MedusaError } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { linkCustomersToCustomerGroupWorkflow } from "@medusajs/medusa/core-flows"
 import {
@@ -32,10 +33,7 @@ export const POST = async (
     const ownedCustomerIds = await getVendorCustomerIds(req)
     const unauthorized = add.filter((cid) => !ownedCustomerIds.includes(cid))
     if (unauthorized.length) {
-      res.status(403).json({
-        message: `Cannot add customers outside vendor scope: ${unauthorized.join(", ")}`,
-      })
-      return
+      throw new MedusaError(MedusaError.Types.NOT_FOUND, "Customer not found.")
     }
   }
 

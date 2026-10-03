@@ -5,13 +5,15 @@ import {
   listVendorTeam,
   type VendorTeamMember,
 } from "@lib/data/vendor-client"
-import { PencilSquare, PlusMini, Trash, User } from "@medusajs/icons"
+import { PencilSquare, PlusMini, Trash } from "@medusajs/icons"
 import {
   Avatar,
   Button,
   Container,
   createDataTableColumnHelper,
+  createDataTableFilterHelper,
   DataTable,
+  DataTableFilteringState,
   DataTablePaginationState,
   DataTableSortingState,
   Heading,
@@ -21,11 +23,59 @@ import {
   usePrompt,
 } from "@medusajs/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { InviteMemberModal } from "./invite-member-modal"
 import { MemberEditDrawer } from "./member-edit-drawer"
 
 const columnHelper = createDataTableColumnHelper<VendorTeamMember>()
+const filterHelper = createDataTableFilterHelper<VendorTeamMember>()
+
+const resolveDateFilter = (val: any): string | undefined => {
+  if (!val || val === "all") return undefined
+  if (typeof val === "object") {
+    if (val.$gte) return typeof val.$gte === "string" ? val.$gte : new Date(val.$gte).toISOString()
+    const flat = Object.values(val).flat()
+    val = flat[0]
+  }
+  if (Array.isArray(val)) val = val[0]
+  if (typeof val !== "string" || val === "all") return undefined
+  if (val === "7d") {
+    return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  }
+  if (val === "30d") {
+    return new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  }
+  if (val === "90d") {
+    return new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  }
+  if (!isNaN(Date.parse(val))) {
+    return new Date(val).toISOString()
+  }
+  return undefined
+}
+
+const filters = [
+  filterHelper.custom({
+    id: "created_at",
+    label: "Created",
+    type: "select",
+    options: [
+      { label: "Last 7 days", value: "7d" },
+      { label: "Last 30 days", value: "30d" },
+      { label: "Last 90 days", value: "90d" },
+    ],
+  }),
+  filterHelper.custom({
+    id: "updated_at",
+    label: "Updated",
+    type: "select",
+    options: [
+      { label: "Last 7 days", value: "7d" },
+      { label: "Last 30 days", value: "30d" },
+      { label: "Last 90 days", value: "90d" },
+    ],
+  }),
+]
 
 export const TeamTable = () => {
   const queryClient = useQueryClient()
@@ -33,6 +83,10 @@ export const TeamTable = () => {
 
   const [search, setSearch] = useState("")
   const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [filtering, setFiltering] = useState<DataTableFilteringState>({})
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
+    updated_at: false,
+  })
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -48,9 +102,36 @@ export const TeamTable = () => {
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
+  const createdAtGte = useMemo(
+    () => resolveDateFilter(filtering.created_at),
+    [filtering.created_at]
+  )
+  const updatedAtGte = useMemo(
+    () => resolveDateFilter(filtering.updated_at),
+    [filtering.updated_at]
+  )
+
   const { data, isLoading } = useQuery({
-    queryKey: ["vendor-team", { limit, offset, q: search, order }],
-    queryFn: () => listVendorTeam({ limit, offset, q: search || undefined, order }),
+    queryKey: [
+      "vendor-team",
+      {
+        limit,
+        offset,
+        q: search || undefined,
+        order,
+        created_at_gte: createdAtGte,
+        updated_at_gte: updatedAtGte,
+      },
+    ],
+    queryFn: () =>
+      listVendorTeam({
+        limit,
+        offset,
+        q: search || undefined,
+        order,
+        created_at_gte: createdAtGte,
+        updated_at_gte: updatedAtGte,
+      }),
     placeholderData: (previous) => previous,
   })
 
@@ -61,109 +142,149 @@ export const TeamTable = () => {
     },
   })
 
-  const handleDelete = async (member: VendorTeamMember) => {
-    const memberName =
-      member.first_name || member.last_name
-        ? `${member.first_name || ""} ${member.last_name || ""}`.trim()
-        : member.email
+  const handleDelete = useCallback(
+    async (member: VendorTeamMember) => {
+      const memberName =
+        member.first_name || member.last_name
+          ? `${member.first_name || ""} ${member.last_name || ""}`.trim()
+          : member.email
 
-    const confirmed = await prompt({
-      title: "Remove team member",
-      description: `Are you sure you want to remove "${memberName}" from your store team? They will immediately lose access.`,
-      confirmText: "Remove",
-      cancelText: "Cancel",
-      variant: "danger",
-    })
+      const confirmed = await prompt({
+        title: "Remove team member",
+        description: `Are you sure you want to remove "${memberName}" from your store team? They will immediately lose access.`,
+        confirmText: "Remove",
+        cancelText: "Cancel",
+        variant: "danger",
+      })
 
-    if (!confirmed) {
-      return
-    }
+      if (!confirmed) {
+        return
+      }
 
-    try {
-      await removeMember(member.id)
-      toast.success(`"${memberName}" was removed.`)
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not remove the team member."
-      )
-    }
-  }
+      try {
+        await removeMember(member.id)
+        toast.success(`"${memberName}" was removed.`)
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not remove the team member."
+        )
+      }
+    },
+    [prompt, removeMember]
+  )
 
-  const columns = [
-    columnHelper.accessor("first_name", {
-      header: "Member",
-      enableSorting: true,
-      cell: ({ row }) => {
-        const member = row.original
-        const name =
-          member.first_name || member.last_name
-            ? `${member.first_name || ""} ${member.last_name || ""}`.trim()
-            : "Team Member"
-        const initials =
-          (member.first_name?.[0] || "") + (member.last_name?.[0] || "") ||
-          member.email?.[0]?.toUpperCase() ||
-          "U"
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("first_name", {
+        id: "first_name",
+        header: "Member",
+        enableSorting: true,
+        sortLabel: "Name",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => {
+          const member = row.original
+          const name =
+            member.first_name || member.last_name
+              ? `${member.first_name || ""} ${member.last_name || ""}`.trim()
+              : "Team Member"
+          const initials =
+            (member.first_name?.[0] || "") + (member.last_name?.[0] || "") ||
+            member.email?.[0]?.toUpperCase() ||
+            "U"
 
-        return (
-          <div className="flex items-center gap-x-3">
-            <Avatar fallback={initials} size="small" />
-            <div className="flex flex-col">
-              <Text size="small" weight="plus" className="text-ui-fg-base">
-                {name}
-              </Text>
-              <Text size="xsmall" className="text-ui-fg-subtle">
-                {member.email}
-              </Text>
+          return (
+            <div className="flex items-center gap-x-3">
+              <Avatar fallback={initials} size="small" />
+              <div className="flex flex-col">
+                <Text size="small" weight="plus" className="text-ui-fg-base">
+                  {name}
+                </Text>
+                <Text size="xsmall" className="text-ui-fg-subtle">
+                  {member.email}
+                </Text>
+              </div>
             </div>
-          </div>
-        )
-      },
-    }),
-    columnHelper.accessor("email", {
-      header: "Email",
-      enableSorting: true,
-      cell: ({ row }) => (
-        <Text size="small" className="text-ui-fg-subtle">
-          {row.original.email}
-        </Text>
-      ),
-    }),
-    columnHelper.accessor("created_at", {
-      header: "Joined",
-      enableSorting: true,
-      cell: ({ row }) => {
-        const date = row.original.created_at
-          ? new Date(row.original.created_at).toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })
-          : "-"
-        return (
+          )
+        },
+      }),
+      columnHelper.accessor("email", {
+        id: "email",
+        header: "Email",
+        enableSorting: true,
+        sortLabel: "Email",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => (
           <Text size="small" className="text-ui-fg-subtle">
-            {date}
+            {row.original.email}
           </Text>
-        )
-      },
-    }),
-    columnHelper.action({
-      actions: (ctx) => [
-        {
-          label: "Edit",
-          icon: <PencilSquare />,
-          onClick: () => {
-            setSelectedMember(ctx.row.original)
-            setEditOpen(true)
+        ),
+      }),
+      columnHelper.accessor("created_at", {
+        id: "created_at",
+        header: "Joined",
+        enableSorting: true,
+        sortLabel: "Created",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => {
+          const date = row.original.created_at
+            ? new Date(row.original.created_at).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })
+            : "-"
+          return (
+            <Text size="small" className="text-ui-fg-subtle">
+              {date}
+            </Text>
+          )
+        },
+      }),
+      columnHelper.accessor("updated_at", {
+        id: "updated_at",
+        header: "Updated",
+        enableSorting: true,
+        sortLabel: "Updated",
+        sortAscLabel: "Ascending",
+        sortDescLabel: "Descending",
+        cell: ({ row }) => {
+          const date = row.original.updated_at
+            ? new Date(row.original.updated_at).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })
+            : "-"
+          return (
+            <Text size="small" className="text-ui-fg-subtle">
+              {date}
+            </Text>
+          )
+        },
+      }),
+      columnHelper.action({
+        actions: (ctx) => [
+          {
+            label: "Edit",
+            icon: <PencilSquare />,
+            onClick: () => {
+              setSelectedMember(ctx.row.original)
+              setEditOpen(true)
+            },
           },
-        },
-        {
-          label: "Remove",
-          icon: <Trash />,
-          onClick: () => handleDelete(ctx.row.original),
-        },
-      ],
-    }),
-  ]
+          {
+            label: "Remove",
+            icon: <Trash />,
+            onClick: () => handleDelete(ctx.row.original),
+          },
+        ],
+      }),
+    ],
+    [handleDelete]
+  )
 
   const table = useDataTable({
     columns,
@@ -172,22 +293,39 @@ export const TeamTable = () => {
     getRowId: (row) => row.id,
     isLoading,
     pagination: { state: pagination, onPaginationChange: setPagination },
-    search: { state: search, onSearchChange: setSearch },
+    search: {
+      state: search,
+      onSearchChange: (val) => {
+        setSearch(val)
+        setPagination((p) => ({ ...p, pageIndex: 0 }))
+      },
+    },
     sorting: { state: sorting, onSortingChange: setSorting },
+    filtering: {
+      state: filtering,
+      onFilteringChange: (val) => {
+        setFiltering(val)
+        setPagination((p) => ({ ...p, pageIndex: 0 }))
+      },
+    },
+    filters,
+    columnVisibility: {
+      state: columnVisibility,
+      onColumnVisibilityChange: setColumnVisibility,
+    },
   })
 
   return (
     <Container className="p-0">
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-4">
-          <div>
-            <Heading level="h2">Team Members</Heading>
-            <Text size="small" className="text-ui-fg-subtle">
-              Manage your store administrators and team members.
-            </Text>
-          </div>
-          <div className="flex items-center gap-x-2 w-full sm:w-auto">
-            <DataTable.Search placeholder="Search members by name or email..." />
+        <DataTable.Toolbar className="flex flex-col gap-y-3 px-6 py-4">
+          <div className="flex items-center justify-between gap-x-2">
+            <div>
+              <Heading level="h2">Team Members</Heading>
+              <Text size="small" className="text-ui-fg-subtle">
+                Manage your store administrators and team members.
+              </Text>
+            </div>
             <Button
               size="small"
               variant="secondary"
@@ -198,7 +336,13 @@ export const TeamTable = () => {
               Invite Member
             </Button>
           </div>
+          <div className="flex items-center justify-end gap-x-2 border-b pb-3">
+            <DataTable.Search placeholder="Search members by name or email..." />
+            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTable.SortingMenu tooltip="Sort" />
+          </div>
         </DataTable.Toolbar>
+        <DataTable.FilterBar />
         <DataTable.Table />
         <DataTable.Pagination />
       </DataTable>

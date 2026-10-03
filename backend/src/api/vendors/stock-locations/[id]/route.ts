@@ -7,7 +7,13 @@ import { z } from "@medusajs/framework/zod"
 import {
   updateStockLocationsWorkflow,
   deleteStockLocationsWorkflow,
+  deleteFulfillmentSetsWorkflow,
+  deleteShippingOptionsWorkflow,
 } from "@medusajs/medusa/core-flows"
+import {
+  assertVendorCanUseStockLocation,
+  assertVendorOwnsStockLocation,
+} from "../../shared/stock-location-scope"
 
 export const UpdateVendorStockLocationSchema = z.object({
   name: z.string().optional(),
@@ -32,6 +38,8 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const locationId = req.params.id
+
+  await assertVendorCanUseStockLocation(req, locationId)
 
   const { data: locations } = await query.graph({
     entity: "stock_location",
@@ -65,6 +73,8 @@ export const POST = async (
 ) => {
   const locationId = req.params.id
 
+  await assertVendorOwnsStockLocation(req, locationId)
+
   const { result } = await updateStockLocationsWorkflow(req.scope).run({
     input: {
       selector: { id: locationId },
@@ -80,6 +90,27 @@ export const DELETE = async (
   res: MedusaResponse
 ) => {
   const locationId = req.params.id
+
+  await assertVendorOwnsStockLocation(req, locationId)
+
+  // Deleting a location used to unlink its fulfilment set but leave the set, its zones
+  // and its shipping options behind, still selling. Take them down with the location.
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const { data: located } = await query.graph({
+    entity: "stock_location",
+    fields: ["id", "fulfillment_sets.id", "fulfillment_sets.service_zones.shipping_options.id"],
+    filters: { id: locationId },
+  })
+  const sets = ((located?.[0] as any)?.fulfillment_sets ?? []) as any[]
+  const optionIds = sets.flatMap((set) =>
+    (set.service_zones ?? []).flatMap((zone: any) => (zone.shipping_options ?? []).map((o: any) => o.id))
+  )
+  if (optionIds.length) {
+    await deleteShippingOptionsWorkflow(req.scope).run({ input: { ids: optionIds } })
+  }
+  if (sets.length) {
+    await deleteFulfillmentSetsWorkflow(req.scope).run({ input: { ids: sets.map((set) => set.id) } })
+  }
 
   await deleteStockLocationsWorkflow(req.scope).run({
     input: { ids: [locationId] },

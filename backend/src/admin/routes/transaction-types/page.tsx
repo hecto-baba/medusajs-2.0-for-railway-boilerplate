@@ -1,4 +1,3 @@
-import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { CurrencyDollar } from "@medusajs/icons"
 import {
   Button,
@@ -243,7 +242,7 @@ const TransactionTypesPage = () => {
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex flex-col items-start justify-between gap-2 md:flex-row md:items-center">
           <div>
-            <Heading level="h2">Transaction Types</Heading>
+            <Heading level="h2">Vendor Transaction Types</Heading>
             <Text size="small" className="text-ui-fg-subtle">
               Kinds of transaction the marketplace supports, and the order they
               are shown in
@@ -361,10 +360,5 @@ const TransactionTypesPage = () => {
     </Container>
   )
 }
-
-export const config = defineRouteConfig({
-  label: "Transaction Types",
-  icon: CurrencyDollar,
-})
 
 export default TransactionTypesPage

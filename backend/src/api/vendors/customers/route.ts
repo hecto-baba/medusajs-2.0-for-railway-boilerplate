@@ -9,6 +9,9 @@ import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import {
   getVendorCustomerIds,
   getVendorId,
+  getVendorCustomerGroupIds,
+  getVendorDirectCustomerIds,
+  shapeCustomerForVendor,
   refetchVendorCustomer,
   VENDOR_CUSTOMER_FIELDS,
 } from "./helpers"
@@ -139,8 +142,11 @@ export const GET = async (
     }
   }
 
+  const directIds = new Set(await getVendorDirectCustomerIds(req))
+  const ownedGroupIds = new Set(await getVendorCustomerGroupIds(req))
+
   const enrichedCustomers = customers.map((c: any) => ({
-    ...c,
+    ...shapeCustomerForVendor(c, directIds, ownedGroupIds),
     orders_count: ordersCountMap[c.id] ?? 0,
   }))
 

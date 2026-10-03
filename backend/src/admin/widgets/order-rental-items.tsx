@@ -16,6 +16,17 @@ import { sdk } from "../lib/sdk"
 import type { DetailWidgetProps, AdminOrder } from "@medusajs/framework/types"
 import { useEffect, useState } from "react"
 
+type RentalUnit = "hour" | "day" | "week" | "month" | "custom"
+type DepositStatus = "held" | "refunded" | "partially_refunded" | "forfeited"
+
+const UNIT_NOUN_PLURAL: Record<RentalUnit, string> = {
+  hour: "hours",
+  day: "days",
+  week: "weeks",
+  month: "months",
+  custom: "days",
+}
+
 type Rental = {
   id: string
   variant_id: string
@@ -26,6 +37,12 @@ type Rental = {
   rental_end_date: string
   actual_return_date: string | null
   rental_days: number
+  rental_unit: RentalUnit
+  rental_units_count: number | null
+  pickup_time: string | null
+  return_time: string | null
+  security_deposit_amount: number
+  security_deposit_status: DepositStatus | null
   status: "pending" | "active" | "returned" | "cancelled"
   product_variant?: {
     id: string
@@ -82,6 +99,22 @@ const OrderRentalItemsWidget = ({
     },
   })
 
+  const depositMutation = useMutation({
+    mutationFn: async (params: { rentalId: string; status: DepositStatus }) => {
+      return sdk.client.fetch(`/admin/rentals/${params.rentalId}/deposit`, {
+        method: "POST",
+        body: { status: params.status },
+      })
+    },
+    onSuccess: () => {
+      toast.success("Security deposit updated successfully")
+      refetch()
+    },
+    onError: (error) => {
+      toast.error(`Failed to update security deposit: ${error.message}`)
+    },
+  })
+
   const handleOpenDrawer = (rental: Rental) => {
     setSelectedRental(rental)
     setNewStatus(rental.status)
@@ -115,11 +148,26 @@ const OrderRentalItemsWidget = ({
   }
 
   const formatStatus = (status: string) => {
-    return status.charAt(0).toUpperCase() + status.slice(1)
+    return status.charAt(0).toUpperCase() + status.slice(1).replace("_", " ")
   }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString()
+  }
+
+  const getDepositBadgeColor = (status: DepositStatus | null) => {
+    switch (status) {
+      case "held":
+        return "orange"
+      case "refunded":
+        return "green"
+      case "partially_refunded":
+        return "blue"
+      case "forfeited":
+        return "red"
+      default:
+        return "grey"
+    }
   }
 
   if (!data?.rentals.length) {
@@ -139,6 +187,7 @@ const OrderRentalItemsWidget = ({
               <Table.HeaderCell>Start Date</Table.HeaderCell>
               <Table.HeaderCell>End Date</Table.HeaderCell>
               <Table.HeaderCell>Status</Table.HeaderCell>
+              <Table.HeaderCell>Deposit</Table.HeaderCell>
               <Table.HeaderCell>Actions</Table.HeaderCell>
             </Table.Row>
           </Table.Header>
@@ -176,13 +225,22 @@ const OrderRentalItemsWidget = ({
                   </Badge>
                 </Table.Cell>
                 <Table.Cell>
+                  {rental.security_deposit_status ? (
+                    <Badge color={getDepositBadgeColor(rental.security_deposit_status)} size="2xsmall">
+                      {formatStatus(rental.security_deposit_status)}
+                    </Badge>
+                  ) : (
+                    <Text size="xsmall" className="text-ui-fg-subtle">None</Text>
+                  )}
+                </Table.Cell>
+                <Table.Cell>
                   <Button
                     size="small"
                     variant="transparent"
                     onClick={() => handleOpenDrawer(rental)}
                     className="p-0 text-ui-fg-subtle"
                   >
-                    Update Status
+                    Manage
                   </Button>
                 </Table.Cell>
               </Table.Row>
@@ -213,9 +271,17 @@ const OrderRentalItemsWidget = ({
                     </Text>
                     <Text size="small">
                       Rental Period: {formatDate(selectedRental.rental_start_date)} to{" "}
-                      {formatDate(selectedRental.rental_end_date)} ({selectedRental.rental_days}{" "}
-                      days)
+                      {formatDate(selectedRental.rental_end_date)}
+                      {selectedRental.rental_units_count != null
+                        ? ` (${selectedRental.rental_units_count} ${UNIT_NOUN_PLURAL[selectedRental.rental_unit ?? "day"]})`
+                        : ` (${selectedRental.rental_days} days)`}
                     </Text>
+                    {(selectedRental.pickup_time || selectedRental.return_time) && (
+                      <Text size="small">
+                        Pickup/Return time: {selectedRental.pickup_time ?? "—"} /{" "}
+                        {selectedRental.return_time ?? "—"}
+                      </Text>
+                    )}
                   </div>
                 </div>
                 <hr />
@@ -233,6 +299,71 @@ const OrderRentalItemsWidget = ({
                     </Select.Content>
                   </Select>
                 </div>
+
+                {selectedRental.security_deposit_status && (
+                  <>
+                    <hr />
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="txt-compact-small font-medium">
+                          Security Deposit
+                        </Label>
+                        <Badge
+                          color={getDepositBadgeColor(selectedRental.security_deposit_status)}
+                          size="2xsmall"
+                        >
+                          {formatStatus(selectedRental.security_deposit_status)}
+                        </Badge>
+                      </div>
+                      <Text size="small" className="text-ui-fg-subtle">
+                        {selectedRental.security_deposit_amount.toFixed(2)} held
+                      </Text>
+                      {selectedRental.security_deposit_status === "held" && (
+                        <div className="flex gap-2">
+                          <Button
+                            size="small"
+                            variant="secondary"
+                            disabled={depositMutation.isPending}
+                            onClick={() =>
+                              depositMutation.mutate({
+                                rentalId: selectedRental.id,
+                                status: "refunded",
+                              })
+                            }
+                          >
+                            Mark Refunded
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="secondary"
+                            disabled={depositMutation.isPending}
+                            onClick={() =>
+                              depositMutation.mutate({
+                                rentalId: selectedRental.id,
+                                status: "partially_refunded",
+                              })
+                            }
+                          >
+                            Partially Refund
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="danger"
+                            disabled={depositMutation.isPending}
+                            onClick={() =>
+                              depositMutation.mutate({
+                                rentalId: selectedRental.id,
+                                status: "forfeited",
+                              })
+                            }
+                          >
+                            Forfeit
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </>
             )}
           </Drawer.Body>

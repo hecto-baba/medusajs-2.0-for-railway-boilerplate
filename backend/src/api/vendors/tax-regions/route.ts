@@ -3,7 +3,7 @@ import type {
   MedusaResponse,
 } from "@medusajs/framework/http"
 import { z } from "@medusajs/framework/zod"
-import { createTaxRegionsWorkflow } from "@medusajs/medusa/core-flows"
+import { platformManaged } from "../shared/platform-managed"
 import { getWorkflowPool } from "../workflow-executions/route"
 
 export const GetVendorTaxRegionsSchema = z.object({
@@ -75,27 +75,7 @@ export const GET = async (
   res.json({ tax_regions: taxRegions })
 }
 
-export const POST = async (
-  req: AuthenticatedMedusaRequest<z.infer<typeof CreateVendorTaxRegionSchema>>,
-  res: MedusaResponse
-) => {
-  const { country_code, rate, name, code } = req.validatedBody
-
-  const { result } = await createTaxRegionsWorkflow(req.scope).run({
-    input: [
-      {
-        country_code: country_code.toLowerCase(),
-        default_tax_rate:
-          rate !== undefined
-            ? {
-                rate,
-                name: name || "Standard Rate",
-                code: code || "TAX",
-              }
-            : undefined,
-      },
-    ],
-  })
-
-  res.status(201).json({ tax_region: result[0] })
+export const POST = async () => {
+  // Tax regions are platform-owned (decision D6): sellers can read them, not change them.
+  throw platformManaged("Tax regions")
 }

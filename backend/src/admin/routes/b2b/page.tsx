@@ -1,5 +1,5 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
-import { BuildingStorefront, DocumentText, CheckCircle } from "@medusajs/icons"
+import { BuildingStorefront, UserGroup, DocumentText, CheckCircle } from "@medusajs/icons"
 import { Container, Heading, Text, Button } from "@medusajs/ui"
 import { useNavigate } from "react-router-dom"
 
@@ -114,7 +114,8 @@ const B2BOverviewPage = () => {
 
 export const config = defineRouteConfig({
   label: "B2B",
-  icon: BuildingStorefront,
+  icon: UserGroup,
+  rank: 6,
 })
 
 export default B2BOverviewPage

@@ -64,7 +64,7 @@ export const GET = async (
       "created_at",
       "updated_at",
     ],
-    filters: { id: categoryId },
+    filters: { id: categoryId, is_internal: false },
   })
 
   if (!categories?.length) {

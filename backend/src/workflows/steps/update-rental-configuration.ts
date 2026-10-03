@@ -1,11 +1,18 @@
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
 import { RENTAL_MODULE } from "../../modules/rental"
 import RentalModuleService from "../../modules/rental/service"
+import { RentalUnit } from "../../utils/rental-unit"
 
 type UpdateRentalConfigurationInput = {
   id: string
   min_rental_days?: number
   max_rental_days?: number | null
+  rental_unit?: RentalUnit
+  min_rental_units?: number
+  max_rental_units?: number | null
+  security_deposit_amount?: number
+  security_deposit_type?: "fixed" | "percentage"
+  requires_time_selection?: boolean
   status?: "active" | "inactive"
 }
 
@@ -16,14 +23,27 @@ export const updateRentalConfigurationStep = createStep(
     { container }
   ) => {
     const rentalModuleService: RentalModuleService = container.resolve(RENTAL_MODULE)
-    
+
     // retrieve existing rental configuration
     const existingRentalConfig = await rentalModuleService.retrieveRentalConfiguration(
       input.id
     )
 
+    // Backward-compatible: if only legacy day fields are sent, mirror them
+    // into the new *_units columns instead of leaving those columns stale.
+    const patch: Record<string, unknown> = { id: input.id, ...input }
+    if (
+      (input.min_rental_days !== undefined || input.max_rental_days !== undefined) &&
+      input.min_rental_units === undefined &&
+      input.max_rental_units === undefined &&
+      input.rental_unit === undefined
+    ) {
+      patch.min_rental_units = input.min_rental_days
+      patch.max_rental_units = input.max_rental_days
+    }
+
     const updatedRentalConfig = await rentalModuleService.updateRentalConfigurations(
-      input
+      patch as UpdateRentalConfigurationInput
     )
 
     return new StepResponse(updatedRentalConfig, existingRentalConfig)
@@ -37,6 +57,12 @@ export const updateRentalConfigurationStep = createStep(
       id: existingRentalConfig.id,
       min_rental_days: existingRentalConfig.min_rental_days,
       max_rental_days: existingRentalConfig.max_rental_days,
+      rental_unit: existingRentalConfig.rental_unit,
+      min_rental_units: existingRentalConfig.min_rental_units,
+      max_rental_units: existingRentalConfig.max_rental_units,
+      security_deposit_amount: existingRentalConfig.security_deposit_amount,
+      security_deposit_type: existingRentalConfig.security_deposit_type,
+      requires_time_selection: existingRentalConfig.requires_time_selection,
       status: existingRentalConfig.status,
     })
   }

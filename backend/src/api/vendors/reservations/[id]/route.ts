@@ -9,6 +9,7 @@ import {
   updateReservationsWorkflow,
 } from "@medusajs/medusa/core-flows"
 import { getVendorInventoryItemIds } from "../../inventory-items/helpers"
+import { assertVendorCanUseStockLocations } from "../../shared/inventory-scope"
 
 export const PostVendorUpdateReservationSchema = z.object({
   location_id: z.string().optional(),
@@ -89,6 +90,7 @@ export const POST = async (
 ) => {
   const { id } = req.params
   await assertVendorOwnsReservation(req, id)
+  await assertVendorCanUseStockLocations(req, [req.validatedBody.location_id])
 
   await updateReservationsWorkflow(req.scope).run({
     input: {

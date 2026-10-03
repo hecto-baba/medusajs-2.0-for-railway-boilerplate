@@ -6,6 +6,7 @@ import { ContainerRegistrationKeys, Modules, OrderStatus } from "@medusajs/frame
 import { confirmOrderEditRequestWorkflow } from "@medusajs/medusa/core-flows"
 import { QUOTE_MODULE } from "../../../../../../../modules/quote"
 import { customerAcceptQuoteWorkflow } from "../../../../../../../workflows/customer-accept-quote"
+import { canAccessQuote } from "../../../../../helpers/quote-access"
 
 export const POST = async (
   req: AuthenticatedMedusaRequest,
@@ -33,7 +34,7 @@ export const POST = async (
     filters: { id: req.params.id },
   })
 
-  if (!quote) {
+  if (!quote || !(await canAccessQuote(req, quote))) {
     return res.status(404).json({ message: "Quote not found" })
   }
 

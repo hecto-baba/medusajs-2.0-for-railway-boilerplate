@@ -14,6 +14,7 @@ import {
 } from "@medusajs/medusa/core-flows"
 import { MARKETPLACE_MODULE } from "../../../../modules/marketplace"
 import {
+  assertVendorManagesCustomer,
   assertVendorOwnsCustomer,
   getVendorId,
   refetchVendorCustomer,
@@ -56,7 +57,7 @@ export const POST = async (
 ) => {
   const { id } = req.params
 
-  await assertVendorOwnsCustomer(req, id)
+  await assertVendorManagesCustomer(req, id)
 
   const updateData = req.validatedBody
 
@@ -79,7 +80,7 @@ export const DELETE = async (
   const { id } = req.params
   const vendorId = await getVendorId(req)
 
-  await assertVendorOwnsCustomer(req, id)
+  await assertVendorManagesCustomer(req, id)
 
   // Dismiss the link between this vendor and customer
   await dismissLinksWorkflow(req.scope).run({

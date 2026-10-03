@@ -4,6 +4,7 @@ import type {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { getWorkflowPool } from "../route"
+import { executionBelongsToSeller, executionOwnerPatterns } from "../scope"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
@@ -47,17 +48,12 @@ export const GET = async (
       return
     }
 
-    // Enforce multi-tenant scoping
-    const contextStr = typeof row.context === "object" ? JSON.stringify(row.context) : String(row.context || "")
-    const executionStr = typeof row.execution === "object" ? JSON.stringify(row.execution) : String(row.execution || "")
+    // Enforce multi-tenant scoping: the execution must have been run for this
+    // seller (their id as the value of vendor_admin_id or vendor_id), the same
+    // rule the list uses. A mere mention of their id is not enough.
+    const owner = executionOwnerPatterns(vendorAdminId, vendorId)
 
-    const isAuthorized =
-      contextStr.includes(vendorAdminId) ||
-      contextStr.includes(vendorId) ||
-      executionStr.includes(vendorAdminId) ||
-      executionStr.includes(vendorId)
-
-    if (!isAuthorized) {
+    if (!owner || !executionBelongsToSeller(row, owner.js)) {
       res.status(404).json({ message: "Workflow execution not found" })
       return
     }

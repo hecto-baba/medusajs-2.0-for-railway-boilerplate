@@ -60,37 +60,20 @@ const medusaConfig = {
   },
   admin: {
     backendUrl: BACKEND_URL,
-    disable: SHOULD_DISABLE_ADMIN,
-    vite: () => ({
-      plugins: [
-        {
-          name: 'hide-core-sidebar-routes',
-          transformIndexHtml(html) {
-            // Hide the native core route sidebar entries (Orders, Products,
-            // Inventory, Customers, Promotions, Price Lists) because they are
-            // already grouped inside the Commerce Infra hub.
-            // React Router renders <NavLink to="/orders"> as href="/orders"
-            // (the /app basename is NOT included in the rendered href attribute).
-            const style = `<style>
-/* Hide native core sidebar routes - grouped under Commerce Infra instead */
-nav div:has(> a[href="/orders"]),
-nav div:has(> a[href="/products"]),
-nav div:has(> a[href="/inventory"]),
-nav div:has(> a[href="/customers"]),
-nav div:has(> a[href="/promotions"]),
-nav div:has(> a[href="/price-lists"]) {
-  display: none !important;
-}
-</style>`;
-            return html.replace('</head>', `${style}\n</head>`);
-          },
-        },
-      ],
-    }),
+    disable: SHOULD_DISABLE_ADMIN
   },
   modules: [
     {
+      resolve: './src/modules/appointment-booking'
+    },
+    {
       resolve: './src/modules/rental'
+    },
+    {
+      resolve: './src/modules/product-enquiry'
+    },
+    {
+      resolve: './src/modules/expression-of-interest'
     },
     {
       resolve: './src/modules/ticket-booking'
@@ -248,7 +231,11 @@ nav div:has(> a[href="/price-lists"]) {
     ...(MEILISEARCH_ENABLED ? [{
       resolve: '@rokmohar/medusa-plugin-meilisearch',
       options: {}
-    }] : [])
+    }] : []),
+    {
+      resolve: '@rsc-labs/medusa-booking-system',
+      options: {}
+    }
   ]
 };
 

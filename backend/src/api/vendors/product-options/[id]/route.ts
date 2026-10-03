@@ -8,6 +8,7 @@ import {
   updateProductOptionsWorkflow,
   deleteProductOptionsWorkflow,
 } from "@medusajs/medusa/core-flows"
+import { assertVendorOwnsOption } from "../helpers"
 
 export const UpdateVendorProductOptionSchema = z.object({
   title: z.string().optional(),
@@ -20,6 +21,8 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const optionId = req.params.id
+
+  await assertVendorOwnsOption(req, optionId)
 
   const { data: options } = await query.graph({
     entity: "product_option",
@@ -51,6 +54,8 @@ export const POST = async (
 ) => {
   const optionId = req.params.id
 
+  await assertVendorOwnsOption(req, optionId)
+
   const { result } = await updateProductOptionsWorkflow(req.scope).run({
     input: {
       selector: { id: optionId },
@@ -66,6 +71,8 @@ export const DELETE = async (
   res: MedusaResponse
 ) => {
   const optionId = req.params.id
+
+  await assertVendorOwnsOption(req, optionId)
 
   await deleteProductOptionsWorkflow(req.scope).run({
     input: { ids: [optionId] },

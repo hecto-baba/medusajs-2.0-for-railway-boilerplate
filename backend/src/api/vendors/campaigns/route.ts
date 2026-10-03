@@ -7,6 +7,7 @@ import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { createVendorCampaignWorkflow } from "../../../workflows/create-vendor-campaign"
 import { VENDOR_CAMPAIGN_FIELDS } from "./helpers"
+import { assertPromotionsBelongToVendor } from "../promotions/helpers"
 
 export const GetVendorCampaignsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -19,6 +20,9 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<HttpTypes.AdminCreateCampaign>,
   res: MedusaResponse
 ) => {
+  // Only the seller's own promotions may be pulled into a campaign.
+  await assertPromotionsBelongToVendor(req, (req.validatedBody as any)?.promotions)
+
   const { result } = await createVendorCampaignWorkflow(req.scope).run({
     input: {
       vendor_admin_id: req.auth_context.actor_id,

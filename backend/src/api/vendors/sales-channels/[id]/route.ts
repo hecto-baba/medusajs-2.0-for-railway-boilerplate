@@ -8,6 +8,13 @@ import {
   updateSalesChannelsWorkflow,
   deleteSalesChannelsWorkflow,
 } from "@medusajs/medusa/core-flows"
+import { assertVendorCanSee, ScopedEntity } from "../../shared/platform-scope"
+import { assertVendorOwns } from "../../shared/vendor-scope"
+
+const SALES_CHANNELS: ScopedEntity = {
+  linkField: "sales_channels",
+  entity: "sales_channel",
+}
 
 export const UpdateVendorSalesChannelSchema = z.object({
   name: z.string().optional(),
@@ -22,6 +29,9 @@ export const GET = async (
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const channelId = req.params.id
+
+  // Own or shared platform channel; another seller's channel is a 404.
+  await assertVendorCanSee(req, SALES_CHANNELS, channelId, "Sales channel not found.")
 
   const {
     data: [vendorAdmin],
@@ -81,6 +91,8 @@ export const POST = async (
 ) => {
   const channelId = req.params.id
 
+  await assertVendorOwns(req, "sales_channels", channelId, "Sales channel not found.")
+
   const { result } = await updateSalesChannelsWorkflow(req.scope).run({
     input: {
       selector: { id: channelId },
@@ -96,6 +108,8 @@ export const DELETE = async (
   res: MedusaResponse
 ) => {
   const channelId = req.params.id
+
+  await assertVendorOwns(req, "sales_channels", channelId, "Sales channel not found.")
 
   await deleteSalesChannelsWorkflow(req.scope).run({
     input: { ids: [channelId] },

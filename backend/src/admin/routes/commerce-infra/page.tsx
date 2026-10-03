@@ -8,6 +8,7 @@ import {
   ReceiptPercent,
   CurrencyDollar,
   ArrowRight,
+  PhotoSolid,
 } from "@medusajs/icons"
 import { Container, Heading, Text, Button, Badge } from "@medusajs/ui"
 import { useNavigate } from "react-router-dom"
@@ -114,6 +115,17 @@ const CommerceInfraOverviewPage = () => {
       description:
         "Create custom price lists, define currency-specific overrides, and establish volume-based wholesale discount tiers.",
       cta: "Manage Price Lists",
+    },
+    {
+      id: "digital-products",
+      title: "Digital Products",
+      path: "/commerce-infra/digital-products",
+      icon: PhotoSolid,
+      badgeText: "Downloads",
+      badgeColor: "purple" as const,
+      description:
+        "Manage digital products and downloadable media, upload files, and configure how they are delivered to customers.",
+      cta: "Manage Digital Products",
     },
   ]
 

@@ -4,12 +4,14 @@ import type {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
-import { createRegionsWorkflow } from "@medusajs/medusa/core-flows"
+import { platformManaged } from "../shared/platform-managed"
 
 export const GetVendorRegionsSchema = z.object({
   q: z.string().optional(),
   currency_code: z.string().optional(),
   order: z.string().optional(),
+  created_at_gte: z.string().optional(),
+  updated_at_gte: z.string().optional(),
 })
 
 export const CreateVendorRegionSchema = z.object({
@@ -24,13 +26,18 @@ export const GET = async (
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { q, currency_code, order } = (req.validatedQuery ?? {}) as z.infer<
-    typeof GetVendorRegionsSchema
-  >
+  const { q, currency_code, order, created_at_gte, updated_at_gte } =
+    (req.validatedQuery ?? {}) as z.infer<typeof GetVendorRegionsSchema>
 
   const filters: Record<string, any> = {}
   if (currency_code) {
     filters.currency_code = currency_code.toLowerCase()
+  }
+  if (created_at_gte) {
+    filters.created_at = { $gte: new Date(created_at_gte) }
+  }
+  if (updated_at_gte) {
+    filters.updated_at = { $gte: new Date(updated_at_gte) }
   }
   if (q) {
     filters.$or = [
@@ -65,26 +72,7 @@ export const GET = async (
   res.json({ regions })
 }
 
-export const POST = async (
-  req: AuthenticatedMedusaRequest<z.infer<typeof CreateVendorRegionSchema>>,
-  res: MedusaResponse
-) => {
-  const { name, currency_code, countries, payment_providers } = req.validatedBody
-
-  const { result } = await createRegionsWorkflow(req.scope).run({
-    input: {
-      regions: [
-        {
-          name,
-          currency_code: currency_code.toLowerCase(),
-          countries,
-          payment_providers: payment_providers?.length
-            ? payment_providers
-            : ["pp_system_default"],
-        },
-      ],
-    },
-  })
-
-  res.status(201).json({ region: result[0] })
+export const POST = async () => {
+  // Regions are platform-owned (decision D6): sellers can read them, not change them.
+  throw platformManaged("Regions")
 }

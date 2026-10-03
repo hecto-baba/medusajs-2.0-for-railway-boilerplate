@@ -63,6 +63,7 @@ export const createRentalsWorkflow = createWorkflow(
             rental_start_date: metadata.rental_start_date,
             rental_end_date: metadata.rental_end_date,
             rental_days: metadata.rental_days,
+            rental_units_count: metadata.rental_units_count,
           })
         }
       }

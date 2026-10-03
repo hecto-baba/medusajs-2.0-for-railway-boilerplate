@@ -9,6 +9,7 @@ import {
   assertVendorOwnsInventoryItem,
   getVendorInventoryItemIds,
 } from "../inventory-items/helpers"
+import { assertVendorCanUseStockLocations, assertVendorOwnsLineItem } from "../shared/inventory-scope"
 
 export const GetVendorReservationsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -155,6 +156,8 @@ export const POST = async (
 
   // Verify the vendor owns this inventory item
   await assertVendorOwnsInventoryItem(req, inventory_item_id)
+  await assertVendorCanUseStockLocations(req, [reservationData.location_id])
+  await assertVendorOwnsLineItem(req, reservationData.line_item_id)
 
   const { result } = await createReservationsWorkflow(req.scope).run({
     input: {

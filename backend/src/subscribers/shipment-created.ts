@@ -1,6 +1,7 @@
 import { SubscriberArgs, type SubscriberConfig } from "@medusajs/framework"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { updateRentalWorkflow } from "../workflows/update-rental"
+import { withParentLineItemIds } from "../lib/split-order"
 
 export default async function shipmentCreatedHandler({
   event: { data },
@@ -36,12 +37,16 @@ export default async function shipmentCreatedHandler({
 
     logger.info(`Found ${lineItemIds.length} item(s) in fulfillment ${data.id}`)
 
+    // A seller ships from their own CHILD order, whose line items are copies; the
+    // rentals were written against the parent order's line items. Look for both.
+    const rentalLineItemIds = await withParentLineItemIds(container, lineItemIds)
+
     // Retrieve all rentals associated with these line items
     const { data: rentals } = await query.graph({
       entity: "rental",
       fields: ["id", "status", "line_item_id", "variant_id"],
       filters: {
-        line_item_id: lineItemIds,
+        line_item_id: rentalLineItemIds,
         status: "pending"
       },
     })

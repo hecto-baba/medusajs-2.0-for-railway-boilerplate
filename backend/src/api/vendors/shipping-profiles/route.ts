@@ -4,7 +4,13 @@ import type {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
-import { createShippingProfilesWorkflow } from "@medusajs/medusa/core-flows"
+import { createVendorShippingProfileWorkflow } from "../../../workflows/create-vendor-shipping-profile"
+import { getVisibleIds, ScopedEntity } from "../shared/platform-scope"
+
+const SHIPPING_PROFILES: ScopedEntity = {
+  linkField: "shipping_profiles",
+  entity: "shipping_profile",
+}
 
 export const CreateVendorShippingProfileSchema = z.object({
   name: z.string().min(1),
@@ -38,9 +44,20 @@ export const GET = async (
   const limit = typeof qParams.limit !== "undefined" ? Number(qParams.limit) : 20
   const offset = typeof qParams.offset !== "undefined" ? Number(qParams.offset) : 0
 
+  // Own profiles plus shared platform profiles. Never another seller's.
+  const { owned, platform } = await getVisibleIds(req, SHIPPING_PROFILES)
+  const visibleIds = [...owned, ...platform]
+
+  // An empty id list means "no constraint" downstream, so answer directly.
+  if (!visibleIds.length) {
+    res.json({ shipping_profiles: [], count: 0, limit, offset })
+    return
+  }
+
   const { data: shippingProfiles } = await query.graph({
     entity: "shipping_profile",
     fields: ["id", "name", "type", "metadata", "created_at", "updated_at"],
+    filters: { id: visibleIds },
   })
 
   let filtered = (shippingProfiles || []) as any[]
@@ -119,11 +136,12 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<z.infer<typeof CreateVendorShippingProfileSchema>>,
   res: MedusaResponse
 ) => {
-  const { result } = await createShippingProfilesWorkflow(req.scope).run({
+  const { result } = await createVendorShippingProfileWorkflow(req.scope).run({
     input: {
-      data: [req.validatedBody as any],
+      vendor_admin_id: req.auth_context.actor_id,
+      shipping_profile: req.validatedBody as any,
     },
   })
 
-  res.status(201).json({ shipping_profile: result[0] })
+  res.status(201).json({ shipping_profile: result.shipping_profile })
 }

@@ -3,6 +3,7 @@ import type {
   MedusaResponse,
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import { getVisibleStockLocations } from "../shared/stock-location-scope"
 
 /**
  * The store's product taxonomy - collections, categories, tags, types, sales
@@ -38,13 +39,9 @@ export const GET = async (
     filters: { id: [req.auth_context.actor_id] },
   }).catch(() => ({ data: [] }))
 
-  const vendorLocationIds = (vendorAdmin?.vendor?.stock_locations || [])
-    .map((l: any) => l?.id)
-    .filter(Boolean)
-
-  const stockLocationFilters = vendorLocationIds.length
-    ? { id: vendorLocationIds }
-    : {}
+  // Own locations plus shared platform locations. Never another seller's.
+  const { owned, platform } = await getVisibleStockLocations(req)
+  const visibleLocationIds = [...owned, ...platform]
 
   const [
     collections,
@@ -95,12 +92,15 @@ export const GET = async (
       entity: "store",
       fields: ["supported_currencies.*"],
     }),
-    query.graph({
-      entity: "stock_location",
-      fields: ["id", "name", "address.*"],
-      filters: stockLocationFilters,
-      pagination: { order: { created_at: "ASC" } },
-    }),
+    // An empty id list means "no constraint", so skip the query instead.
+    visibleLocationIds.length
+      ? query.graph({
+          entity: "stock_location",
+          fields: ["id", "name", "address.*"],
+          filters: { id: visibleLocationIds },
+          pagination: { order: { created_at: "ASC" } },
+        })
+      : Promise.resolve({ data: [] as any[] }),
   ])
 
   res.json({

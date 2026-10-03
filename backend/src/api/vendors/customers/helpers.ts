@@ -1,33 +1,11 @@
 import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
+import { getVendorId, resolveVendorAdmin } from "../shared/vendor-scope"
 
-/**
- * Returns the vendor id behind the calling admin.
- */
-export const getVendorId = async (
-  req: AuthenticatedMedusaRequest
-): Promise<string> => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+// Single source of truth lives in shared/vendor-scope.ts; re-exported so
+// existing imports from this file keep working.
+export { getVendorId }
 
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
-
-  const vendorId = vendorAdmin?.vendor?.id
-
-  if (!vendorId) {
-    throw new MedusaError(
-      MedusaError.Types.NOT_FOUND,
-      "No vendor found for the authenticated session."
-    )
-  }
-
-  return vendorId
-}
 
 /**
  * Returns all customer ids that belong to the calling vendor:
@@ -39,17 +17,12 @@ export const getVendorCustomerIds = async (
 ): Promise<string[]> => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: [
-      "vendor.id",
-      "vendor.customers.id",
-      "vendor.orders.customer_id",
-    ],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, [
+    "vendor.id",
+    "vendor.customers.id",
+    "vendor.orders.customer_id",
+    "vendor.orders.metadata",
+  ])
 
   if (!vendorAdmin?.vendor) {
     throw new MedusaError(
@@ -65,9 +38,12 @@ export const getVendorCustomerIds = async (
     .filter((id): id is string => !!id) ?? []
 
   const orderCustomerIds = (
-    (vendorAdmin.vendor as any).orders as { customer_id?: string }[] | undefined
+    (vendorAdmin.vendor as any).orders as
+      | { customer_id?: string; metadata?: { buyer_customer_id?: string | null } }[]
+      | undefined
   )
-    ?.map((o) => o?.customer_id)
+    // A seller's child order keeps the buyer in metadata, not customer_id.
+    ?.map((o) => o?.customer_id ?? o?.metadata?.buyer_customer_id)
     .filter((id): id is string => !!id) ?? []
 
   return Array.from(new Set([...directIds, ...orderCustomerIds]))
@@ -86,6 +62,76 @@ export const assertVendorOwnsCustomer = async (
   if (!ownedIds.includes(customerId)) {
     throw new MedusaError(MedusaError.Types.NOT_FOUND, notFoundMessage)
   }
+}
+
+/** Ids of the customers the seller created (linked directly), not those who only ordered. */
+export const getVendorDirectCustomerIds = async (
+  req: AuthenticatedMedusaRequest
+): Promise<string[]> => {
+  const vendorAdmin = await resolveVendorAdmin(req, [
+    "vendor.id",
+    "vendor.customers.id",
+  ])
+
+  return (
+    ((vendorAdmin?.vendor as any)?.customers as { id?: string }[] | undefined) ?? []
+  )
+    .map((customer) => customer?.id)
+    .filter((id): id is string => !!id)
+}
+
+/**
+ * A seller READS the customers they created and those who ordered from them,
+ * but WRITES only to customers they created. Answers 404 for a customer they
+ * cannot see at all, and a clear "not allowed" for one they can see but did not
+ * create (so the message is not misleading, and reveals nothing new).
+ */
+export const assertVendorManagesCustomer = async (
+  req: AuthenticatedMedusaRequest,
+  customerId: string
+): Promise<void> => {
+  await assertVendorOwnsCustomer(req, customerId)
+
+  const directIds = await getVendorDirectCustomerIds(req)
+
+  if (!directIds.includes(customerId)) {
+    throw new MedusaError(
+      MedusaError.Types.NOT_ALLOWED,
+      "You can only change customers you created."
+    )
+  }
+}
+
+type CustomerView = {
+  id: string
+  groups?: { id: string }[] | null
+  addresses?: unknown[] | null
+  metadata?: unknown
+  [key: string]: unknown
+}
+
+/**
+ * Shapes a customer for the calling seller:
+ *   - only the seller's OWN groups are listed (group names are another
+ *     seller's business);
+ *   - a customer who only ordered is shown without addresses or metadata.
+ */
+export const shapeCustomerForVendor = <T extends CustomerView>(
+  customer: T,
+  directIds: Set<string>,
+  ownedGroupIds: Set<string>
+): T => {
+  const shaped: CustomerView = {
+    ...customer,
+    groups: (customer.groups ?? []).filter((group) => ownedGroupIds.has(group.id)),
+  }
+
+  if (!directIds.has(customer.id)) {
+    shaped.addresses = []
+    shaped.metadata = null
+  }
+
+  return shaped as T
 }
 
 /** Fields returned for customer list/detail view in vendor panel. */
@@ -130,31 +176,34 @@ export const refetchVendorCustomer = async (
   // Count orders placed by this customer for this vendor
   const { data: vendorOrders } = await query.graph({
     entity: "order",
-    fields: ["id", "total", "currency_code", "created_at"],
+    fields: ["id", "total", "currency_code", "created_at", "customer_id", "metadata"],
     filters: {
-      customer_id: [id],
       vendor: { id: [vendorId] },
     },
   }).catch(() => ({ data: [] }))
 
+  // The vendor's orders placed by THIS customer (a seller's child order keeps the
+  // buyer in metadata rather than customer_id).
+  const customerOrders = (vendorOrders as any[])
+    .filter((order) => order.customer_id === id || order.metadata?.buyer_customer_id === id)
+    .map(({ customer_id, metadata, ...rest }) => rest)
+
+  const directIds = new Set(await getVendorDirectCustomerIds(req))
+  const ownedGroupIds = new Set(await getVendorCustomerGroupIds(req))
+
   return {
-    ...customer,
-    orders_count: vendorOrders.length,
-    orders: vendorOrders,
+    ...shapeCustomerForVendor(customer as any, directIds, ownedGroupIds),
+    orders_count: customerOrders.length,
+    orders: customerOrders,
   }
 }
 export const getVendorCustomerGroupIds = async (
   req: AuthenticatedMedusaRequest
 ): Promise<string[]> => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id", "vendor.customer_groups.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, [
+    "vendor.id",
+    "vendor.customer_groups.id",
+  ])
 
   if (!vendorAdmin?.vendor) {
     throw new MedusaError(

@@ -1,5 +1,6 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import { canBuyerSeeOrder } from "../../helpers/order-access"
 
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
@@ -36,7 +37,8 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
       filters: { id: req.params.id },
     })
 
-    if (!order) {
+    // Not the buyer's (or a seller's child order): indistinguishable from missing.
+    if (!order || !(await canBuyerSeeOrder(req, order))) {
       return res.status(404).json({ message: "Order not found" })
     }
 

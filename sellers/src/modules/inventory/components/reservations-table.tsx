@@ -27,7 +27,7 @@ import { PencilSquare, Trash } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
-import { PlaceholderCell } from "@modules/common"
+import { DataTableAddFilter, PlaceholderCell } from "@modules/common"
 import { ReservationDrawer } from "./forms/reservation-drawer"
 
 const columnHelper = createDataTableColumnHelper<VendorReservation>()
@@ -382,8 +382,10 @@ export const ReservationsTable = () => {
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-x-2">
+            <DataTableAddFilter table={table} />
+          </div>
+          <div className="flex items-center gap-x-2">
             <DataTable.Search placeholder="Search" />
-            <DataTable.FilterMenu tooltip="Filter" />
             <DataTable.SortingMenu tooltip="Sort" />
           </div>
         </DataTable.Toolbar>

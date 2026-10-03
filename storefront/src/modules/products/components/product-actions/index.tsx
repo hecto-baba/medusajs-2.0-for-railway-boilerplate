@@ -18,6 +18,7 @@ import { HttpTypes } from "@medusajs/types"
 import { RentalConfiguration, RentalSelection } from "types/rental"
 import RentalDatePicker from "../rental-date-picker"
 import { convertToLocale } from "@lib/util/money"
+import { UNIT_LABEL_PLURAL } from "@lib/util/rental-units"
 import { VariantWithDigitalProduct } from "types/global"
 import { getDigitalProductPreview } from "@lib/data/digital-products"
 
@@ -50,6 +51,7 @@ export default function ProductActions({
     null
   )
   const [rentalPrice, setRentalPrice] = useState<number | null>(null)
+  const [rentalDeposit, setRentalDeposit] = useState<number | null>(null)
   const countryCode = useParams().countryCode as string
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -173,6 +175,7 @@ export default function ProductActions({
       if (previousVariantId.current !== undefined) {
         setRentalSelection(null)
         setRentalPrice(null)
+        setRentalDeposit(null)
       }
 
       previousVariantId.current = selectedVariant?.id
@@ -206,6 +209,10 @@ export default function ProductActions({
           rentalStartDate: rentalSelection.rental_start_date,
           rentalEndDate: rentalSelection.rental_end_date,
           rentalDays: rentalSelection.rental_days,
+          rentalUnit: rentalSelection.rental_unit,
+          rentalUnitsCount: rentalSelection.rental_units_count,
+          pickupTime: rentalSelection.pickup_time,
+          returnTime: rentalSelection.return_time,
         })
       } else {
         await addToCart({
@@ -272,22 +279,41 @@ export default function ProductActions({
               disabled={!!disabled || isAdding || !selectedVariant}
               onSelectionChange={setRentalSelection}
               onPriceChange={setRentalPrice}
+              onDepositChange={setRentalDeposit}
             />
             {rentalPrice !== null && rentalSelection && (
-              <div className="flex items-baseline justify-between">
-                <span className="txt-medium text-ui-fg-subtle">
-                  Total for {rentalSelection.rental_days}{" "}
-                  {rentalSelection.rental_days === 1 ? "day" : "days"}
-                </span>
-                <span
-                  className="text-xl-semi"
-                  data-testid="rental-total-price"
-                >
-                  {convertToLocale({
-                    amount: rentalPrice,
-                    currency_code: region.currency_code,
-                  })}
-                </span>
+              <div className="flex flex-col gap-y-1">
+                <div className="flex items-baseline justify-between">
+                  <span className="txt-medium text-ui-fg-subtle">
+                    {rentalSelection.rental_units_count}{" "}
+                    {UNIT_LABEL_PLURAL[rentalSelection.rental_unit]}
+                  </span>
+                  <span
+                    className="text-xl-semi"
+                    data-testid="rental-total-price"
+                  >
+                    {convertToLocale({
+                      amount: rentalPrice,
+                      currency_code: region.currency_code,
+                    })}
+                  </span>
+                </div>
+                {!!rentalDeposit && (
+                  <div
+                    className="flex items-baseline justify-between"
+                    data-testid="rental-deposit-line"
+                  >
+                    <span className="txt-medium text-ui-fg-subtle">
+                      Security deposit (refundable)
+                    </span>
+                    <span className="txt-medium text-ui-fg-base">
+                      {convertToLocale({
+                        amount: rentalDeposit,
+                        currency_code: region.currency_code,
+                      })}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
             <Divider />

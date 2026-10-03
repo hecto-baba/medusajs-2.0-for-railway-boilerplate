@@ -1,5 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { z } from "@medusajs/framework/zod"
+import { canUseCart } from "../helpers/cart-access"
 import { createDeliveryWorkflow } from "../../../workflows/delivery/workflows/create-delivery"
 import { handleDeliveryWorkflow } from "../../../workflows/delivery/workflows/handle-delivery"
 
@@ -8,25 +9,15 @@ const schema = z.object({
   restaurant_id: z.string(),
 })
 
-function setCorsHeaders(req: MedusaRequest, res: MedusaResponse) {
-  const origin = (req.headers.origin as string) || "*"
-  res.setHeader("Access-Control-Allow-Origin", origin)
-  res.setHeader("Access-Control-Allow-Credentials", "true")
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, x-publishable-api-key"
-  )
-}
-
-export async function OPTIONS(req: MedusaRequest, res: MedusaResponse) {
-  setCorsHeaders(req, res)
-  return res.status(204).end()
-}
+// CORS comes from the store's configured origins. This file used to reflect ANY request
+// origin with credentials allowed, which let any website call it as the signed-in buyer.
 
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
-  setCorsHeaders(req, res)
   const validatedBody = schema.parse(req.body)
+
+  if (!(await canUseCart(req, validatedBody.cart_id))) {
+    return res.status(404).json({ message: "Cart not found" })
+  }
 
   const { result: delivery } = await createDeliveryWorkflow(req.scope).run({
     input: {

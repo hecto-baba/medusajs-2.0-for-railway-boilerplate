@@ -5,6 +5,12 @@ import type {
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { createVendorCollectionWorkflow } from "../../../workflows/create-vendor-collection"
+import { getVisibleIds, ScopedEntity } from "../shared/platform-scope"
+
+const COLLECTIONS: ScopedEntity = {
+  linkField: "product_collections",
+  entity: "product_collection",
+}
 
 export const GetVendorCollectionsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -48,15 +54,22 @@ export const POST = async (
     // fallback will be handled by workflow
   }
 
-  const { result } = await createVendorCollectionWorkflow(req.scope).run({
-    input: {
-      vendor_id: vendorId,
-      vendor_admin_id: req.auth_context.actor_id,
-      collection: req.validatedBody,
-    },
-  })
+  try {
+    const { result } = await createVendorCollectionWorkflow(req.scope).run({
+      input: {
+        vendor_id: vendorId,
+        vendor_admin_id: req.auth_context.actor_id,
+        collection: req.validatedBody,
+      },
+    })
 
-  res.status(201).json({ collection: result.collection })
+    res.status(201).json({ collection: result.collection })
+  } catch (err: any) {
+    console.error("[Vendors:Collections:POST] Error creating collection:", err)
+    res.status(400).json({
+      message: err.message || "Failed to create collection",
+    })
+  }
 }
 
 export const GET = async (
@@ -86,27 +99,17 @@ export const GET = async (
     entity: "vendor_admin",
     fields: [
       "vendor.id",
-      "vendor.collections.id",
+      "vendor.product_collections.id",
       "vendor.products.id",
       "vendor.products.collection_id",
     ],
     filters: { id: [req.auth_context.actor_id] },
   })
 
-  const vendorCollectionIds = new Set<string>(
-    (vendorAdmin?.vendor?.collections || [])
-      .map((c: any) => c?.id)
-      .filter(Boolean)
-  )
-
-  // Also include collections that contain this vendor's products
-  const productCollectionIds = (vendorAdmin?.vendor?.products || [])
-    .map((p: any) => p?.collection_id)
-    .filter(Boolean)
-
-  productCollectionIds.forEach((id: string) => vendorCollectionIds.add(id))
-
-  const allCollectionIds = Array.from(vendorCollectionIds)
+  // Own collections plus shared platform collections. A collection that merely
+  // contains this seller's products belongs to someone else and is not listed.
+  const { owned, platform } = await getVisibleIds(req, COLLECTIONS)
+  const allCollectionIds = [...owned, ...platform]
 
   if (!allCollectionIds.length) {
     res.json({ collections: [], count: 0, limit, offset })

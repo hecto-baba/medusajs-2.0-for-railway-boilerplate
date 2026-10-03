@@ -4,6 +4,7 @@ import type {
 } from "@medusajs/framework/http"
 import { MedusaError } from "@medusajs/framework/utils"
 import { getVendorId } from "../../shared/vendor-scope"
+import { assertOnboardingEditable } from "../helpers"
 import { onboardingStore } from "../../../../lib/onboarding-store"
 import {
   saveOnboardingStep,
@@ -19,6 +20,7 @@ export const POST = async (
   res: MedusaResponse
 ) => {
   const vendorId = await getVendorId(req)
+  assertOnboardingEditable(vendorId)
   const body = (req.validatedBody ?? req.body) as Partial<TrustClawSaveStepPayload> & {
     segment?: { id: string; name: string; code: string }
     vendorType?: { id: string; name: string; code: string }
