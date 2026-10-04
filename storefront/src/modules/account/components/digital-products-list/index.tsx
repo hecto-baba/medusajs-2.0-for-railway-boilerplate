@@ -29,8 +29,8 @@ export const DigitalProductsList = ({
 
   if (!digitalProducts || digitalProducts.length === 0) {
     return (
-      <div className="w-full text-center py-8">
-        <p className="text-base-regular text-ui-fg-subtle">
+      <div className="w-full text-center py-8 rounded-large bg-card shadow-lift">
+        <p className="text-muted">
           You haven&apos;t purchased any digital products yet.
         </p>
       </div>
@@ -38,6 +38,7 @@ export const DigitalProductsList = ({
   }
 
   return (
+    <div className="overflow-x-auto rounded-large bg-card p-2 shadow-lift">
     <Table>
       <Table.Header>
         <Table.Row>
@@ -52,7 +53,7 @@ export const DigitalProductsList = ({
           return (
             <Table.Row key={digitalProduct.id}>
               <Table.Cell>
-                <span className="font-semibold">{digitalProduct.name}</span>
+                <span className="font-bold text-ink">{digitalProduct.name}</span>
               </Table.Cell>
               <Table.Cell>
                 <ul className="flex flex-col gap-y-1">
@@ -62,14 +63,14 @@ export const DigitalProductsList = ({
                         <a
                           href="#"
                           onClick={(e) => handleDownload(e, media.id)}
-                          className="text-ui-fg-interactive hover:underline"
+                          className="font-bold text-brand hover:underline"
                         >
                           Download{showMediaCount ? ` ${index + 1}` : ``}
                         </a>
                       </li>
                     ))
                   ) : (
-                    <span className="text-ui-fg-subtle text-sm">No files attached</span>
+                    <span className="text-muted text-sm">No files attached</span>
                   )}
                 </ul>
               </Table.Cell>
@@ -78,5 +79,6 @@ export const DigitalProductsList = ({
         })}
       </Table.Body>
     </Table>
+    </div>
   )
 }

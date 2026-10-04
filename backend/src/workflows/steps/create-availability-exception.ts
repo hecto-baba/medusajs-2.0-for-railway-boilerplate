@@ -2,6 +2,8 @@ import { MedusaError } from "@medusajs/framework/utils"
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
 import { APPOINTMENT_BOOKING_MODULE } from "../../modules/appointment-booking"
 import AppointmentBookingModuleService from "../../modules/appointment-booking/service"
+import { validateException } from "../../modules/appointment-booking/lib/availability"
+import { isUniqueViolation } from "../../modules/appointment-booking/lib/db-errors"
 
 export type CreateAvailabilityExceptionStepInput = {
   provider_id: string
@@ -19,16 +21,57 @@ export const createAvailabilityExceptionStep = createStep(
       APPOINTMENT_BOOKING_MODULE
     )
 
-    if (input.type === "extra_hours" && (!input.start_time || !input.end_time)) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        `start_time and end_time are required for an "extra_hours" exception`
+    const problem = validateException(input)
+    if (problem) {
+      throw new MedusaError(MedusaError.Types.INVALID_DATA, problem)
+    }
+
+    const [provider] = await service.listProviders(
+      { id: input.provider_id },
+      { select: ["id"], take: 1 }
+    )
+    if (!provider) {
+      throw new MedusaError(MedusaError.Types.NOT_FOUND, "Resource not found.")
+    }
+
+    // The date is a calendar date, stored as UTC midnight of that date, so the
+    // same holiday always has the same stored value however it was submitted.
+    const date = new Date(`${new Date(input.date).toISOString().slice(0, 10)}T00:00:00.000Z`)
+    const start_time = input.start_time || null
+    const end_time = input.end_time || null
+
+    const findIdentical = async () => {
+      const sameDay = await service.listAvailabilityExceptions(
+        { provider_id: input.provider_id, date, type: input.type },
+        { take: null }
+      )
+      return sameDay.find(
+        (e) => (e.start_time ?? null) === start_time && (e.end_time ?? null) === end_time
       )
     }
 
-    const exception = await service.createAvailabilityExceptions(input)
+    // Idempotent: the same holiday submitted twice returns the existing row.
+    const identical = await findIdentical()
+    if (identical) {
+      return new StepResponse(identical, undefined)
+    }
 
-    return new StepResponse(exception, exception.id)
+    try {
+      const exception = await service.createAvailabilityExceptions({
+        provider_id: input.provider_id,
+        date,
+        type: input.type,
+        start_time,
+        end_time,
+        reason: input.reason ?? null,
+      })
+      return new StepResponse(exception, exception.id)
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err
+      const existing = await findIdentical()
+      if (!existing) throw err
+      return new StepResponse(existing, undefined)
+    }
   },
   async (exceptionId, { container }) => {
     if (!exceptionId) return

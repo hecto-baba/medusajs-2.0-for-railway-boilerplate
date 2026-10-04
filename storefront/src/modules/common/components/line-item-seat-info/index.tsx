@@ -1,4 +1,3 @@
-import { Text } from "@medusajs/ui"
 import { ROW_TYPE_LABELS, RowType } from "types/ticket"
 
 type LineItemSeatInfoProps = {
@@ -47,16 +46,16 @@ const LineItemSeatInfo = ({
   const tierLabel = rowType ? ROW_TYPE_LABELS[rowType] : null
 
   return (
-    <Text
+    <p
       data-testid={dataTestid}
-      className="inline-block txt-medium text-ui-fg-subtle w-full overflow-hidden text-ellipsis"
+      className="inline-block w-full overflow-hidden text-ellipsis text-sm text-muted"
     >
       {showDate}
       {" · "}
       {rowNumber ? `Row ${rowNumber}, ` : ""}
       Seat {String(seatNumber)}
       {tierLabel ? ` (${tierLabel})` : ""}
-    </Text>
+    </p>
   )
 }
 

@@ -5,7 +5,7 @@ import { Heading, Text, clx } from "@medusajs/ui"
 import PaymentButton from "../payment-button"
 import { useSearchParams } from "next/navigation"
 import { getStoreName } from "@lib/util/env"
-import { isTicketLineItem } from "types/ticket"
+import { isNoShippingCart } from "types/appointment"
 
 const Review = ({ cart }: { cart: any }) => {
   const searchParams = useSearchParams()
@@ -18,10 +18,8 @@ const Review = ({ cart }: { cart: any }) => {
   // A ticket-only cart never gets a shipping method, because its variants
   // require no shipping and the checkout skips that step. Requiring one here
   // would leave such a cart permanently one step short of reviewable.
-  const items = cart?.items ?? []
-  const isTicketsOnly =
-    items.length > 0 &&
-    items.every((item: any) => isTicketLineItem(item.metadata))
+  // Appointments are the same: they require no shipping either.
+  const isTicketsOnly = isNoShippingCart(cart?.items)
 
   const previousStepsCompleted =
     cart.shipping_address &&
@@ -29,12 +27,12 @@ const Review = ({ cart }: { cart: any }) => {
     (cart.payment_collection || paidByGiftcard)
 
   return (
-    <div className="bg-white">
+    <div className="rounded-large bg-card p-5 shadow-lift small:p-6">
       <div className="flex flex-row items-center justify-between mb-6">
         <Heading
           level="h2"
           className={clx(
-            "flex flex-row text-3xl-regular gap-x-2 items-baseline",
+            "flex flex-row font-display text-2xl font-extrabold tracking-tight gap-x-2 items-baseline",
             {
               "opacity-50 pointer-events-none select-none": !isOpen,
             }

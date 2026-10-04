@@ -6,6 +6,8 @@ import { ResetPasswordEmail, RESET_PASSWORD, isResetPasswordData } from './reset
 import { TicketOrderPlacedTemplate, TICKET_ORDER_PLACED, isTicketOrderPlacedData } from './ticket-order-placed'
 import { FulfillmentUpdateTemplate, FULFILLMENT_UPDATE, isFulfillmentUpdateTemplateData } from './fulfillment-update'
 import { EnquiryRespondedTemplate, ENQUIRY_RESPONDED, isEnquiryRespondedTemplateData } from './enquiry-responded'
+import { AppointmentBookedTemplate, APPOINTMENT_BOOKED, isAppointmentBookedData } from './appointment-booked'
+import { AppointmentChangedTemplate, APPOINTMENT_CHANGED, isAppointmentChangedData } from './appointment-changed'
 
 export const EmailTemplates = {
   INVITE_USER,
@@ -13,7 +15,9 @@ export const EmailTemplates = {
   RESET_PASSWORD,
   TICKET_ORDER_PLACED,
   ENQUIRY_RESPONDED,
-  FULFILLMENT_UPDATE
+  FULFILLMENT_UPDATE,
+  APPOINTMENT_BOOKED,
+  APPOINTMENT_CHANGED
 } as const
 
 export type EmailTemplateType = keyof typeof EmailTemplates
@@ -74,6 +78,24 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
       }
       return <FulfillmentUpdateTemplate {...data} />
 
+    case EmailTemplates.APPOINTMENT_BOOKED:
+      if (!isAppointmentBookedData(data)) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          `Invalid data for template "${EmailTemplates.APPOINTMENT_BOOKED}"`
+        )
+      }
+      return <AppointmentBookedTemplate {...data} />
+
+    case EmailTemplates.APPOINTMENT_CHANGED:
+      if (!isAppointmentChangedData(data)) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          `Invalid data for template "${EmailTemplates.APPOINTMENT_CHANGED}"`
+        )
+      }
+      return <AppointmentChangedTemplate {...data} />
+
     default:
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
@@ -82,4 +104,4 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
   }
 }
 
-export { InviteUserEmail, OrderPlacedTemplate, ResetPasswordEmail, TicketOrderPlacedTemplate, EnquiryRespondedTemplate, FulfillmentUpdateTemplate }
+export { InviteUserEmail, OrderPlacedTemplate, ResetPasswordEmail, TicketOrderPlacedTemplate, EnquiryRespondedTemplate, FulfillmentUpdateTemplate, AppointmentBookedTemplate, AppointmentChangedTemplate }

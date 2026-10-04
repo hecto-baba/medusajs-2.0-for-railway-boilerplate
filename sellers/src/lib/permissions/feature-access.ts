@@ -210,6 +210,9 @@ export function isRouteAllowed(
   if (pathname.startsWith("/products") && !capabilities.hasProducts) {
     return false
   }
+  if (pathname.startsWith("/enquiries") && !capabilities.hasProducts) {
+    return false
+  }
   if (pathname.startsWith("/b2b") && !capabilities.hasB2B) {
     return false
   }

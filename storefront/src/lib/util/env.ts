@@ -34,6 +34,27 @@ export const getStoreName = () => {
 }
 
 /**
+ * Delivery promise shown in the header and cart, for example "9 mins".
+ * Display only: there is no delivery-time model in the backend yet, so the
+ * storefront shows it only when the owner sets NEXT_PUBLIC_DELIVERY_ETA and
+ * never invents a promise of its own.
+ */
+export const getDeliveryEta = () => {
+  const value = process.env.NEXT_PUBLIC_DELIVERY_ETA?.trim()
+  return value ? value : null
+}
+
+/**
+ * Order subtotal (in the store's major currency units) above which delivery is
+ * free, used by the cart's progress bar. Display only. Unset or invalid means
+ * the bar is hidden.
+ */
+export const getFreeDeliveryThreshold = () => {
+  const value = Number(process.env.NEXT_PUBLIC_FREE_DELIVERY_THRESHOLD)
+  return Number.isFinite(value) && value > 0 ? value : null
+}
+
+/**
  * Whether to show the search entry point in the nav.
  *
  * On by default, opt out with NEXT_PUBLIC_FEATURE_SEARCH_DISABLED=true.

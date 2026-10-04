@@ -39,27 +39,27 @@ export default async function ResetPasswordPage({ searchParams }: Props) {
 
   if (!token) {
     return (
-      <div className="w-full flex justify-start px-8 py-8">
-        <div className="max-w-sm w-full flex flex-col items-center">
-          <h1 className="text-large-semi uppercase mb-6">
+      <div className="bg-canvas py-8 small:py-12"><div className="content-container"><div className="mx-auto w-full max-w-lg rounded-large bg-card p-6 shadow-lift small:p-8">
+        <div className="w-full flex flex-col items-center">
+          <h1 className="font-display text-3xl font-extrabold tracking-tight mb-2 text-center">
             This link is incomplete
           </h1>
-          <p className="text-center text-base-regular text-ui-fg-base mb-8">
+          <p className="text-center text-base text-muted mb-8">
             The reset link is missing its token, which usually means the address
             was copied by hand and part of it was left behind. Ask for a new
             link and open it directly from the email.
           </p>
-          <LocalizedClientLink href="/account" className="underline">
+          <LocalizedClientLink href="/account" className="text-sm font-bold text-brand hover:underline">
             Back to sign in
           </LocalizedClientLink>
         </div>
-      </div>
+      </div></div></div>
     )
   }
 
   return (
-    <div className="w-full flex justify-start px-8 py-8">
+    <div className="bg-canvas py-8 small:py-12"><div className="content-container"><div className="mx-auto w-full max-w-lg rounded-large bg-card p-6 shadow-lift small:p-8">
       <ResetPassword token={token} email={email} />
-    </div>
+    </div></div></div>
   )
 }

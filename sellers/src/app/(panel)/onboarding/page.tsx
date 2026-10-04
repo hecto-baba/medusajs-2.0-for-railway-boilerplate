@@ -1,9 +1,7 @@
 "use client"
 
-import {
-  OnboardingWizard,
-  useVendorOnboardingStatus,
-} from "@modules/onboarding"
+import { OnboardingWizard } from "@modules/onboarding/components/onboarding-wizard"
+import { useVendorOnboardingStatus } from "@modules/onboarding/hooks/use-onboarding"
 import { Button, Heading, Text } from "@medusajs/ui"
 import { CheckCircleSolid, ArrowRight } from "@medusajs/icons"
 import Link from "next/link"

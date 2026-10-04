@@ -3,7 +3,16 @@
 import { useEffect, useState, useMemo } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Button, Badge, Heading, Text } from "@medusajs/ui"
+import Chip from "@modules/common/components/chip"
+import Breadcrumbs from "@modules/common/components/breadcrumbs"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import {
+  AddButton,
+  ConflictDialog,
+  CoverTile,
+  ErrorBanner,
+  SuccessBanner,
+} from "../_components/shared"
 import { addToCart, clearCartAndAdd } from "@lib/data/cart"
 
 type ProductVariant = {
@@ -276,8 +285,8 @@ export default function RestaurantDetailPage() {
 
   if (loading) {
     return (
-      <div className="content-container py-16 flex justify-center items-center">
-        <Text className="text-ui-fg-subtle animate-pulse">Loading restaurant and menu...</Text>
+      <div className="content-container flex items-center justify-center py-16">
+        <p className="animate-pulse text-muted">Loading restaurant and menu...</p>
       </div>
     )
   }
@@ -285,207 +294,158 @@ export default function RestaurantDetailPage() {
   if (!restaurant) {
     return (
       <div className="content-container py-16 text-center">
-        <Heading level="h1" className="text-2xl font-bold mb-4">Restaurant Not Found</Heading>
-        <Text className="text-ui-fg-muted mb-6">
+        <h1 className="mb-3 font-display text-3xl font-extrabold tracking-tight text-ink">
+          Restaurant Not Found
+        </h1>
+        <p className="mb-6 text-muted">
           The restaurant you are looking for does not exist or is currently unavailable.
-        </Text>
+        </p>
         <Link
           href={`/${countryCode}/restaurants`}
-          className="inline-block rounded-md bg-ui-bg-interactive px-4 py-2 text-sm text-white font-medium hover:opacity-90"
+          className="inline-flex h-11 items-center rounded-large bg-brand px-5 text-sm font-extrabold text-brand-ink hover:opacity-90"
         >
-          ← Back to Restaurants
+          Back to Restaurants
         </Link>
       </div>
     )
   }
 
+  const dietLabel: Record<string, string> = {
+    veg: "Veg",
+    non_veg: "Non-Veg",
+    egg: "Egg",
+    vegan: "Vegan",
+  }
+
   return (
-    <div className="content-container py-12 max-w-5xl mx-auto">
-      {/* Success Notification */}
-      {successItemTitle && (
-        <div className="rounded-lg bg-green-50 border border-green-200 p-4 text-green-800 text-sm flex items-center justify-between mb-6">
-          <span>
-            ✅ Added <strong>{successItemTitle}</strong> to your cart.
-          </span>
-          <Link
-            href={`/${countryCode}/cart`}
-            className="text-xs font-semibold underline hover:text-green-900"
-          >
-            View Cart →
-          </Link>
-        </div>
-      )}
-
-      {/* Error Banner */}
+    <div className="content-container py-8">
+      {successItemTitle && <SuccessBanner title={successItemTitle} />}
       {errorBanner && (
-        <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-amber-800 text-sm flex items-center justify-between mb-6">
-          <span>{errorBanner}</span>
-          <button
-            onClick={() => setErrorBanner(null)}
-            className="text-xs text-amber-700 hover:text-amber-900 ml-4 font-semibold"
-          >
-            Dismiss
-          </button>
-        </div>
+        <ErrorBanner message={errorBanner} onDismiss={() => setErrorBanner(null)} />
       )}
 
-      {/* Breadcrumb & Navigation */}
-      <div className="mb-6 flex items-center justify-between">
-        <Link
-          href={`/${countryCode}/restaurants`}
-          className="txt-compact-small text-ui-fg-muted hover:text-ui-fg-base flex items-center gap-1"
+      <div className="flex items-center justify-between">
+        <Breadcrumbs
+          items={[
+            { label: "Restaurants", href: "/restaurants" },
+            { label: restaurant.name },
+          ]}
+        />
+        <LocalizedClientLink
+          href="/cart"
+          className="mb-4 text-sm font-bold text-brand hover:underline"
         >
-          <span>←</span>
-          <span>All Restaurants</span>
-        </Link>
-        <Link
-          href={`/${countryCode}/cart`}
-          className="txt-compact-small text-ui-fg-interactive font-medium hover:underline"
-        >
-          View Cart
-        </Link>
+          View cart ›
+        </LocalizedClientLink>
       </div>
 
-      {/* Restaurant Header */}
-      <div className="border-b border-ui-border-base pb-8 mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
-            {restaurant.image_url && (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={restaurant.image_url}
-                alt={restaurant.name}
-                className="w-16 h-16 rounded-lg object-cover border border-ui-border-base flex-shrink-0"
-              />
+      <div className="mb-8 flex items-start gap-4 rounded-large bg-card p-5 shadow-lift">
+        <CoverTile
+          src={restaurant.image_url}
+          name={restaurant.name}
+          className="h-20 w-20 shrink-0 rounded-[12px]"
+        />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="break-words font-display text-2xl font-extrabold tracking-tight text-ink small:text-3xl">
+              {restaurant.name}
+            </h1>
+            <Chip tone={restaurant.is_open ? "success" : "muted"}>
+              {restaurant.is_open ? "Open now" : "Closed"}
+            </Chip>
+          </div>
+          <div className="mt-2 flex flex-col gap-y-0.5 text-xs text-muted">
+            {restaurant.address && restaurant.address !== "N/A" && (
+              <span className="break-words">{restaurant.address}</span>
             )}
-            <div>
-              <div className="flex items-center gap-3">
-                <Heading level="h1" className="text-2xl md:text-3xl font-bold text-ui-fg-base">
-                  {restaurant.name}
-                </Heading>
-                <Badge color={restaurant.is_open ? "green" : "grey"} size="small">
-                  {restaurant.is_open ? "Open" : "Closed"}
-                </Badge>
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ui-fg-subtle">
-                {restaurant.address && restaurant.address !== "N/A" && (
-                  <span>📍 {restaurant.address}</span>
-                )}
-                {restaurant.phone && restaurant.phone !== "N/A" && (
-                  <span>📞 {restaurant.phone}</span>
-                )}
-                {restaurant.email && (
-                  <span>✉️ {restaurant.email}</span>
-                )}
-              </div>
-            </div>
+            {restaurant.phone && restaurant.phone !== "N/A" && (
+              <span>{restaurant.phone}</span>
+            )}
+            {restaurant.email && (
+              <span className="break-all">{restaurant.email}</span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Menu Section */}
       <div>
-        <div className="mb-6">
-          <Heading level="h2" className="text-lg font-semibold text-ui-fg-base">
-            Menu ({products.length})
-          </Heading>
-        </div>
+        <h2 className="mb-4 font-display text-2xl font-extrabold tracking-tight text-ink">
+          Menu ({products.length})
+        </h2>
 
         {products.length === 0 ? (
-          <div className="rounded-xl border border-ui-border-base p-12 text-center bg-ui-bg-subtle">
-            <Text className="text-ui-fg-muted text-sm">
+          <div className="rounded-large bg-card p-12 text-center shadow-lift">
+            <p className="text-sm text-muted">
               No products currently available on this menu.
-            </Text>
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-4 small:grid-cols-2">
             {products.map((product: any) => {
               const activeVariant = getActiveVariant(product)
-              const priceDisplay = getTotalProductPriceDisplay(product, activeVariant) || getVariantPriceDisplay(activeVariant)
+              const priceDisplay =
+                getTotalProductPriceDisplay(product, activeVariant) ||
+                getVariantPriceDisplay(activeVariant)
               const variantId = activeVariant?.id
               const isAdding = addingVariantId === variantId
               const hasMultipleVariants = (product.variants?.length || 0) > 1
               const currentSelectedAddons = selectedAddons[product.id] || []
+              const diet = dietLabel[product.metadata?.dietary_type as string]
 
               return (
                 <div
                   key={product.id}
-                  className="rounded-xl border border-ui-border-base bg-ui-bg-base p-5 flex flex-col justify-between hover:border-ui-border-interactive transition-colors"
+                  className="flex min-w-0 flex-col justify-between rounded-large bg-card p-5 shadow-lift"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <Text className="txt-medium-plus font-bold text-ui-fg-base">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <p className="break-words font-display text-base font-extrabold tracking-tight text-ink">
                             {product.title}
-                          </Text>
-                          {product.metadata?.dietary_type === "veg" && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-ui-bg-base text-ui-fg-base border border-ui-border-base">
-                              Veg
-                            </span>
-                          )}
-                          {product.metadata?.dietary_type === "non_veg" && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-ui-bg-subtle text-ui-fg-subtle border border-ui-border-base">
-                              Non-Veg
-                            </span>
-                          )}
-                          {product.metadata?.dietary_type === "egg" && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-ui-bg-subtle text-ui-fg-subtle border border-ui-border-base">
-                              Egg
-                            </span>
-                          )}
-                          {product.metadata?.dietary_type === "vegan" && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-ui-bg-base text-ui-fg-base border border-ui-border-base">
-                              Vegan
-                            </span>
-                          )}
+                          </p>
+                          {diet && <Chip tone="muted">{diet}</Chip>}
                           {product.metadata?.promo_badge && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 text-blue-800 border border-blue-200">
+                            <Chip tone="pop">
                               {String(product.metadata.promo_badge)}
-                            </span>
+                            </Chip>
                           )}
                         </div>
 
                         {priceDisplay && (
-                          <div className="flex items-center gap-2 mt-1">
-                            <Text className="txt-medium text-ui-fg-base font-bold text-base">
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <span className="text-base font-bold tabular-nums text-ink">
                               {priceDisplay}
-                            </Text>
+                            </span>
                             {currentSelectedAddons.length > 0 && (
-                              <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">
-                                ({currentSelectedAddons.length} extra{currentSelectedAddons.length > 1 ? "s" : ""} selected)
-                              </span>
+                              <Chip tone="success">
+                                {currentSelectedAddons.length} extra
+                                {currentSelectedAddons.length > 1 ? "s" : ""} selected
+                              </Chip>
                             )}
                           </div>
                         )}
 
                         {product.description && (
-                          <Text className="txt-small text-ui-fg-subtle line-clamp-2 mt-2">
+                          <p className="mt-2 line-clamp-2 text-sm text-muted">
                             {product.description}
-                          </Text>
+                          </p>
                         )}
                       </div>
 
-                      {product.thumbnail && (
-                        <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border border-ui-border-base">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={product.thumbnail}
-                            alt={product.title}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
+                      <CoverTile
+                        src={product.thumbnail}
+                        name={product.title}
+                        className="h-20 w-20 shrink-0 rounded-[12px]"
+                      />
                     </div>
 
-                    {/* Portion Size Variant Selector */}
                     {hasMultipleVariants && (
-                      <div className="mt-4 pt-3 border-t border-ui-border-base">
-                        <Text className="txt-compact-xsmall font-semibold text-ui-fg-subtle mb-1.5 uppercase tracking-wider">
+                      <div className="mt-4 border-t border-line pt-3">
+                        <p className="mb-1.5 text-xs font-extrabold uppercase tracking-wider text-muted">
                           Select Portion
-                        </Text>
-                        <div className="flex flex-wrap gap-1.5">
+                        </p>
+                        <div className="flex flex-wrap gap-2">
                           {product.variants.map((v: any) => {
                             const isSelected = activeVariant?.id === v.id
                             const vPrice = getVariantPriceDisplay(v)
@@ -493,15 +453,20 @@ export default function RestaurantDetailPage() {
                               <button
                                 key={v.id}
                                 type="button"
+                                aria-pressed={isSelected}
                                 onClick={() => handleSelectVariant(product.id, v.id)}
-                                className={`px-2.5 py-1 rounded-md text-xs font-medium border transition cursor-pointer ${
+                                className={`rounded-rounded border px-3 py-1.5 text-xs font-bold transition-colors ${
                                   isSelected
-                                    ? "bg-ui-bg-interactive text-white border-ui-border-interactive font-semibold shadow-xs"
-                                    : "bg-ui-bg-subtle text-ui-fg-subtle border-ui-border-base hover:bg-ui-bg-base hover:text-ui-fg-base"
+                                    ? "border-brand bg-brand-soft text-brand"
+                                    : "border-line bg-card text-ink hover:border-brand"
                                 }`}
                               >
                                 <span>{v.title}</span>
-                                {vPrice && <span className="ml-1 opacity-80 text-[10px]">({vPrice})</span>}
+                                {vPrice && (
+                                  <span className="ml-1 text-[10px] font-medium opacity-80">
+                                    ({vPrice})
+                                  </span>
+                                )}
                               </button>
                             )
                           })}
@@ -509,50 +474,52 @@ export default function RestaurantDetailPage() {
                       </div>
                     )}
 
-                    {/* Optional Add-ons & Toppings (Interactive Buttons) */}
-                    {product.metadata?.addons && Array.isArray(product.metadata.addons) && product.metadata.addons.length > 0 && (
-                      <div className="mt-3 pt-2.5 border-t border-ui-border-base">
-                        <Text className="txt-compact-xsmall font-semibold text-ui-fg-subtle mb-1.5 uppercase tracking-wider">
-                          Optional Add-ons & Extras
-                        </Text>
-                        <div className="flex flex-wrap gap-2">
-                          {product.metadata.addons.map((addon: any, aIdx: number) => {
-                            const isSelected = currentSelectedAddons.includes(addon.name)
-                            const addonPrice = addon.price != null ? Number(addon.price).toFixed(2) : "0.00"
-                            return (
-                              <button
-                                key={aIdx}
-                                type="button"
-                                onClick={() => handleToggleAddon(product.id, addon.name)}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all cursor-pointer ${
-                                  isSelected
-                                    ? "bg-ui-bg-interactive text-white border-ui-border-interactive shadow-xs font-semibold"
-                                    : "bg-ui-bg-subtle text-ui-fg-subtle border-ui-border-base hover:bg-ui-bg-base hover:border-ui-border-interactive hover:text-ui-fg-base"
-                                }`}
-                              >
-                                <span>{isSelected ? "✓" : "+"}</span>
-                                <span>{addon.name}</span>
-                                <span className={`text-[10px] ${isSelected ? "text-white/90" : "text-ui-fg-muted font-normal"}`}>
-                                  ({addonPrice === "0.00" ? "Free" : `+€${addonPrice}`})
-                                </span>
-                              </button>
-                            )
-                          })}
+                    {product.metadata?.addons &&
+                      Array.isArray(product.metadata.addons) &&
+                      product.metadata.addons.length > 0 && (
+                        <div className="mt-3 border-t border-line pt-3">
+                          <p className="mb-1.5 text-xs font-extrabold uppercase tracking-wider text-muted">
+                            Optional Add-ons &amp; Extras
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {product.metadata.addons.map((addon: any, aIdx: number) => {
+                              const isSelected = currentSelectedAddons.includes(addon.name)
+                              const addonPrice =
+                                addon.price != null ? Number(addon.price).toFixed(2) : "0.00"
+                              return (
+                                <button
+                                  key={aIdx}
+                                  type="button"
+                                  aria-pressed={isSelected}
+                                  onClick={() => handleToggleAddon(product.id, addon.name)}
+                                  className={`inline-flex items-center gap-1.5 rounded-rounded border px-3 py-1.5 text-xs font-bold transition-colors ${
+                                    isSelected
+                                      ? "border-brand bg-brand-soft text-brand"
+                                      : "border-line bg-card text-ink hover:border-brand"
+                                  }`}
+                                >
+                                  <span>{isSelected ? "✓" : "+"}</span>
+                                  <span>{addon.name}</span>
+                                  <span className="text-[10px] font-medium opacity-80">
+                                    ({addonPrice === "0.00" ? "Free" : `+€${addonPrice}`})
+                                  </span>
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-ui-border-base flex justify-end">
-                    <Button
-                      size="small"
-                      variant="primary"
-                      disabled={isAdding || !variantId || !restaurant.is_open}
-                      isLoading={isAdding}
+                  <div className="mt-4 flex justify-end border-t border-line pt-3">
+                    <AddButton
+                      closed={!restaurant.is_open}
+                      disabled={!variantId || !restaurant.is_open}
+                      loading={isAdding}
+                      label="ADD"
+                      ariaLabel={`Add ${product.title} to cart`}
                       onClick={() => handleAddToCart(product)}
-                    >
-                      {!restaurant.is_open ? "Closed" : "Add to cart"}
-                    </Button>
+                    />
                   </div>
                 </div>
               )
@@ -561,36 +528,12 @@ export default function RestaurantDetailPage() {
         )}
       </div>
 
-      {/* Cart Conflict Modal */}
       {conflictModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="bg-ui-bg-base rounded-xl max-w-md w-full p-6 shadow-xl border border-ui-border-base">
-            <Heading level="h3" className="text-base font-bold text-ui-fg-base mb-2">
-              Replace Cart Items?
-            </Heading>
-            <Text className="text-sm text-ui-fg-subtle mb-6">
-              {conflictModal.message}
-            </Text>
-            <div className="flex items-center justify-end gap-3">
-              <Button
-                size="small"
-                variant="secondary"
-                onClick={() =>
-                  setConflictModal({ open: false, product: null, message: "" })
-                }
-              >
-                Cancel
-              </Button>
-              <Button
-                size="small"
-                variant="danger"
-                onClick={handleClearAndAdd}
-              >
-                Clear Cart & Add
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ConflictDialog
+          message={conflictModal.message}
+          onCancel={() => setConflictModal({ open: false, product: null, message: "" })}
+          onConfirm={handleClearAndAdd}
+        />
       )}
     </div>
   )

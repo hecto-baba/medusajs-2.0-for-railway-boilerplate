@@ -8,6 +8,9 @@ export type ValidateEoiCartItemInput = {
   variant: ProductVariantDTO
   quantity: number
   eoi_configuration: InferTypeOf<typeof EoiConfiguration> | null
+  // Items already in the cart, so a repeat add of the same EOI variant can be
+  // rejected instead of silently merging into a quantity-2 line.
+  cart_items?: { variant_id?: string | null; metadata?: Record<string, unknown> | null }[]
 }
 
 export type ValidateEoiCartItemOutput = {
@@ -28,7 +31,7 @@ export type ValidateEoiCartItemOutput = {
  */
 export const validateEoiCartItemStep = createStep(
   "validate-eoi-cart-item",
-  async ({ variant, quantity, eoi_configuration }: ValidateEoiCartItemInput) => {
+  async ({ variant, quantity, eoi_configuration, cart_items }: ValidateEoiCartItemInput) => {
     if (eoi_configuration?.status !== "active") {
       return new StepResponse({
         is_eoi: false,
@@ -47,9 +50,27 @@ export const validateEoiCartItemStep = createStep(
       )
     }
 
-    const unitPrice = (variant as any).calculated_price?.calculated_amount || 0
+    const alreadyInCart = (cart_items ?? []).some(
+      (item) => item?.variant_id === variant.id && item?.metadata?.is_eoi === true
+    )
+    if (alreadyInCart) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        `Variant ${variant.id} is already in the cart as an Expression of Interest.`
+      )
+    }
+
+    // A missing price must stop the add, not quote a free reservation: with
+    // no calculated price the percentage maths below would charge 0.
+    const unitPrice = Number((variant as any).calculated_price?.calculated_amount)
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `Variant ${variant.id} has no price for this cart's region/currency, so an Expression of Interest cannot be quoted.`
+      )
+    }
     const valueType = eoi_configuration.value_type as EoiValueType
-    const valueAmount = eoi_configuration.value_amount as unknown as number
+    const valueAmount = Number(eoi_configuration.value_amount)
 
     const { eoi_charged_amount, remaining_amount } = calculateEoiAmount({
       unitPrice,

@@ -55,7 +55,12 @@ import {
   createInventoryLevelsWorkflow,
   updateInventoryLevelsWorkflow,
 } from "@medusajs/medusa/core-flows"
-import { ensureVariantInventoryItem, getVendorId, resolveVendorAdmin } from "./helpers"
+import {
+  assertCreatePublishable,
+  ensureVariantInventoryItem,
+  getVendorId,
+  resolveVendorAdmin,
+} from "./helpers"
 import {
   assertVendorCanUseStockLocation,
   getVisibleStockLocations,
@@ -77,13 +82,16 @@ export const POST = async (
     (req.validatedBody as any)?.shipping_profile_id,
   ])
   await assertVendorCanUseProductReferences(req, [req.validatedBody as any])
+  assertCreatePublishable(req.validatedBody as any)
 
+  const perfStart = Date.now()
   const { result } = await createVendorProductWorkflow(req.scope).run({
     input: {
       vendor_admin_id: req.auth_context.actor_id,
       product: req.validatedBody,
     },
   })
+  const perfWorkflow = Date.now() - perfStart
 
   const variantsInput = rawBody.variants || (req.validatedBody as any)?.variants || []
 
@@ -178,6 +186,9 @@ export const POST = async (
     }
   }
 
+  console.log(
+    `[perf] POST /vendors/products: workflow ${perfWorkflow}ms, inventory ${Date.now() - perfStart - perfWorkflow}ms, variants ${result.product?.variants?.length ?? 0}`
+  )
   res.status(201).json({ product: result.product })
 }
 

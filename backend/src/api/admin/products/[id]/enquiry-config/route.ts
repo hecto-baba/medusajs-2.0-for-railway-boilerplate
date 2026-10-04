@@ -19,14 +19,17 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
 const EnquiryFieldDefinitionSchema = z
   .object({
-    id: z.string(),
+    id: z.string().min(1).max(100),
     type: z.enum(ENQUIRY_FIELD_TYPES),
-    label: z.string().min(1),
+    label: z.string().min(1).max(200),
     required: z.boolean(),
     order: z.number(),
-    options: z.array(z.string()).optional(),
+    options: z.array(z.string().max(200)).max(50).optional(),
   })
+  // Bounded: this body is stored as JSON and the seller route reuses this
+  // schema, so an unbounded list would let one request store megabytes.
   .array()
+  .max(30)
   // Same rules as validateEnquiryFieldDefinitions (unique ids, non-empty
   // options on choice types) - checked here too so a bad request is
   // rejected before the workflow runs, not just inside it.

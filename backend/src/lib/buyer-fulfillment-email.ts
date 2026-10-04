@@ -1,7 +1,7 @@
 import type { MedusaContainer } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { EmailTemplates } from "../modules/email-notifications/templates"
-import { RESEND_FROM_EMAIL } from "./constants"
+import { ZEPTOMAIL_FROM_EMAIL } from "./constants"
 
 /**
  * Tells the buyer when a seller ships or delivers part of their order
@@ -83,7 +83,7 @@ export const sendBuyerFulfillmentEmail = async (
       template: EmailTemplates.FULFILLMENT_UPDATE,
       data: {
         emailOptions: {
-          replyTo: process.env.ORDER_REPLY_TO_EMAIL || RESEND_FROM_EMAIL,
+          replyTo: process.env.ORDER_REPLY_TO_EMAIL || ZEPTOMAIL_FROM_EMAIL,
           subject:
             input.kind === "shipped"
               ? `Part of your order #${orderDisplayId} has shipped`

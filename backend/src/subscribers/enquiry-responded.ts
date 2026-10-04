@@ -2,7 +2,7 @@ import { Modules } from '@medusajs/framework/utils'
 import { INotificationModuleService } from '@medusajs/framework/types'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
 import { EmailTemplates } from '../modules/email-notifications/templates'
-import { RESEND_FROM_EMAIL } from '../lib/constants'
+import { ZEPTOMAIL_FROM_EMAIL } from '../lib/constants'
 
 /**
  * Emails the customer once an admin (or, later, a vendor) replies to their
@@ -22,7 +22,7 @@ export default async function enquiryRespondedHandler({
     data: [enquiry]
   } = await query.graph({
     entity: 'enquiry',
-    fields: ['id', 'customer_email', 'message', 'reply', 'product.title'],
+    fields: ['id', 'product_id', 'customer_email', 'message', 'reply', 'product.title'],
     filters: { id: data.id }
   })
 
@@ -35,18 +35,34 @@ export default async function enquiryRespondedHandler({
   }
 
   try {
+    // Name the seller who owns the product in the email ("<Seller> replied").
+    // The event does not say who replied, so this is the product's owner,
+    // whether the seller answered or an admin answered on their behalf. A
+    // product with no seller falls back to the template's generic "We replied".
+    // Inside the try: a failed lookup must not stop the email from going out.
+    // One targeted read of this product's seller, not a scan of every seller.
+    const {
+      data: [owner]
+    } = await query.graph({
+      entity: 'product',
+      fields: ['id', 'vendor.name'],
+      filters: { id: enquiry.product_id }
+    })
+    const storeName = (owner as any)?.vendor?.name ?? undefined
+
     await notificationModuleService.createNotifications({
       to: enquiry.customer_email,
       channel: 'email',
       template: EmailTemplates.ENQUIRY_RESPONDED,
       data: {
         emailOptions: {
-          replyTo: process.env.ORDER_REPLY_TO_EMAIL || RESEND_FROM_EMAIL,
+          replyTo: process.env.ORDER_REPLY_TO_EMAIL || ZEPTOMAIL_FROM_EMAIL,
           subject: `Re: your question about ${enquiry.product?.title ?? 'a product'}`
         },
         productTitle: enquiry.product?.title ?? 'this product',
         message: enquiry.message,
         reply: enquiry.reply,
+        storeName,
         preview: 'You have a reply to your product question'
       }
     })

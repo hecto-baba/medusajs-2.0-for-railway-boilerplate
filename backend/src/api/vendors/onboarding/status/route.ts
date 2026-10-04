@@ -21,6 +21,11 @@ export const GET = async (
   const vendorId = await getVendorId(req)
   const localRecord = await onboardingStore.getAsync(vendorId)
 
+  // The taxonomy lookup and the remote status are independent, so start the
+  // remote call now and let it overlap with the taxonomy resolution rather
+  // than waiting on each in turn.
+  const remotePromise = fetchOnboardingStatus(vendorId).catch(() => null)
+
   // Resolve taxonomy details dynamically
   const resolved = await resolveTaxonomyDetails({
     segmentId: localRecord.segmentId,
@@ -33,7 +38,7 @@ export const GET = async (
   const vendorCategory = localRecord.vendorCategory || resolved.vendorCategory || null
 
   try {
-    const remote = await fetchOnboardingStatus(vendorId).catch(() => null)
+    const remote = await remotePromise
 
     const effectiveStatus = (localRecord.status && localRecord.status !== "DRAFT")
       ? localRecord.status

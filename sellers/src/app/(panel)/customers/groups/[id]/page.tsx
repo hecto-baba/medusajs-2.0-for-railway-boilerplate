@@ -1,4 +1,4 @@
-import { CustomerGroupDetail } from "@modules/customers"
+import { CustomerGroupDetail } from "@modules/customers/components/groups/group-detail"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Customer Group Details" }

@@ -1,12 +1,8 @@
-import { MySchedule } from "@modules/appointments"
-import { Metadata } from "next"
+import { redirect } from "next/navigation"
 
-export const metadata: Metadata = { title: "My Schedule" }
-
+// The single "My Schedule" page was replaced by Appointments > Resources, where
+// a business manages every bookable resource and its own calendar. Old
+// bookmarks land there.
 export default function MySchedulePage() {
-  return (
-    <div className="p-6">
-      <MySchedule />
-    </div>
-  )
+  redirect("/appointments/resources")
 }

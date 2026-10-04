@@ -1,7 +1,7 @@
 import { sdk } from "@lib/config"
 import { HttpTypes } from "@medusajs/types"
 import { cache } from "react"
-import { getCacheDirectives } from "./cookies"
+import { getSharedCacheDirectives } from "./cookies"
 
 // See the note in regions.ts for why these are client.fetch calls rather than
 // the sdk.store.* helpers.
@@ -17,7 +17,7 @@ export const listCategories = cache(async function () {
       {
         method: "GET",
         query: { fields: "+category_children" },
-        ...(await getCacheDirectives("categories")),
+        ...getSharedCacheDirectives("categories"),
       }
     )
     .then(({ product_categories }) => product_categories)
@@ -32,7 +32,7 @@ export const getCategoriesList = cache(async function (
     {
       method: "GET",
       query: { limit, offset },
-      ...(await getCacheDirectives("categories")),
+      ...getSharedCacheDirectives("categories"),
     }
   )
 })
@@ -45,7 +45,7 @@ export const getCategoryByHandle = cache(async function (
     {
       method: "GET",
       query: { handle: categoryHandle },
-      ...(await getCacheDirectives("categories")),
+      ...getSharedCacheDirectives("categories"),
     }
   )
 })

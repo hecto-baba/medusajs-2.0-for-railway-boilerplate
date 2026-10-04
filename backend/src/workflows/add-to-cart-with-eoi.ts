@@ -35,7 +35,13 @@ export const addToCartWithEoiWorkflow = createWorkflow(
   (input: AddToCartWithEoiWorkflowInput) => {
     const { data: carts } = useQueryGraphStep({
       entity: "cart",
-      fields: ["id", "currency_code", "region_id"],
+      fields: [
+        "id",
+        "currency_code",
+        "region_id",
+        "items.variant_id",
+        "items.metadata",
+      ],
       filters: { id: input.cart_id },
       options: {
         throwIfKeyNotFound: true,
@@ -46,8 +52,7 @@ export const addToCartWithEoiWorkflow = createWorkflow(
       entity: "product_variant",
       fields: [
         "id",
-        "product.id",
-        "product.eoi_configuration.*",
+        "eoi_configuration.*",
         "calculated_price.*",
       ],
       filters: {
@@ -65,12 +70,13 @@ export const addToCartWithEoiWorkflow = createWorkflow(
     }).config({ name: "retrieve-variant" })
 
     const eoiData = when({ variants }, (data) => {
-      return data.variants[0].product?.eoi_configuration?.status === "active"
+      return data.variants[0].eoi_configuration?.status === "active"
     }).then(() => {
       return validateEoiCartItemStep({
         variant: variants[0],
         quantity: input.quantity,
-        eoi_configuration: variants[0].product?.eoi_configuration || null,
+        eoi_configuration: variants[0].eoi_configuration || null,
+        cart_items: carts[0].items || [],
       } as unknown as ValidateEoiCartItemInput)
     })
 
@@ -84,10 +90,19 @@ export const addToCartWithEoiWorkflow = createWorkflow(
       input,
       eoiData,
     }, (data) => {
+      // The EOI snapshot keys are server-owned: create-eoi-for-order trusts
+      // them when it writes the Eoi row, so a client must never be able to
+      // supply its own. Strip them from whatever metadata came in.
+      const clientMetadata = Object.fromEntries(
+        Object.entries(data.input.metadata || {}).filter(
+          ([key]) => key !== "is_eoi" && !key.startsWith("eoi_")
+        )
+      )
+
       const baseItem = {
         variant_id: data.input.variant_id,
         quantity: data.input.quantity,
-        metadata: data.input.metadata,
+        metadata: Object.keys(clientMetadata).length ? clientMetadata : undefined,
       }
 
       // If it's an EOI-eligible product, use the resolved EOI charge as the
@@ -101,7 +116,7 @@ export const addToCartWithEoiWorkflow = createWorkflow(
           ...baseItem,
           unit_price: data.eoiData.eoi_charged_amount,
           metadata: {
-            ...(data.input.metadata || {}),
+            ...clientMetadata,
             is_eoi: true,
             eoi_value_type: data.eoiData.value_type,
             eoi_value_amount: data.eoiData.value_amount,

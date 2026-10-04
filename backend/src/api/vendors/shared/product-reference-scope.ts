@@ -24,7 +24,13 @@ export const PRODUCT_COLLECTIONS: ScopedEntity = {
   entity: "product_collection",
 }
 
+export const PRODUCT_SALES_CHANNELS: ScopedEntity = {
+  linkField: "sales_channels",
+  entity: "sales_channel",
+}
+
 type ProductReferenceBody = {
+  sales_channels?: Array<{ id?: string } | string> | null
   type_id?: string | null
   collection_id?: string | null
   categories?: Array<{ id?: string } | string> | null
@@ -42,6 +48,7 @@ export const assertVendorCanUseProductReferences = async (
   const tagIds = new Set<string>()
   const collectionIds = new Set<string>()
   const categoryIds = new Set<string>()
+  const channelIds = new Set<string>()
 
   for (const body of bodies) {
     if (body?.type_id) {
@@ -54,6 +61,12 @@ export const assertVendorCanUseProductReferences = async (
       const id = tagIdOf(category)
       if (id) {
         categoryIds.add(id)
+      }
+    }
+    for (const channel of body?.sales_channels ?? []) {
+      const id = tagIdOf(channel)
+      if (id) {
+        channelIds.add(id)
       }
     }
     for (const tag of body?.tags ?? []) {
@@ -85,6 +98,16 @@ export const assertVendorCanUseProductReferences = async (
   }
 
   await assertCategoriesAssignable(req, Array.from(categoryIds))
+
+  if (channelIds.size) {
+    const { owned, platform } = await getVisibleIds(req, PRODUCT_SALES_CHANNELS)
+    const visible = new Set([...owned, ...platform])
+    for (const id of channelIds) {
+      if (!visible.has(id)) {
+        throw new MedusaError(MedusaError.Types.NOT_FOUND, "Sales channel not found.")
+      }
+    }
+  }
 
   if (tagIds.size) {
     const { owned, platform } = await getVisibleIds(req, PRODUCT_TAGS)

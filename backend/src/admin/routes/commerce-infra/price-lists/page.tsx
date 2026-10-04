@@ -37,7 +37,7 @@ const CommercePriceListsPage = () => {
 
 export const config = defineRouteConfig({
   label: "Price Lists",
-  rank: 6,
+  rank: 12,
 })
 
 export default CommercePriceListsPage

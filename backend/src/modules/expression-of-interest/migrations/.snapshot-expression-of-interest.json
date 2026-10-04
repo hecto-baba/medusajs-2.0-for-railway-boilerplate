@@ -395,8 +395,8 @@
           "enumItems": [],
           "mappedType": "text"
         },
-        "product_id": {
-          "name": "product_id",
+        "variant_id": {
+          "name": "variant_id",
           "type": "text",
           "unsigned": false,
           "autoincrement": false,

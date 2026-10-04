@@ -3,12 +3,19 @@
 import { Popover, Transition } from "@headlessui/react"
 import { ArrowRightMini, XMark } from "@medusajs/icons"
 import { Text, clx, useToggleState } from "@medusajs/ui"
+import dynamic from "next/dynamic"
 import { Fragment } from "react"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import CountrySelect from "../country-select"
+import { MenuIcon } from "@modules/common/icons/ui-icons"
 import { HttpTypes } from "@medusajs/types"
 import { getStoreName } from "@lib/util/env"
+
+// Only rendered inside the open menu panel, so keep it (and the flag lib) out
+// of the first-load bundle.
+const CountrySelect = dynamic(() => import("../country-select"), {
+  ssr: false,
+})
 
 type SideMenuGroup = {
   title?: string
@@ -26,12 +33,14 @@ const SideMenuGroups: SideMenuGroup[] = [
       { name: "Store", href: "/store" },
       { name: "Digital Products", href: "/digital-products" },
       { name: "Restaurants", href: "/restaurants" },
+      { name: "Book an appointment", href: "/book" },
     ],
   },
   {
     title: "Account",
     items: [
       { name: "Account", href: "/account" },
+      { name: "My bookings", href: "/appointments/my" },
       { name: "My Digital Library", href: "/account/digital-products" },
     ],
   },
@@ -64,9 +73,10 @@ const SideMenu = ({
               <div className="relative flex h-full">
                 <Popover.Button
                   data-testid="nav-menu-button"
-                  className="relative h-full flex items-center transition-all ease-out duration-200 focus:outline-none hover:text-ui-fg-base"
+                  className="relative flex h-11 w-11 items-center justify-center rounded-rounded text-ink transition-colors duration-200 hover:bg-canvas focus:outline-none focus-visible:outline-brand"
                 >
-                  Menu
+                  <MenuIcon size={22} />
+                  <span className="sr-only">Menu</span>
                 </Popover.Button>
               </div>
 

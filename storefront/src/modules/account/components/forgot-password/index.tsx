@@ -20,10 +20,10 @@ const ForgotPassword = ({ setCurrentView }: Props) => {
 
   return (
     <div
-      className="max-w-sm w-full flex flex-col items-center"
+      className="w-full flex flex-col items-center"
       data-testid="forgot-password-page"
     >
-      <h1 className="text-large-semi uppercase mb-6">Reset your password</h1>
+      <h1 className="font-display text-3xl font-extrabold tracking-tight mb-2 text-center">Reset your password</h1>
 
       {state.success ? (
         <>
@@ -34,7 +34,7 @@ const ForgotPassword = ({ setCurrentView }: Props) => {
             inbox" would undo that on the very next line.
           */}
           <p
-            className="text-center text-base-regular text-ui-fg-base mb-8"
+            className="text-center text-base text-muted mb-8"
             data-testid="forgot-password-sent"
           >
             If an account exists for that address, a link to set a new password
@@ -42,7 +42,7 @@ const ForgotPassword = ({ setCurrentView }: Props) => {
           </p>
           <button
             onClick={() => setCurrentView(LOGIN_VIEW.SIGN_IN)}
-            className="underline text-small-regular"
+            className="text-sm font-bold text-brand hover:underline"
             data-testid="back-to-sign-in-button"
           >
             Back to sign in
@@ -50,7 +50,7 @@ const ForgotPassword = ({ setCurrentView }: Props) => {
         </>
       ) : (
         <>
-          <p className="text-center text-base-regular text-ui-fg-base mb-8">
+          <p className="text-center text-base text-muted mb-8">
             Enter the email address on your account and we will send you a link
             to set a new password.
           </p>
@@ -75,11 +75,11 @@ const ForgotPassword = ({ setCurrentView }: Props) => {
               Send reset link
             </SubmitButton>
           </form>
-          <span className="text-center text-ui-fg-base text-small-regular mt-6">
+          <span className="text-center text-muted text-sm mt-6">
             Remembered it?{" "}
             <button
               onClick={() => setCurrentView(LOGIN_VIEW.SIGN_IN)}
-              className="underline"
+              className="font-bold text-brand hover:underline"
               data-testid="back-to-sign-in-button"
             >
               Sign in

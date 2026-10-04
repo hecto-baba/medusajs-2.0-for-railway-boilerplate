@@ -15,5 +15,6 @@ let MEDUSA_BACKEND_URL =
  */
 export const sdk = new Medusa({
   baseUrl: MEDUSA_BACKEND_URL,
-  debug: process.env.NODE_ENV === "development",
+  // Request logging is opt-in: set MEDUSA_SDK_DEBUG=1 to see every SDK call.
+  debug: process.env.MEDUSA_SDK_DEBUG === "1",
 })

@@ -52,7 +52,7 @@ export const isResetPasswordData = (data: any): data is ResetPasswordEmailProps 
 /**
  * The ResetPasswordEmail template component built with react-email
  */
-export const ResetPasswordEmail: React.FC<ResetPasswordEmailProps> = ({
+export const ResetPasswordEmail: React.FC<ResetPasswordEmailProps> & { PreviewProps?: ResetPasswordEmailProps } = ({
   resetLink,
   email,
   isAdmin = false,

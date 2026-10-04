@@ -1,4 +1,4 @@
-import { NewProductView } from "@modules/products"
+import { NewProductView } from "@modules/products/components/new-product-view"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Create product" }

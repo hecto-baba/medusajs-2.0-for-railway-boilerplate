@@ -389,8 +389,8 @@ export default function RentalDatePicker({
   return (
     <div className="flex flex-col gap-y-3" data-testid="rental-date-picker">
       <div className="flex flex-col gap-y-1">
-        <Text className="text-ui-fg-base font-medium">Rental period</Text>
-        <Text className="txt-medium text-ui-fg-subtle">
+        <Text className="font-display text-lg font-extrabold text-ink">Rental period</Text>
+        <Text className="text-sm text-muted">
           {max !== null
             ? `Rent this item for ${min} to ${max} ${unitNounPlural}.`
             : `Rent this item for ${min} ${
@@ -402,7 +402,7 @@ export default function RentalDatePicker({
       {unit === "hour" ? (
         <>
           <div className="flex flex-col gap-y-1">
-            <Label htmlFor="rental-hour-day" className="txt-medium">
+            <Label htmlFor="rental-hour-day" className="text-sm font-bold">
               Date
             </Label>
             <RentalCalendar
@@ -415,7 +415,7 @@ export default function RentalDatePicker({
           </div>
           <div className="grid grid-cols-2 gap-x-3">
             <div className="flex flex-col gap-y-1">
-              <Label htmlFor="rental-hour-start" className="txt-medium">
+              <Label htmlFor="rental-hour-start" className="text-sm font-bold">
                 Start time
               </Label>
               <input
@@ -424,12 +424,12 @@ export default function RentalDatePicker({
                 value={hourStart}
                 disabled={disabled || !hourDay}
                 onChange={(e) => setHourStart(e.target.value)}
-                className="border-ui-border-base bg-ui-bg-field h-10 rounded-md border px-3 txt-medium disabled:opacity-50"
+                className="h-11 rounded-rounded border border-line bg-card px-3 text-sm text-ink focus:border-brand focus:outline-none disabled:opacity-50"
                 data-testid="rental-hour-start"
               />
             </div>
             <div className="flex flex-col gap-y-1">
-              <Label htmlFor="rental-hour-end" className="txt-medium">
+              <Label htmlFor="rental-hour-end" className="text-sm font-bold">
                 End time
               </Label>
               <input
@@ -438,7 +438,7 @@ export default function RentalDatePicker({
                 value={hourEnd}
                 disabled={disabled || !hourStart}
                 onChange={(e) => setHourEnd(e.target.value)}
-                className="border-ui-border-base bg-ui-bg-field h-10 rounded-md border px-3 txt-medium disabled:opacity-50"
+                className="h-11 rounded-rounded border border-line bg-card px-3 text-sm text-ink focus:border-brand focus:outline-none disabled:opacity-50"
                 data-testid="rental-hour-end"
               />
             </div>
@@ -447,12 +447,13 @@ export default function RentalDatePicker({
       ) : (
         <>
           <div className="flex flex-col gap-y-1">
-            <Label htmlFor="rental-start-date" className="txt-medium">
+            <Label htmlFor="rental-start-date" className="text-sm font-bold">
               Pickup date
             </Label>
             <RentalCalendar
               selected={startDate ? parseDateInputValue(startDate) : undefined}
               onSelect={(date) => setStartDate(date ? toDateInputValue(date) : "")}
+              rangeEnd={endDate ? parseDateInputValue(endDate) : undefined}
               fromDate={parseDateInputValue(today)}
               bookedRanges={bookedRanges}
               disabled={disabled}
@@ -460,7 +461,7 @@ export default function RentalDatePicker({
           </div>
 
           <div className="flex flex-col gap-y-1">
-            <Label htmlFor="rental-units-count" className="txt-medium">
+            <Label htmlFor="rental-units-count" className="text-sm font-bold">
               Number of {unitNounPlural}
             </Label>
             <div className="flex items-center gap-x-2">
@@ -469,7 +470,7 @@ export default function RentalDatePicker({
                 aria-label={`Decrease number of ${unitNounPlural}`}
                 disabled={disabled || unitsCount <= min}
                 onClick={() => setUnitsCount((c) => Math.max(min, c - 1))}
-                className="border-ui-border-base bg-ui-bg-field h-10 w-10 rounded-md border txt-medium disabled:opacity-50"
+                className="h-11 w-11 rounded-rounded border border-line bg-card text-lg font-bold text-ink hover:border-muted disabled:opacity-50"
               >
                 –
               </button>
@@ -484,7 +485,7 @@ export default function RentalDatePicker({
                   const v = Number(e.target.value) || min
                   setUnitsCount(max !== null ? Math.min(max, Math.max(min, v)) : Math.max(min, v))
                 }}
-                className="border-ui-border-base bg-ui-bg-field h-10 w-20 rounded-md border px-3 txt-medium text-center disabled:opacity-50"
+                className="h-11 w-20 rounded-rounded border border-line bg-card px-3 text-center text-sm font-bold tabular-nums text-ink disabled:opacity-50"
                 data-testid="rental-units-count"
               />
               <button
@@ -494,7 +495,7 @@ export default function RentalDatePicker({
                 onClick={() =>
                   setUnitsCount((c) => (max !== null ? Math.min(max, c + 1) : c + 1))
                 }
-                className="border-ui-border-base bg-ui-bg-field h-10 w-10 rounded-md border txt-medium disabled:opacity-50"
+                className="h-11 w-11 rounded-rounded border border-line bg-card text-lg font-bold text-ink hover:border-muted disabled:opacity-50"
               >
                 +
               </button>
@@ -506,7 +507,7 @@ export default function RentalDatePicker({
       {requiresTime && (
         <div className="grid grid-cols-2 gap-x-3">
           <div className="flex flex-col gap-y-1">
-            <Label htmlFor="rental-pickup-time" className="txt-medium">
+            <Label htmlFor="rental-pickup-time" className="text-sm font-bold">
               Pickup time
             </Label>
             <input
@@ -515,12 +516,12 @@ export default function RentalDatePicker({
               value={pickupTime}
               disabled={disabled}
               onChange={(e) => setPickupTime(e.target.value)}
-              className="border-ui-border-base bg-ui-bg-field h-10 rounded-md border px-3 txt-medium disabled:opacity-50"
+              className="h-11 rounded-rounded border border-line bg-card px-3 text-sm text-ink focus:border-brand focus:outline-none disabled:opacity-50"
               data-testid="rental-pickup-time"
             />
           </div>
           <div className="flex flex-col gap-y-1">
-            <Label htmlFor="rental-return-time" className="txt-medium">
+            <Label htmlFor="rental-return-time" className="text-sm font-bold">
               Return time
             </Label>
             <input
@@ -529,7 +530,7 @@ export default function RentalDatePicker({
               value={returnTime}
               disabled={disabled}
               onChange={(e) => setReturnTime(e.target.value)}
-              className="border-ui-border-base bg-ui-bg-field h-10 rounded-md border px-3 txt-medium disabled:opacity-50"
+              className="h-11 rounded-rounded border border-line bg-card px-3 text-sm text-ink focus:border-brand focus:outline-none disabled:opacity-50"
               data-testid="rental-return-time"
             />
           </div>
@@ -537,7 +538,7 @@ export default function RentalDatePicker({
       )}
 
       {effectiveUnitsCount !== null && !message && (
-        <Text className="txt-medium text-ui-fg-subtle">
+        <Text className="text-sm font-semibold text-ink">
           {effectiveUnitsCount} {effectiveUnitsCount === 1 ? unitNounSingular.toLowerCase() : unitNounPlural}
           {isChecking && " - checking availability..."}
         </Text>
@@ -545,7 +546,7 @@ export default function RentalDatePicker({
 
       {message && (
         <Text
-          className={clx("txt-medium text-ui-fg-error")}
+          className={clx("text-sm font-semibold text-brand")}
           data-testid="rental-error-message"
         >
           {message}
@@ -554,7 +555,7 @@ export default function RentalDatePicker({
 
       {available && !message && !isChecking && (
         <Text
-          className="txt-medium text-ui-fg-interactive"
+          className="inline-flex w-fit items-center rounded-circle bg-success-soft px-3 py-1 text-sm font-bold text-success"
           data-testid="rental-available-message"
         >
           Available for these dates.

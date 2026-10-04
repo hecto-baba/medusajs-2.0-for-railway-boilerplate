@@ -1,4 +1,4 @@
-import { CustomerGroupsTable } from "@modules/customers"
+import { CustomerGroupsTable } from "@modules/customers/components/groups/customer-groups-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Customer Groups" }

@@ -1,4 +1,4 @@
-import { PromotionEditor } from "@modules/promotions"
+import { PromotionEditor } from "@modules/promotions/components/promotion-editor"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Edit promotion" }

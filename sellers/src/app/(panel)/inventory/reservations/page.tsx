@@ -1,4 +1,4 @@
-import { ReservationsTable } from "@modules/inventory"
+import { ReservationsTable } from "@modules/inventory/components/reservations-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = {

@@ -1,4 +1,4 @@
-import { ApiKeysTable } from "@modules/settings"
+import { ApiKeysTable } from "@modules/settings/components/api-keys/api-keys-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Secret API Keys" }

@@ -3,6 +3,7 @@ import { getRegion } from "@lib/data/regions"
 import ProductPreview from "@modules/products/components/product-preview"
 import { Pagination } from "@modules/store/components/pagination"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
+import { ListingFilters, hasListingFilters } from "@lib/util/listing-filters"
 
 const PRODUCT_LIMIT = 12
 
@@ -22,6 +23,7 @@ export default async function PaginatedProducts({
   productsIds,
   countryCode,
   digitalFilter = "exclude",
+  filters,
 }: {
   sortBy?: SortOptions
   page: number
@@ -30,6 +32,7 @@ export default async function PaginatedProducts({
   productsIds?: string[]
   countryCode: string
   digitalFilter?: "only" | "exclude"
+  filters?: ListingFilters
 }) {
   const queryParams: PaginatedProductsParams = {
     limit: 12,
@@ -61,14 +64,34 @@ export default async function PaginatedProducts({
     sortBy,
     countryCode,
     digitalFilter,
+    filters,
   })
 
   const totalPages = Math.ceil(count / PRODUCT_LIMIT)
 
+  if (!products.length) {
+    return (
+      <div
+        className="rounded-large bg-card px-6 py-16 text-center shadow-lift"
+        data-testid="products-empty"
+      >
+        <p className="font-display text-xl font-extrabold">
+          {hasListingFilters(filters) ? "No products match these filters" : "No products here yet"}
+        </p>
+        <p className="mt-1 text-sm text-muted">
+          {hasListingFilters(filters) ? "Try widening the price range or clearing the filters." : "Check back soon."}
+        </p>
+      </div>
+    )
+  }
+
   return (
     <>
+      <p className="mb-4 text-sm text-muted" data-testid="products-count">
+        {count} {count === 1 ? "product" : "products"}
+      </p>
       <ul
-        className="grid grid-cols-2 w-full small:grid-cols-3 medium:grid-cols-4 gap-x-6 gap-y-8"
+        className="grid w-full grid-cols-2 gap-3 xsmall:grid-cols-3 small:gap-4 medium:grid-cols-4 large:grid-cols-5"
         data-testid="products-list"
       >
         {products.map((p) => {

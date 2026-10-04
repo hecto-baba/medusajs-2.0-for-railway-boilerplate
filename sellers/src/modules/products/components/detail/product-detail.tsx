@@ -12,7 +12,6 @@ import { useQuery } from "@tanstack/react-query"
 import {
   AttributesSection,
   GeneralSection,
-  TrustClawAttributesSection,
 } from "./general-section"
 import { OrganizeSection } from "./organize-section"
 import {
@@ -23,7 +22,9 @@ import { MediaSection } from "./media-section"
 import { JsonSection, MetadataSection } from "./metadata-section"
 import { OptionsSection } from "./options-section"
 import { RentalSection } from "./rental-section"
+import { EoiSection } from "./eoi-section"
 import { AppointmentSection } from "./appointment-section"
+import { EnquirySection } from "./enquiry-section"
 import { RestaurantDishSection } from "./restaurant-dish-section"
 import { VariantsSection } from "./variants-section"
 
@@ -84,8 +85,14 @@ export const ProductDetail = ({ id }: { id: string }) => {
             <LayoutComposer.Entry id="ProductRentalSection">
               <RentalSection product={product} />
             </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductEoiSection">
+              <EoiSection product={product} />
+            </LayoutComposer.Entry>
             <LayoutComposer.Entry id="ProductAppointmentSection">
               <AppointmentSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductEnquirySection">
+              <EnquirySection product={product} />
             </LayoutComposer.Entry>
             <LayoutComposer.Entry id="ProductRestaurantDishSection">
               <RestaurantDishSection product={product} />
@@ -105,9 +112,6 @@ export const ProductDetail = ({ id }: { id: string }) => {
             </LayoutComposer.Entry>
             <LayoutComposer.Entry id="ProductAttributesSection">
               <AttributesSection product={product} />
-            </LayoutComposer.Entry>
-            <LayoutComposer.Entry id="ProductTrustClawAttributesSection">
-              <TrustClawAttributesSection product={product} />
             </LayoutComposer.Entry>
           </>
         ),

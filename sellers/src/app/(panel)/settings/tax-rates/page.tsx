@@ -1,4 +1,4 @@
-import { TaxRatesCard } from "@modules/settings"
+import { TaxRatesCard } from "@modules/settings/components/tax-rates/tax-rates-card"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "My Tax Rates" }

@@ -4,8 +4,9 @@
   "private": true,
   "description": "Seller-facing panel for the marketplace. Talks to the Medusa backend's /vendors routes.",
   "scripts": {
-    "dev": "next dev -p 7001",
+    "dev": "next dev --turbopack -p 7001",
     "build": "next build",
+    "check:bundle": "node scripts/check-bundle-size.mjs",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
@@ -54,6 +55,7 @@
   },
   "devDependencies": {
     "@medusajs/ui-preset": "2.19.0",
+    "@next/bundle-analyzer": "15.5.25",
     "@playwright/test": "^1.62.1",
     "@types/node": "22.20.1",
     "@types/qrcode": "^1.5.6",

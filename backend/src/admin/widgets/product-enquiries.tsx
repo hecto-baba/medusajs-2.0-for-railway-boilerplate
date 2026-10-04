@@ -8,6 +8,7 @@ import {
   Textarea,
   Badge,
   toast,
+  usePrompt,
 } from "@medusajs/ui"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { sdk } from "../lib/sdk"
@@ -48,6 +49,10 @@ type EnquiryConfig = {
 type EnquiryConfigResponse = {
   enquiry_config: EnquiryConfig | null
 }
+
+// Stable reference: a fresh `[]` each render makes the field builder's reset
+// effect fire on every parent re-render and wipe in-progress edits.
+const NO_FIELDS: EnquiryFieldDefinition[] = []
 
 const STATUS_COLOR: Record<EnquiryStatus, "orange" | "green" | "grey"> = {
   pending: "orange",
@@ -108,6 +113,7 @@ const ProductEnquiriesWidget = ({
   const [reply, setReply] = useState("")
   const [builderOpen, setBuilderOpen] = useState(false)
   const queryClient = useQueryClient()
+  const prompt = usePrompt()
 
   const displayQueryKey = ["products", product.id, "enquiries"]
   const configQueryKey = ["products", product.id, "enquiry-config"]
@@ -140,8 +146,9 @@ const ProductEnquiriesWidget = ({
       queryClient.invalidateQueries({ queryKey: configQueryKey })
       setBuilderOpen(false)
     },
-    onError: () => {
-      toast.error("Failed to save enquiry settings")
+    onError: (error: any) => {
+      // The backend's message is specific (e.g. "turn Rental off first").
+      toast.error(error?.message || "Failed to save enquiry settings")
     },
   })
 
@@ -201,6 +208,18 @@ const ProductEnquiriesWidget = ({
     })
   }
 
+  // Enabling makes the product enquiry-only (the cart refuses it), so ask first.
+  const handleEnableClick = async () => {
+    const confirmed = await prompt({
+      title: "Make this product enquiry-only?",
+      description:
+        "While enquiries are on, customers can't add this product to the cart - they can only send a question. A product can also use only one sale mode, so turn off Rental, Appointment or Expression of Interest first if it uses one.",
+      confirmText: "Continue",
+      cancelText: "Cancel",
+    })
+    if (confirmed) setBuilderOpen(true)
+  }
+
   const handleDisable = () => {
     upsertConfigMutation.mutate({ status: "inactive" })
   }
@@ -232,11 +251,13 @@ const ProductEnquiriesWidget = ({
           <>
             <div className="px-6 py-4">
               <Text className="text-ui-fg-subtle">
-                This product is not currently accepting enquiries.
+                This product is not currently accepting enquiries. Turning them on
+                makes it enquiry-only: customers can ask a question but can't add
+                it to the cart.
               </Text>
             </div>
             <div className="flex justify-end border-t px-6 py-4">
-              <Button size="small" variant="secondary" onClick={() => setBuilderOpen(true)}>
+              <Button size="small" variant="secondary" onClick={handleEnableClick}>
                 Enable Enquiries
               </Button>
             </div>
@@ -245,6 +266,12 @@ const ProductEnquiriesWidget = ({
 
         {!isLoadingAny && isEnabled && (
           <>
+            <div className="px-6 py-3">
+              <Text size="small" className="text-ui-fg-subtle">
+                Enquiry-only: this product can't be added to the cart.
+              </Text>
+            </div>
+
             {enquiries.length === 0 && (
               <div className="px-6 py-4">
                 <Text className="text-ui-fg-subtle">
@@ -299,7 +326,7 @@ const ProductEnquiriesWidget = ({
       <EnquiryFieldBuilder
         open={builderOpen}
         onOpenChange={setBuilderOpen}
-        initialFields={config?.custom_fields ?? []}
+        initialFields={config?.custom_fields ?? NO_FIELDS}
         isEnabling={!isEnabled}
         isSaving={upsertConfigMutation.isPending}
         onSave={handleSaveFields}

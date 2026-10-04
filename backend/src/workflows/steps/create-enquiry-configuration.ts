@@ -3,6 +3,7 @@ import { MedusaError } from "@medusajs/framework/utils"
 import { PRODUCT_ENQUIRY_MODULE } from "../../modules/product-enquiry"
 import ProductEnquiryModuleService from "../../modules/product-enquiry/service"
 import { EnquiryFieldDefinition } from "../../utils/enquiry-field"
+import { assertNoOtherSaleMode, withSaleModeLock } from "../../lib/sale-mode"
 import { validateEnquiryFieldDefinitions } from "../../utils/validate-enquiry-fields"
 
 type CreateEnquiryConfigurationInput = {
@@ -21,12 +22,25 @@ export const createEnquiryConfigurationStep = createStep(
     const productEnquiryModuleService: ProductEnquiryModuleService =
       container.resolve(PRODUCT_ENQUIRY_MODULE)
 
-    try {
-      const config = await productEnquiryModuleService.createEnquiryConfigurations({
+    const write = () =>
+      productEnquiryModuleService.createEnquiryConfigurations({
         product_id: input.product_id,
         status: input.status ?? "active",
         custom_fields: input.custom_fields ?? null,
       })
+
+    try {
+      // One sale mode per product: enabling enquiries (the default here) is
+      // refused while rental, appointment, EOI or ticketing is active. The
+      // check and the write share one lock so another mode cannot switch on
+      // between them.
+      const config =
+        input.status !== "inactive"
+          ? await withSaleModeLock(container, [input.product_id], async () => {
+              await assertNoOtherSaleMode(container, input.product_id, "enquiry")
+              return write()
+            })
+          : await write()
 
       return new StepResponse(config, config.id)
     } catch (error) {

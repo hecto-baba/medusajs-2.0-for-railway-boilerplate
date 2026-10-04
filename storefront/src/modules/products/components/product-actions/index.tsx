@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@medusajs/ui"
-import { isEqual } from "lodash"
+import dynamic from "next/dynamic"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
@@ -10,13 +10,17 @@ import Divider from "@modules/common/components/divider"
 import OptionSelect from "@modules/products/components/product-actions/option-select"
 
 import ErrorMessage from "@modules/checkout/components/error-message"
-import MobileActions from "./mobile-actions"
 import ProductPrice from "../product-price"
+import { useCart } from "@lib/context/cart-context"
 import { addToCart } from "@lib/data/cart"
+import { addEoiToCart } from "@lib/data/eoi"
+import { getEoiQuote } from "@lib/util/eoi"
+import { getDeliveryEta, getFreeDeliveryThreshold } from "@lib/util/env"
+import DeliveryInfo from "./delivery-info"
+import QuantityControl from "./quantity-control"
 import { addRentalToCart } from "@lib/data/rentals"
 import { HttpTypes } from "@medusajs/types"
 import { RentalConfiguration, RentalSelection } from "types/rental"
-import RentalDatePicker from "../rental-date-picker"
 import { convertToLocale } from "@lib/util/money"
 import { UNIT_LABEL_PLURAL } from "@lib/util/rental-units"
 import { VariantWithDigitalProduct } from "types/global"
@@ -28,7 +32,25 @@ type ProductActionsProps = {
   disabled?: boolean
 }
 
-const optionsAsKeymap = (variantOptions: any) => {
+// Only rendered for some products / after scrolling, so keep them (and the
+// headlessui Dialog, react-day-picker, etc. they pull in) out of the initial
+// bundle. Rental and EOI still server-render; the mobile bar is hidden until
+// the inline button scrolls out of view, so it renders on the client only.
+const RentalDatePicker = dynamic(() => import("../rental-date-picker"))
+const EoiOptions = dynamic(() => import("./eoi-options"))
+const MobileActions = dynamic(() => import("./mobile-actions"), { ssr: false })
+
+const sameOptions = (
+  a: Record<string, string | undefined> | undefined,
+  b: Record<string, string | undefined> | undefined
+) => {
+  const aKeys = Object.keys(a ?? {})
+  const bKeys = Object.keys(b ?? {})
+  if (aKeys.length !== bKeys.length) return false
+  return aKeys.every((k) => a![k] === b?.[k])
+}
+
+const optionsAsKeymap =(variantOptions: any) => {
   return variantOptions?.reduce((acc: Record<string, string | undefined>, varopt: any) => {
     if (varopt.option && varopt.value !== null && varopt.value !== undefined) {
       acc[varopt.option.title] = varopt.value
@@ -45,6 +67,7 @@ export default function ProductActions({
   const [options, setOptions] = useState<Record<string, string | undefined>>({})
   const [isAdding, setIsAdding] = useState(false)
   const [quantity, setQuantity] = useState<number>(1)
+  const [purchaseMode, setPurchaseMode] = useState<"buy" | "eoi">("buy")
   const [isDownloadingPreview, setIsDownloadingPreview] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rentalSelection, setRentalSelection] = useState<RentalSelection | null>(
@@ -53,6 +76,9 @@ export default function ProductActions({
   const [rentalPrice, setRentalPrice] = useState<number | null>(null)
   const [rentalDeposit, setRentalDeposit] = useState<number | null>(null)
   const countryCode = useParams().countryCode as string
+  const { trackAdd } = useCart()
+  const eta = getDeliveryEta()
+  const freeThreshold = getFreeDeliveryThreshold()
   const router = useRouter()
   const [, startTransition] = useTransition()
 
@@ -71,7 +97,7 @@ export default function ProductActions({
 
     return product.variants.find((v) => {
       const variantOptions = optionsAsKeymap(v.options)
-      return isEqual(variantOptions, options)
+      return sameOptions(variantOptions, options)
     })
   }, [product.variants, options]) as VariantWithDigitalProduct | undefined
 
@@ -151,6 +177,12 @@ export default function ProductActions({
     return false
   }, [selectedVariant])
 
+  // A variant can offer an Expression of Interest: reserve now with a deposit,
+  // the balance tracked on the order. Only an active configuration on the
+  // selected variant counts; without one the variant sells as usual.
+  const eoiQuote = useMemo(() => getEoiQuote(selectedVariant), [selectedVariant])
+  const isEoi = !!eoiQuote && purchaseMode === "eoi"
+
   // The rental configuration arrives on the product through its linked
   // module. A product without an active configuration behaves exactly as
   // before, so the ordinary sale path is untouched.
@@ -182,9 +214,37 @@ export default function ProductActions({
     }
   }, [selectedVariant?.id])
 
+  // When a product has a single option (just a size, say), each value maps to
+  // exactly one variant, so its price can be shown on the option card.
+  const optionHints = useMemo(() => {
+    if ((product.options?.length ?? 0) !== 1) return undefined
+    const option = product.options![0]
+    const hints: Record<string, string> = {}
+    for (const value of option.values ?? []) {
+      const variant = product.variants?.find((v) =>
+        v.options?.some((o: any) => o.option_id === option.id && o.value === value.value)
+      )
+      const price = variant?.calculated_price
+      if (price?.calculated_amount && price.currency_code) {
+        hints[value.value] = convertToLocale({
+          amount: price.calculated_amount,
+          currency_code: price.currency_code,
+        })
+      }
+    }
+    return Object.keys(hints).length ? hints : undefined
+  }, [product])
+
   const actionsRef = useRef<HTMLDivElement>(null)
 
   const inView = useIntersection(actionsRef, "0px")
+
+  // Adding is slow (a few backend calls), so the cart drawer opens and counts
+  // the item right away, and rolls back with a message if the add fails.
+  const track = <T,>(promise: Promise<T>, quantityAdded = 1) => {
+    trackAdd(promise, quantityAdded)
+    return promise
+  }
 
   // add the selected variant to the cart
   const handleAddToCart = async () => {
@@ -203,7 +263,7 @@ export default function ProductActions({
           return
         }
 
-        await addRentalToCart({
+        await track(addRentalToCart({
           variantId: selectedVariant.id,
           countryCode,
           rentalStartDate: rentalSelection.rental_start_date,
@@ -213,13 +273,22 @@ export default function ProductActions({
           rentalUnitsCount: rentalSelection.rental_units_count,
           pickupTime: rentalSelection.pickup_time,
           returnTime: rentalSelection.return_time,
-        })
+        }))
+      } else if (isEoi) {
+        await track(
+          addEoiToCart({ variantId: selectedVariant.id, countryCode }),
+          1
+        )
       } else {
-        await addToCart({
-          variantId: selectedVariant.id,
-          quantity: Math.max(1, quantity),
-          countryCode,
-        })
+        const amount = Math.max(1, quantity)
+        await track(
+          addToCart({
+            variantId: selectedVariant.id,
+            quantity: amount,
+            countryCode,
+          }),
+          amount
+        )
       }
 
       // Belt and braces on top of the scoped cache tag the action revalidates.
@@ -256,6 +325,7 @@ export default function ProductActions({
                       updateOption={setOptionValue}
                       title={option.title ?? ""}
                       data-testid="product-options"
+                      hints={optionHints}
                       disabled={!!disabled || isAdding}
                     />
                   </div>
@@ -267,6 +337,14 @@ export default function ProductActions({
         </div>
 
         <ProductPrice product={product} variant={selectedVariant} />
+
+        {eoiQuote && !isRental && (
+          <EoiOptions
+            quote={eoiQuote}
+            isEoi={isEoi}
+            onChange={setPurchaseMode}
+          />
+        )}
 
         {isRental && (
           <>
@@ -331,39 +409,12 @@ export default function ProductActions({
           </Button>
         )}
 
-        {!isRental && (
-          <div className="flex items-center justify-between gap-x-3 my-2 py-1">
-            <span className="text-sm font-medium text-ui-fg-base">Quantity:</span>
-            <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white shadow-xs">
-              <button
-                type="button"
-                disabled={quantity <= 1 || isAdding}
-                onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
-                className="w-8 h-9 flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-30 font-semibold select-none transition-colors"
-                aria-label="Decrease quantity"
-              >
-                −
-              </button>
-              <input
-                type="number"
-                min="1"
-                value={quantity}
-                disabled={isAdding}
-                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-16 h-9 text-center text-xs font-semibold text-gray-900 border-x border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                aria-label="Quantity"
-              />
-              <button
-                type="button"
-                disabled={isAdding}
-                onClick={() => setQuantity((prev) => prev + 1)}
-                className="w-8 h-9 flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-30 font-semibold select-none transition-colors"
-                aria-label="Increase quantity"
-              >
-                +
-              </button>
-            </div>
-          </div>
+        {!isRental && !isEoi && (
+          <QuantityControl
+            quantity={quantity}
+            setQuantity={setQuantity}
+            disabled={isAdding}
+          />
         )}
 
         <Button
@@ -376,7 +427,7 @@ export default function ProductActions({
             (isRental && !rentalSelection)
           }
           variant="primary"
-          className="w-full h-10"
+          className="h-12 w-full !rounded-large !border-0 !bg-brand !text-base !font-extrabold !text-brand-ink !shadow-none hover:!opacity-90 disabled:!bg-line disabled:!text-muted"
           isLoading={isAdding}
           data-testid="add-product-button"
         >
@@ -388,9 +439,18 @@ export default function ProductActions({
             ? "Select rental dates"
             : isRental
             ? "Add rental to cart"
+            : isEoi
+            ? `Reserve for ${convertToLocale({ amount: eoiQuote!.charged, currency_code: eoiQuote!.currencyCode })}`
             : "Add to cart"}
         </Button>
         <ErrorMessage error={error} data-testid="add-product-error-message" />
+        {!isRental && (
+          <DeliveryInfo
+            eta={eta}
+            freeThreshold={freeThreshold}
+            currencyCode={region.currency_code}
+          />
+        )}
         <MobileActions
           product={product}
           variant={selectedVariant}
@@ -404,6 +464,11 @@ export default function ProductActions({
           optionsDisabled={!!disabled || isAdding}
           isRental={isRental}
           hasRentalSelection={!!rentalSelection}
+          confirmLabel={
+            isEoi
+              ? `Reserve for ${convertToLocale({ amount: eoiQuote!.charged, currency_code: eoiQuote!.currencyCode })}`
+              : undefined
+          }
         />
       </div>
     </>

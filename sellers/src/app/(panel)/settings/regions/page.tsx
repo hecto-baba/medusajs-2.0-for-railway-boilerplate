@@ -1,4 +1,4 @@
-import { RegionsTable } from "@modules/settings"
+import { RegionsTable } from "@modules/settings/components/regions/regions-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Regions & Currencies" }

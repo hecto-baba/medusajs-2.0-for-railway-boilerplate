@@ -1,4 +1,4 @@
-import { VenuesTable } from "@modules/venues"
+import { VenuesTable } from "@modules/venues/components/venues-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Venues" }

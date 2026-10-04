@@ -21,6 +21,28 @@ export type UseLayoutPreferenceReturn = {
   isSaving: boolean
 }
 
+// One request per zone at a time. Strict Mode mounts effects twice in dev and
+// the sidebar and topbar can share a zone, so without this each mount fires its
+// own identical GET. The entry is dropped once settled, and on every save, so a
+// later mount always sees fresh data.
+const inFlightConfig = new Map<string, Promise<any>>()
+
+function fetchZoneConfiguration(zone: string): Promise<any> {
+  const existing = inFlightConfig.get(zone)
+  if (existing) return existing
+
+  const request = fetch(
+    `/api/vendors/layouts/${encodeURIComponent(zone)}/configuration`
+  )
+    .then((res) => (res.ok ? res.json() : null))
+    .finally(() => {
+      if (inFlightConfig.get(zone) === request) inFlightConfig.delete(zone)
+    })
+
+  inFlightConfig.set(zone, request)
+  return request
+}
+
 function getStoredPreference(zone: string): LayoutPreference | null {
   if (typeof window === "undefined") return null
   try {
@@ -67,8 +89,7 @@ export function useLayoutPreference(zone: string): UseLayoutPreferenceReturn {
 
     // Try background fetch from server proxy
     let isMounted = true
-    fetch(`/api/vendors/layouts/${encodeURIComponent(zone)}/configuration`)
-      .then((res) => (res.ok ? res.json() : null))
+    fetchZoneConfiguration(zone)
       .then((data) => {
         if (!isMounted || !data) return
         const serverConfig =
@@ -104,6 +125,7 @@ export function useLayoutPreference(zone: string): UseLayoutPreferenceReturn {
       saveStoredPreference(zone, next)
 
       // Post to backend proxy
+      inFlightConfig.delete(zone)
       fetch(`/api/vendors/layouts/${encodeURIComponent(zone)}/configuration`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

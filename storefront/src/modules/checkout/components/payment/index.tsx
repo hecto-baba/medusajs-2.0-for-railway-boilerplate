@@ -14,7 +14,7 @@ import PaymentContainer from "@modules/checkout/components/payment-container"
 import { isStripe as isStripeFunc, paymentInfoMap } from "@lib/constants"
 import { StripeContext } from "@modules/checkout/components/payment-wrapper"
 import { initiatePaymentSession } from "@lib/data/cart"
-import { isTicketLineItem } from "types/ticket"
+import { isNoShippingCart } from "types/appointment"
 
 const Payment = ({
   cart,
@@ -49,10 +49,8 @@ const Payment = ({
 
   // Tickets require no shipping, so a ticket-only cart has no shipping method
   // and would otherwise never count as ready to pay.
-  const items = cart?.items ?? []
-  const isTicketsOnly =
-    items.length > 0 &&
-    items.every((item: any) => isTicketLineItem(item.metadata))
+  // Appointments are the same: they require no shipping either.
+  const isTicketsOnly = isNoShippingCart(cart?.items)
 
   const paymentReady =
     (activeSession && (isTicketsOnly || cart?.shipping_methods.length !== 0)) ||
@@ -152,12 +150,12 @@ const Payment = ({
   ])
 
   return (
-    <div className="bg-white">
+    <div className="rounded-large bg-card p-5 shadow-lift small:p-6">
       <div className="flex flex-row items-center justify-between mb-6">
         <Heading
           level="h2"
           className={clx(
-            "flex flex-row text-3xl-regular gap-x-2 items-baseline",
+            "flex flex-row font-display text-2xl font-extrabold tracking-tight gap-x-2 items-baseline",
             {
               "opacity-50 pointer-events-none select-none":
                 !isOpen && !paymentReady,
@@ -171,7 +169,7 @@ const Payment = ({
           <Text>
             <button
               onClick={handleEdit}
-              className="text-ui-fg-interactive hover:text-ui-fg-interactive-hover"
+              className="text-brand hover:underline"
               data-testid="edit-payment-button"
             >
               Edit

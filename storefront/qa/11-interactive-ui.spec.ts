@@ -66,11 +66,11 @@ test.describe("Interactive UI", () => {
     await expect(page.getByTestId("nav-store-link")).toBeVisible()
   })
 
-  test("the cart dropdown opens on hover and links to the cart", async ({ page }) => {
+  test("the cart drawer opens on click and links to the cart", async ({ page }) => {
     await addProductToCart(page, "t-shirt")
     await page.goto(url())
 
-    await page.getByTestId("nav-cart-link").hover()
+    await page.getByTestId("nav-cart-link").click()
     const dropdown = page.getByTestId("nav-cart-dropdown")
     await expect(dropdown).toBeVisible()
 

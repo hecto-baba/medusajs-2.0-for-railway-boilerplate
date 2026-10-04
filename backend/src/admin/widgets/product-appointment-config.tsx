@@ -8,9 +8,9 @@ import {
   Heading,
   Input,
   Label,
-  Switch,
   Text,
   toast,
+  usePrompt,
 } from "@medusajs/ui"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { sdk } from "../lib/sdk"
@@ -30,8 +30,8 @@ type ProvidersResponse = { providers: ProviderOption[] }
 const ProductAppointmentConfigWidget = ({
   data: product,
 }: DetailWidgetProps<AdminProduct>) => {
+  const prompt = usePrompt()
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [bookable, setBookable] = useState(false)
   const [durationMinutes, setDurationMinutes] = useState(30)
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([])
 
@@ -41,22 +41,23 @@ const ProductAppointmentConfigWidget = ({
     queryKey: [["products", product.id, "appointment-config"]],
   })
 
+  // Explicit limit: the endpoint defaults to 15, which would silently hide every
+  // provider after the first page from the picker.
   const { data: providersData } = useQuery<ProvidersResponse>({
-    queryFn: () => sdk.client.fetch("/admin/providers"),
-    queryKey: [["providers"]],
+    queryFn: () => sdk.client.fetch("/admin/providers", { query: { limit: 200 } }),
+    queryKey: [["providers", "all"]],
   })
 
   const serviceProviders = data?.service_providers ?? []
   const providers = providersData?.providers ?? []
 
+  const syncFromServer = () => {
+    setDurationMinutes(serviceProviders[0]?.default_duration_minutes ?? 30)
+    setSelectedProviderIds(serviceProviders.map((sp) => sp.provider_id))
+  }
+
   useEffect(() => {
-    if (serviceProviders.length) {
-      setBookable(true)
-      setDurationMinutes(serviceProviders[0].default_duration_minutes)
-      setSelectedProviderIds(serviceProviders.map((sp) => sp.provider_id))
-    } else {
-      setBookable(false)
-    }
+    syncFromServer()
   }, [data])
 
   const saveMutation = useMutation({
@@ -70,10 +71,17 @@ const ProductAppointmentConfigWidget = ({
       refetch()
       setDrawerOpen(false)
     },
-    onError: () => {
-      toast.error("Failed to update appointment configuration")
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to update appointment configuration")
     },
   })
+
+  const handleDrawerOpenChange = (open: boolean) => {
+    // Closing (Cancel, overlay click, Escape) discards unsaved edits so the
+    // next open starts from what is actually stored.
+    if (!open) syncFromServer()
+    setDrawerOpen(open)
+  }
 
   const handleToggleProvider = (providerId: string, checked: boolean) => {
     setSelectedProviderIds((current) =>
@@ -94,8 +102,19 @@ const ProductAppointmentConfigWidget = ({
     setDrawerOpen(true)
   }
 
-  const handleUnpublish = () => {
-    saveMutation.mutate({ provider_ids: [], default_duration_minutes: durationMinutes })
+  const handleUnpublish = async () => {
+    const confirmed = await prompt({
+      title: "Make this product unbookable?",
+      description:
+        "It will no longer be offered by any provider. Existing bookings are not affected.",
+      confirmText: "Make unbookable",
+      cancelText: "Cancel",
+    })
+    if (!confirmed) return
+    saveMutation.mutate({
+      provider_ids: [],
+      default_duration_minutes: durationMinutes,
+    })
   }
 
   return (
@@ -176,7 +195,7 @@ const ProductAppointmentConfigWidget = ({
         )}
       </Container>
 
-      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+      <Drawer open={drawerOpen} onOpenChange={handleDrawerOpenChange}>
         <Drawer.Content>
           <Drawer.Header>
             <Drawer.Title>
@@ -227,7 +246,7 @@ const ProductAppointmentConfigWidget = ({
           </Drawer.Body>
           <Drawer.Footer>
             <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setDrawerOpen(false)}>
+              <Button variant="secondary" onClick={() => handleDrawerOpenChange(false)}>
                 Cancel
               </Button>
               <Button

@@ -4,6 +4,7 @@ import { Table, Text } from "@medusajs/ui"
 import LineItemOptions from "@modules/common/components/line-item-options"
 import LineItemRentalDates from "@modules/common/components/line-item-rental-dates"
 import LineItemSeatInfo from "@modules/common/components/line-item-seat-info"
+import LineItemAppointmentInfo from "@modules/common/components/line-item-appointment-info"
 import LineItemPrice from "@modules/common/components/line-item-price"
 import LineItemUnitPrice from "@modules/common/components/line-item-unit-price"
 import Thumbnail from "@modules/products/components/thumbnail"
@@ -24,12 +25,12 @@ const Item = ({ item }: ItemProps) => {
         <Table.Cell className="!pl-0 p-4 w-24" />
         <Table.Cell className="text-left">
           <Text
-            className="txt-medium-plus text-ui-fg-base"
+            className="font-bold text-ink"
             data-testid="product-name"
           >
             Security Deposit
           </Text>
-          <Text className="txt-small text-ui-fg-subtle">
+          <Text className="text-sm text-muted">
             Refundable, held separately from the rental fee.
           </Text>
         </Table.Cell>
@@ -52,7 +53,7 @@ const Item = ({ item }: ItemProps) => {
 
       <Table.Cell className="text-left">
         <Text
-          className="txt-medium-plus text-ui-fg-base"
+          className="font-bold text-ink"
           data-testid="product-name"
         >
           {item.title}
@@ -68,12 +69,16 @@ const Item = ({ item }: ItemProps) => {
           metadata={item.metadata}
           data-testid="product-seat-info"
         />
+        <LineItemAppointmentInfo
+          metadata={item.metadata}
+          data-testid="product-appointment-info"
+        />
       </Table.Cell>
 
       <Table.Cell className="!pr-0">
         <span className="!pr-0 flex flex-col items-end h-full justify-center">
           <span className="flex gap-x-1 ">
-            <Text className="text-ui-fg-muted">
+            <Text className="text-muted">
               <span data-testid="product-quantity">{item.quantity}</span>x{" "}
             </Text>
             <LineItemUnitPrice item={item} style="tight" />

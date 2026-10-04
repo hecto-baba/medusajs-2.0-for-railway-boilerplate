@@ -1,4 +1,4 @@
-import { SalesChannelDetail } from "@modules/settings"
+import { SalesChannelDetail } from "@modules/settings/components/sales-channels/sales-channel-detail"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Sales Channel Details" }

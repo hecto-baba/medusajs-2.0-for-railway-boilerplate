@@ -1,4 +1,4 @@
-import { CampaignForm } from "@modules/campaigns"
+import { CampaignForm } from "@modules/campaigns/components/campaign-form"
 import { Metadata } from "next"
 
 export const metadata: Metadata = {

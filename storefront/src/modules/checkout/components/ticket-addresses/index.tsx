@@ -46,11 +46,11 @@ const TicketAddresses = ({
   }
 
   return (
-    <div className="bg-white">
+    <div className="rounded-large bg-card p-5 shadow-lift small:p-6">
       <div className="flex flex-row items-center justify-between mb-6">
         <Heading
           level="h2"
-          className="flex flex-row text-3xl-regular gap-x-2 items-baseline"
+          className="flex flex-row font-display text-2xl font-extrabold tracking-tight gap-x-2 items-baseline"
         >
           Billing Address
           {!isOpen && <CheckCircleSolid />}
@@ -59,7 +59,7 @@ const TicketAddresses = ({
           <Text>
             <button
               onClick={handleEdit}
-              className="text-ui-fg-interactive hover:text-ui-fg-interactive-hover"
+              className="text-brand hover:underline"
               data-testid="edit-ticket-address-button"
             >
               Edit
@@ -76,8 +76,8 @@ const TicketAddresses = ({
 
           <div className="pb-8">
             <Text className="txt-medium-plus text-ui-fg-subtle mb-6">
-              Your tickets are sent by email, so we only need your billing
-              details.
+              Your tickets and booking confirmations are sent by email, so we
+              only need your billing details.
             </Text>
 
             <BillingAddress cart={cart} />
@@ -96,7 +96,8 @@ const TicketAddresses = ({
                 data-testid="ticket-email-input"
               />
               <Text className="txt-small text-ui-fg-subtle mt-2">
-                We will send your tickets to this address.
+                We will send your tickets or booking confirmation to this
+                address.
               </Text>
             </div>
 

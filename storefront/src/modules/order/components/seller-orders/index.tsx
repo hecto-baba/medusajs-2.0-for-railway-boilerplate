@@ -1,13 +1,22 @@
-import { Heading, Text } from "@medusajs/ui"
-
 import type { SellerOrder } from "@lib/data/orders"
 import { convertToLocale } from "@lib/util/money"
+import Chip from "@modules/common/components/chip"
 
 const STATUS_LABEL: Record<SellerOrder["fulfillment_status"], string> = {
   not_fulfilled: "Being prepared",
   fulfilled: "Packed",
   shipped: "Shipped",
   delivered: "Delivered",
+}
+
+const STATUS_TONE: Record<
+  SellerOrder["fulfillment_status"],
+  "success" | "pop" | "muted"
+> = {
+  not_fulfilled: "muted",
+  fulfilled: "pop",
+  shipped: "pop",
+  delivered: "success",
 }
 
 type SellerOrdersProps = {
@@ -22,38 +31,43 @@ const SellerOrders = ({ sellerOrders }: SellerOrdersProps) => {
   }
 
   return (
-    <div data-testid="seller-orders">
-      <Heading level="h2" className="flex flex-row text-3xl-regular my-6">
+    <div
+      className="rounded-large bg-card p-5 shadow-lift"
+      data-testid="seller-orders"
+    >
+      <h2 className="font-display text-xl font-extrabold tracking-tight mb-4">
         Shipped by
-      </Heading>
-      <div className="flex flex-col gap-y-4">
+      </h2>
+      <div className="flex flex-col gap-y-3">
         {sellerOrders.map((sellerOrder) => (
           <div
             key={sellerOrder.id}
-            className="border border-ui-border-base rounded-rounded p-4"
+            className="rounded-[12px] border border-line bg-canvas p-4"
             data-testid="seller-order"
           >
-            <div className="flex items-center justify-between mb-2">
-              <Text className="txt-medium-plus text-ui-fg-base">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="font-bold text-ink">
                 {sellerOrder.seller.name ?? "Seller"}
-              </Text>
-              <Text className="txt-medium text-ui-fg-subtle" data-testid="seller-order-status">
-                {STATUS_LABEL[sellerOrder.fulfillment_status]}
-              </Text>
+              </span>
+              <span data-testid="seller-order-status">
+                <Chip tone={STATUS_TONE[sellerOrder.fulfillment_status]}>
+                  {STATUS_LABEL[sellerOrder.fulfillment_status]}
+                </Chip>
+              </span>
             </div>
             <ul className="flex flex-col gap-y-1">
               {sellerOrder.items.map((item, index) => (
-                <li key={`${item.title}-${index}`} className="txt-medium text-ui-fg-subtle">
+                <li key={`${item.title}-${index}`} className="text-sm text-muted">
                   {item.quantity} x {item.title}
                 </li>
               ))}
             </ul>
-            <Text className="txt-medium text-ui-fg-subtle mt-2">
+            <p className="mt-2 text-sm font-bold">
               {convertToLocale({
                 amount: sellerOrder.total,
                 currency_code: sellerOrder.currency_code,
               })}
-            </Text>
+            </p>
           </div>
         ))}
       </div>

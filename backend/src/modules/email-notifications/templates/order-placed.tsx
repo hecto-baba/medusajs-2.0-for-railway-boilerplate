@@ -46,8 +46,8 @@ const formatAmount = (amount: unknown, currencyCode?: string): string => {
  * Quantities come back as BigNumber objects, not numbers.
  *
  * React refuses to render an object child, so printing one raw threw
- * "Objects are not valid as a React child (found: 1)" from inside the Resend
- * SDK, which failed the whole email rather than just that cell. Amounts were
+ * "Objects are not valid as a React child (found: 1)" while the
+ * email was rendered, which failed the whole email rather than just that cell. Amounts were
  * already coerced by formatAmount above; the quantity was the one value still
  * being handed to React untouched.
  */

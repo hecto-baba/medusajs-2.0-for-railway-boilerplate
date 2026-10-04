@@ -555,7 +555,18 @@ export async function placeOrder() {
       await revalidateCacheTag("orders")
       return cartRes
     })
-    .catch(medusaError)
+    // Returned, not thrown. Next replaces the message of anything a server
+    // action throws with a generic "Server Components render" error in
+    // production, so the shopper never learned why the order failed.
+    .catch((e: any) => {
+      try {
+        medusaError(e)
+      } catch (err: any) {
+        return { error: (err?.message as string) || "Could not place the order." }
+      }
+    })
+
+  if (cartRes && "error" in cartRes) return { error: cartRes.error as string }
 
   if (cartRes?.type === "order") {
     // Ticket orders have no shipping address at all, so the billing address is
@@ -600,7 +611,7 @@ export async function placeOrder() {
     }
   }
 
-  return cartRes.cart
+  return { cart: cartRes?.cart }
 }
 
 /**

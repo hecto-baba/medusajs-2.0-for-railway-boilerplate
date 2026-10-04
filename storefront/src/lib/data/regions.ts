@@ -2,7 +2,7 @@ import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
 import { cache } from "react"
 import { HttpTypes } from "@medusajs/types"
-import { getCacheDirectives } from "./cookies"
+import { getSharedCacheDirectives } from "./cookies"
 
 /**
  * Reads go through sdk.client.fetch rather than the sdk.store.* helpers.
@@ -22,7 +22,7 @@ export const listRegions = cache(async function () {
   return sdk.client
     .fetch<HttpTypes.StoreRegionListResponse>("/store/regions", {
       method: "GET",
-      ...(await getCacheDirectives("regions")),
+      ...getSharedCacheDirectives("regions"),
     })
     .then(({ regions }) => regions)
     .catch(medusaError)
@@ -32,7 +32,7 @@ export const retrieveRegion = cache(async function (id: string) {
   return sdk.client
     .fetch<HttpTypes.StoreRegionResponse>(`/store/regions/${id}`, {
       method: "GET",
-      ...(await getCacheDirectives("regions")),
+      ...getSharedCacheDirectives("regions"),
     })
     .then(({ region }) => region)
     .catch(medusaError)
