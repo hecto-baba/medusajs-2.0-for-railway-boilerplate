@@ -753,17 +753,22 @@ export default defineMiddlewares({
       matcher: "/store/products",
       middlewares: [
         (req: any, res: any, next: any) => {
+          // A link relation named with no sub-field ("variants.digital_product",
+          // "+variants.digital_product", "*variants.digital_product") selects
+          // nothing, so the variant comes back without its digital_product.
+          // Ask for its id, which is all the storefront needs to tell a
+          // product is digital.
+          const fixDigitalField = (f: any) =>
+            typeof f === "string"
+              ? f.replace(/[*+]?variants\.digital_product(\.\*)?(?=,|$)/g, "+variants.digital_product.id")
+              : f
           if (typeof req.query?.fields === "string") {
-            req.query.fields = req.query.fields.replace(/\*variants\.digital_product(\.\*)?/g, "+variants.digital_product");
+            req.query.fields = fixDigitalField(req.query.fields);
           } else if (Array.isArray(req.query?.fields)) {
-            req.query.fields = req.query.fields.map((f: any) =>
-              typeof f === "string" ? f.replace(/\*variants\.digital_product(\.\*)?/g, "+variants.digital_product") : f
-            );
+            req.query.fields = req.query.fields.map(fixDigitalField);
           }
           if (req.queryConfig?.fields && Array.isArray(req.queryConfig.fields)) {
-            req.queryConfig.fields = req.queryConfig.fields.map((f: any) =>
-              typeof f === "string" ? f.replace(/\*variants\.digital_product(\.\*)?/g, "+variants.digital_product") : f
-            );
+            req.queryConfig.fields = req.queryConfig.fields.map(fixDigitalField);
           }
           next();
         },

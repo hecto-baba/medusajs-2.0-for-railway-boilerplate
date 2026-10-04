@@ -254,7 +254,7 @@ export const catalogue = async (
   ).json()
   const regionId = regions.regions?.[0]?.id
   const res = await request.get(
-    `${apiBase}/store/products?limit=200&region_id=${regionId}&fields=id,handle,title,thumbnail,metadata,*variants.calculated_price,+variants.inventory_quantity,+variants.digital_product,+variants.eoi_configuration.*,+rental_configuration.*,+enquiry_configuration.*`,
+    `${apiBase}/store/products?limit=200&region_id=${regionId}&fields=id,handle,title,thumbnail,metadata,*variants.calculated_price,+variants.inventory_quantity,+variants.digital_product.id,+variants.eoi_configuration.*,+rental_configuration.*,+enquiry_configuration.*`,
     { headers }
   )
   return (await res.json()).products ?? []
