@@ -27,7 +27,7 @@ const ImageGallery = ({ images }: ImageGalleryProps) => {
     >
       {gallery.length > 1 && (
         <ul
-          className="no-scrollbar flex gap-2.5 overflow-x-auto small:max-h-[560px] small:w-[76px] small:shrink-0 small:flex-col small:overflow-y-auto small:overflow-x-visible"
+          className="no-scrollbar flex gap-2.5 overflow-x-auto small:max-h-[420px] small:w-[76px] small:shrink-0 small:flex-col small:overflow-y-auto small:overflow-x-visible"
           aria-label="Product images"
         >
           {gallery.map((image, index) => (
@@ -58,7 +58,16 @@ const ImageGallery = ({ images }: ImageGalleryProps) => {
         </ul>
       )}
 
-      <div className="relative aspect-[1/0.92] min-w-0 flex-1 overflow-hidden rounded-[22px] bg-card shadow-lift">
+      <div
+        className={clx(
+          "relative min-w-0 flex-1 overflow-hidden rounded-[22px] bg-card shadow-lift",
+          // Capped so the picture never pushes the buy box below the fold. A
+          // product with no image gets a short strip, not an empty square.
+          active
+            ? "aspect-[1/0.8] small:max-h-[420px]"
+            : "aspect-[1/0.35] small:max-h-[180px]"
+        )}
+      >
         {active ? (
           <Image
             key={active.id}

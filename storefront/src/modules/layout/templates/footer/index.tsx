@@ -3,7 +3,6 @@ import { getCollectionsList } from "@lib/data/collections"
 import { getStoreName } from "@lib/util/env"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import { BoltIcon } from "@modules/common/icons/ui-icons"
 import MedusaCTA from "@modules/layout/components/medusa-cta"
 import ThemeToggle from "@modules/layout/components/theme-toggle"
 
@@ -24,11 +23,6 @@ export default async function Footer() {
               href="/"
               className="flex items-center gap-1 font-display text-2xl font-extrabold tracking-tight text-brand"
             >
-              <BoltIcon
-                size={22}
-                className="shrink-0 fill-pop stroke-brand"
-                strokeWidth={1.5}
-              />
               {getStoreName()}
             </LocalizedClientLink>
             <p className="mt-3 text-sm text-muted">

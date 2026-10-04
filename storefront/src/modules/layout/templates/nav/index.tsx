@@ -1,12 +1,8 @@
 import { listCategories } from "@lib/data/categories"
 import { getCustomer } from "@lib/data/customer"
-import { listRegions } from "@lib/data/regions"
-import { getDeliveryEta, getStoreName, isSearchEnabled } from "@lib/util/env"
-import { StoreRegion } from "@medusajs/types"
+import { getStoreName, isSearchEnabled } from "@lib/util/env"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import {
-  BoltIcon,
-  PinIcon,
   SearchIcon,
   UserIcon,
 } from "@modules/common/icons/ui-icons"
@@ -15,23 +11,12 @@ import CategoryNav, {
   NavCategory,
   NavVerticalLink,
 } from "@modules/layout/components/category-nav"
-import SideMenu from "@modules/layout/components/side-menu"
 
 export default async function Nav({ countryCode }: { countryCode?: string }) {
-  const [regions, customer, categories] = await Promise.all([
-    listRegions().then((regions: StoreRegion[]) => regions),
+  const [customer, categories] = await Promise.all([
     getCustomer().catch(() => null),
     listCategories().catch(() => []),
   ])
-
-  const eta = getDeliveryEta()
-  const country = regions
-    ?.flatMap((region) => region.countries ?? [])
-    .find((c) => c.iso_2 === countryCode)?.display_name
-
-  const address =
-    customer?.addresses?.find((a) => a.is_default_shipping) ??
-    customer?.addresses?.[0]
 
   const navCategories: NavCategory[] = (categories ?? [])
     .filter((c) => !c.parent_category_id)
@@ -70,61 +55,22 @@ export default async function Nav({ countryCode }: { countryCode?: string }) {
       : []),
   ]
 
-  const locationText = address
-    ? [address.address_name || "Home", address.city].filter(Boolean).join(" · ")
-    : country
-
   return (
     <div className="sticky top-0 inset-x-0 z-50">
       <header className="relative border-b border-line bg-card text-ink">
         <div className="content-container">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 small:flex-nowrap small:gap-x-5">
             <div className="flex items-center gap-1">
-              <SideMenu
-                regions={regions}
-                customerInfo={
-                  customer
-                    ? {
-                        first_name: customer.first_name,
-                        email: customer.email,
-                      }
-                    : null
-                }
-              />
               <LocalizedClientLink
                 href="/"
                 className="flex min-w-0 items-center gap-1 font-display text-2xl font-extrabold tracking-tight text-brand"
                 data-testid="nav-store-link"
               >
-                <BoltIcon
-                  size={22}
-                  className="shrink-0 fill-pop stroke-brand"
-                  strokeWidth={1.5}
-                />
                 <span className="max-w-[4.5rem] truncate xsmall:max-w-[10rem] small:max-w-[14rem]">
                   {getStoreName()}
                 </span>
               </LocalizedClientLink>
             </div>
-
-            {(eta || locationText) && (
-              <div
-                className="order-3 hidden min-w-0 items-center gap-2.5 small:order-none small:flex"
-                data-testid="nav-delivery-chip"
-              >
-                <PinIcon size={20} className="shrink-0 text-ink" />
-                <span className="min-w-0 leading-tight">
-                  <b className="block font-display text-base">
-                    {eta ? `Delivery in ${eta}` : "Delivering to"}
-                  </b>
-                  {locationText && (
-                    <small className="block max-w-[13rem] truncate text-xs text-muted">
-                      {locationText}
-                    </small>
-                  )}
-                </span>
-              </div>
-            )}
 
             {isSearchEnabled() && (
               <LocalizedClientLink

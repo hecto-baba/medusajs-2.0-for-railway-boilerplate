@@ -41,7 +41,7 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
             { label: product.title },
           ]}
         />
-        <div className="grid items-start gap-8 small:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] small:gap-10">
+        <div className="grid items-start gap-8 small:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)] small:gap-10">
           <ImageGallery images={product?.images || []} />
           <div className="flex min-w-0 flex-col gap-y-6 small:sticky small:top-40">
             <ProductInfo product={product} />
