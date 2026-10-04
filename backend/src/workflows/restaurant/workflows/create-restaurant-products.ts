@@ -12,9 +12,21 @@ type WorkflowInput = {
 export const createRestaurantProductsWorkflow = createWorkflow(
   "create-restaurant-products-workflow",
   function (input: WorkflowInput) {
+    // Dishes are made to order, not counted in a warehouse. Leaving inventory
+    // management on makes add-to-cart fail with "Sales channel ... is not
+    // associated with any stock location" unless stock is set up per variant.
+    const productsInput = transform({ input }, (data) =>
+      data.input.products.map((product) => ({
+        ...product,
+        variants: product.variants?.map((variant) => ({
+          ...variant,
+          manage_inventory: false,
+        })),
+      }))
+    )
     const products = createProductsWorkflow.runAsStep({
       input: {
-        products: input.products,
+        products: productsInput,
       },
     })
     const links = transform({ products, input }, (data) =>

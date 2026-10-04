@@ -16,6 +16,7 @@ import {
   setSaveAddressChoice,
 } from "./cookies"
 import compareAddresses from "@lib/util/compare-addresses"
+import type { CartConflict, CartResult } from "@lib/util/cart-conflict"
 import { getCustomer } from "./customer"
 import { getProductsById } from "./products"
 import { getRegion } from "./regions"
@@ -103,19 +104,43 @@ export async function updateCart(data: HttpTypes.StoreUpdateCart) {
     .catch(medusaError)
 }
 
-export async function addToCart({
-  variantId,
-  quantity,
-  countryCode,
-  metadata,
-  isDigital,
-}: {
+type AddToCartInput = {
   variantId: string
   quantity: number
   countryCode: string
   metadata?: Record<string, any>
   isDigital?: boolean
-}) {
+}
+
+// Messages here are shown to shoppers, so they must not carry ids or backend
+// detail. The real error is already logged by medusaError / the catch below.
+const friendlyAddError = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : ""
+  if (/stock location|inventory|out of stock/i.test(message)) {
+    return "This item is currently unavailable."
+  }
+  if (/could not reach the store/i.test(message)) {
+    return "Could not reach the store. Please try again."
+  }
+  return "We couldn't add this item to your cart. Please try again."
+}
+
+export async function addToCart(input: AddToCartInput): Promise<CartResult> {
+  try {
+    return await addToCartOrThrow(input)
+  } catch (error) {
+    console.error("addToCart failed:", error)
+    return { error: friendlyAddError(error) }
+  }
+}
+
+async function addToCartOrThrow({
+  variantId,
+  quantity,
+  countryCode,
+  metadata,
+  isDigital,
+}: AddToCartInput): Promise<CartConflict | void> {
   if (!variantId) {
     throw new Error("Missing variant ID when adding to cart")
   }
@@ -133,17 +158,20 @@ export async function addToCart({
   if (metadata?.restaurant_id) {
     // Attempting to add a restaurant food dish
     if (hasRetailItems) {
-      throw new Error(
-        "CONFLICT_RETAIL_EXISTS: Your cart contains standard store products. Food delivery orders cannot be combined with standard retail merchandise."
-      )
+      return {
+        conflict: "CONFLICT_RETAIL_EXISTS",
+        message:
+          "Your cart contains standard store products. Food delivery orders cannot be combined with standard retail merchandise.",
+      }
     }
 
     if (existingRestaurantId && existingRestaurantId !== metadata.restaurant_id) {
-      throw new Error(
-        `CONFLICT_RESTAURANT_EXISTS: Your cart already contains items from ${
+      return {
+        conflict: "CONFLICT_RESTAURANT_EXISTS",
+        message: `Your cart already contains items from ${
           cart.metadata?.restaurant_name || "another restaurant"
-        }. Orders can only be placed from one restaurant at a time.`
-      )
+        }. Orders can only be placed from one restaurant at a time.`,
+      }
     }
 
     if (!existingRestaurantId) {
@@ -163,9 +191,11 @@ export async function addToCart({
   } else {
     // Attempting to add a standard store product
     if (hasRestaurantItems || existingRestaurantId) {
-      throw new Error(
-        "CONFLICT_FOOD_EXISTS: Your cart contains food items from a restaurant. Standard retail products cannot be combined with restaurant food delivery orders."
-      )
+      return {
+        conflict: "CONFLICT_FOOD_EXISTS",
+        message:
+          "Your cart contains food items from a restaurant. Standard retail products cannot be combined with restaurant food delivery orders.",
+      }
     }
   }
 
@@ -306,8 +336,13 @@ export async function clearCartAndAdd({
   quantity: number
   countryCode: string
   metadata?: Record<string, any>
-}) {
-  await clearCart()
+}): Promise<CartResult> {
+  try {
+    await clearCart()
+  } catch (error) {
+    console.error("clearCart failed:", error)
+    return { error: "We couldn't clear your cart. Please try again." }
+  }
   return await addToCart({
     variantId,
     quantity,

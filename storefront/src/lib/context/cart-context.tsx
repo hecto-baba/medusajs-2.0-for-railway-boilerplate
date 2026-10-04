@@ -21,6 +21,7 @@ import {
   deleteLineItem,
   updateLineItem,
 } from "@lib/data/cart"
+import { isCartConflict, isCartFailure } from "@lib/util/cart-conflict"
 import { isAppointmentLineItem } from "types/appointment"
 import { isTicketLineItem } from "types/ticket"
 
@@ -153,6 +154,15 @@ export const CartProvider = ({
       setPendingAdds((n) => n + quantity)
       setDrawerOpen(true)
       promise
+        .then((result) => {
+          if (isCartConflict(result)) {
+            setDrawerOpen(false)
+            showNotice(result.message)
+          } else if (isCartFailure(result)) {
+            setDrawerOpen(false)
+            showNotice(result.error)
+          }
+        })
         .catch((error) => {
           setDrawerOpen(false)
           showNotice(messageOf(error))
@@ -183,17 +193,14 @@ export const CartProvider = ({
           setOptimistic(change)
         }
         try {
-          await action()
-        } catch (error) {
-          const message = messageOf(error)
-          if (message.includes("CONFLICT_")) {
-            setConflict({
-              variantId: key,
-              message: message.replace(/^.*?CONFLICT_[A-Z_]+:\s*/, ""),
-            })
-          } else {
-            showNotice(message)
+          const result = await action()
+          if (isCartConflict(result)) {
+            setConflict({ variantId: key, message: result.message })
+          } else if (isCartFailure(result)) {
+            showNotice(result.error)
           }
+        } catch (error) {
+          showNotice(messageOf(error))
         } finally {
           setPending((p) => {
             const next = { ...p }
