@@ -3793,3 +3793,94 @@ export const listVendorPayouts = (params?: {
     count: number
     totals: Record<string, { owed: number; paid: number; void: number; refunded: number }>
   }>("payouts", params || {})
+
+/* ---------------------------------------------------------------- enquiry */
+
+export type VendorEnquiryFieldType =
+  | "text"
+  | "long_text"
+  | "email"
+  | "phone"
+  | "number"
+  | "dropdown"
+  | "radio"
+  | "checkbox"
+
+export type VendorEnquiryFieldDefinition = {
+  id: string
+  type: VendorEnquiryFieldType
+  label: string
+  required: boolean
+  order: number
+  options?: string[]
+}
+
+export type VendorEnquiryConfig = {
+  id: string
+  product_id: string
+  status: "active" | "inactive"
+  custom_fields: VendorEnquiryFieldDefinition[] | null
+}
+
+export type VendorEnquiryStatus = "pending" | "responded" | "closed"
+
+export type VendorEnquiry = {
+  id: string
+  product_id: string
+  product?: { title?: string | null } | null
+  customer_email: string
+  message: string
+  reply: string | null
+  status: VendorEnquiryStatus
+  responded_at: string | null
+  created_at: string
+  // Only on the per-product and single-enquiry reads, not on the queue list.
+  custom_field_answers?: Record<string, string | string[]> | null
+  custom_fields_snapshot?: VendorEnquiryFieldDefinition[] | null
+}
+
+export const getVendorEnquiryConfig = (productId: string) =>
+  request<{ enquiry_config: VendorEnquiryConfig | null }>(
+    "products/" + productId + "/enquiry-config",
+    {}
+  )
+
+export const upsertVendorEnquiryConfig = (
+  productId: string,
+  body: {
+    status?: "active" | "inactive"
+    custom_fields?: VendorEnquiryFieldDefinition[]
+  }
+) =>
+  mutate<{ enquiry_config: VendorEnquiryConfig }>(
+    "products/" + productId + "/enquiry-config",
+    "POST",
+    body
+  )
+
+export const listVendorProductEnquiries = (productId: string) =>
+  request<{ enquiries: VendorEnquiry[]; count: number }>(
+    "products/" + productId + "/enquiries",
+    {}
+  )
+
+export const listVendorEnquiries = (params: {
+  limit?: number
+  offset?: number
+  status?: VendorEnquiryStatus
+}) =>
+  request<ListResponse<{ enquiries: VendorEnquiry[] }>>(
+    "enquiries",
+    params as Record<string, string | number | undefined>
+  )
+
+export const getVendorEnquiry = (id: string) =>
+  request<{ enquiry: VendorEnquiry }>("enquiries/" + id, {})
+
+export const replyToVendorEnquiry = (id: string, reply: string) =>
+  mutate<{ enquiry: VendorEnquiry }>("enquiries/" + id, "POST", { reply })
+
+export const closeVendorEnquiry = (id: string) =>
+  mutate<{ enquiry: VendorEnquiry }>("enquiries/" + id + "/status", "POST", {
+    status: "closed",
+  })

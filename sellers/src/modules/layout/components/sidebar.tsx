@@ -5,6 +5,7 @@ import {
   BuildingStorefront,
   Calendar,
   ChevronDownMini,
+  ChatBubbleLeftRight,
   CogSixTooth,
   CurrencyDollar,
   ReceiptPercent,
@@ -67,6 +68,8 @@ const NAV_ITEMS: NavItem[] = [
     icon: Users,
     items: [{ href: "/customers/groups", label: "Customer Groups" }],
   },
+  // Enquiries hang off products, so they follow the Products capability.
+  { href: "/enquiries", label: "Enquiries", icon: ChatBubbleLeftRight },
   { href: "/pricing", label: "Price Lists", icon: CurrencyDollar },
   {
     href: "/promotions",
@@ -122,6 +125,7 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
     const filtered = NAV_ITEMS.filter((item) => {
       if (item.href === "/orders" && !capabilities.hasOrders) return false
       if (item.href === "/products" && !capabilities.hasProducts) return false
+      if (item.href === "/enquiries" && !capabilities.hasProducts) return false
       if (item.href === "/inventory" && !capabilities.hasInventory) return false
       if (item.href === "/pricing" && !capabilities.hasPricing) return false
       if (item.href === "/promotions" && !capabilities.hasPromotions) return false

@@ -155,5 +155,8 @@ export function isRouteAllowed(
   if (pathname.startsWith("/products") && !capabilities.hasProducts) {
     return false
   }
+  if (pathname.startsWith("/enquiries") && !capabilities.hasProducts) {
+    return false
+  }
   return true
 }

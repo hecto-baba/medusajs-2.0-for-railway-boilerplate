@@ -21,7 +21,7 @@ export const getProductsById = cache(async function ({
       query: {
         id: ids,
         region_id: regionId,
-        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,+variants.digital_product",
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,+variants.digital_product,+enquiry_configuration.*",
       },
       ...(await getCacheDirectives("products")),
     })

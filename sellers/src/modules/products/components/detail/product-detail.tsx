@@ -24,6 +24,7 @@ import { OptionsSection } from "./options-section"
 import { RentalSection } from "./rental-section"
 import { EoiSection } from "./eoi-section"
 import { AppointmentSection } from "./appointment-section"
+import { EnquirySection } from "./enquiry-section"
 import { VariantsSection } from "./variants-section"
 
 /**
@@ -88,6 +89,9 @@ export const ProductDetail = ({ id }: { id: string }) => {
             </LayoutComposer.Entry>
             <LayoutComposer.Entry id="ProductAppointmentSection">
               <AppointmentSection product={product} />
+            </LayoutComposer.Entry>
+            <LayoutComposer.Entry id="ProductEnquirySection">
+              <EnquirySection product={product} />
             </LayoutComposer.Entry>
           </>
         ),

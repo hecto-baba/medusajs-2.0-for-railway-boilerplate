@@ -4,6 +4,7 @@ import { getTicketProductAvailability } from "@lib/data/tickets"
 import { HttpTypes } from "@medusajs/types"
 import BookingPanel from "@modules/appointments/components/booking-panel"
 import ProductActions from "@modules/products/components/product-actions"
+import EnquiryForm, { EnquiryField } from "@modules/products/components/enquiry-form"
 import SeatSelector from "@modules/products/components/seat-selector"
 import { Text } from "@medusajs/ui"
 
@@ -78,6 +79,24 @@ export default async function ProductActionsWrapper({
           There are no times available for this service at the moment. Please check back soon.
         </Text>
       </div>
+    )
+  }
+
+  // A product with enquiries on is enquiry-only: the backend refuses it in a
+  // cart, so show the question form instead of Add to Cart. (Placed after the
+  // ticket and appointment branches; a product uses only one sale mode.)
+  const enquiryConfig = (product as any).enquiry_configuration as
+    | { status?: string; custom_fields?: EnquiryField[] | null }
+    | null
+    | undefined
+
+  if (enquiryConfig?.status === "active") {
+    return (
+      <EnquiryForm
+        productId={product.id}
+        productTitle={product.title}
+        fields={enquiryConfig.custom_fields ?? []}
+      />
     )
   }
 
