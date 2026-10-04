@@ -37,7 +37,7 @@ export const isInviteUserData = (data: any): data is InviteUserEmailProps =>
 /**
  * The InviteUserEmail template component built with react-email
  */
-export const InviteUserEmail: React.FC<InviteUserEmailProps> = ({
+export const InviteUserEmail: React.FC<InviteUserEmailProps> & { PreviewProps?: InviteUserEmailProps } = ({
   inviteLink,
   storeName = process.env.STORE_NAME || 'your store',
   preview = `You've been invited to join ${process.env.STORE_NAME || 'your store'} as an administrator`,
