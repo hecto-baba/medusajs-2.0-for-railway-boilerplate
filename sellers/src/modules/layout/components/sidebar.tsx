@@ -29,7 +29,6 @@ import {
 } from "../layout-composer"
 import { Searchbar } from "../search"
 import { useVendorOnboardingStatus } from "@modules/onboarding"
-import { getVendorCapabilities } from "@lib/permissions/feature-access"
 
 type NavItem = {
   href: string
@@ -143,12 +142,6 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
   const pathname = usePathname()
   const { data: onboarding } = useVendorOnboardingStatus()
 
-  const capabilities = useMemo(
-    () => getVendorCapabilities(onboarding),
-    [onboarding]
-  )
-
-  // Filter navigation items dynamically based on vendor segment & type capabilities
   const visibleNavItems = useMemo(() => {
     const isApproved = onboarding?.status === "APPROVED"
 
@@ -163,23 +156,8 @@ export const Sidebar = ({ storeName, email, name }: SidebarProps) => {
       ]
     }
 
-    const filtered = NAV_ITEMS.filter((item) => {
-      if (item.href === "/orders" && !capabilities.hasOrders) return false
-      if (item.href === "/products" && !capabilities.hasProducts) return false
-      if (item.href === "/enquiries" && !capabilities.hasProducts) return false
-      if (item.href === "/inventory" && !capabilities.hasInventory) return false
-      if (item.href === "/pricing" && !capabilities.hasPricing) return false
-      if (item.href === "/promotions" && !capabilities.hasPromotions) return false
-      if (item.href === "/venues" && !capabilities.hasVenues) return false
-      if (item.href === "/shows" && !capabilities.hasShows) return false
-      if (item.href === "/b2b" && !capabilities.hasB2B) return false
-      if (item.href === "/restaurants" && !capabilities.hasRestaurants) return false
-      if (item.href === "/digital-products" && !capabilities.hasDigitalProducts) return false
-      return true
-    })
-
-    return filtered
-  }, [capabilities, onboarding])
+    return NAV_ITEMS
+  }, [onboarding])
 
   const verticalLabel = onboarding?.segment?.name || null
   const vendorTypeLabel = onboarding?.vendorType?.code || null
