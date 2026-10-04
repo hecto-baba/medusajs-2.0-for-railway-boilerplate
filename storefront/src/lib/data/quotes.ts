@@ -120,14 +120,37 @@ export const previewQuote = async (quoteId: string) => {
   }
 }
 
-export const acceptQuote = async (quoteId: string) => {
+/**
+ * Accepts a quote. A quote with goods to deliver and no address needs one with
+ * the acceptance: it turns into an order here, without passing through
+ * checkout, so this is the only point the buyer can still be asked.
+ */
+export type QuoteDeliveryAddress = {
+  first_name: string
+  last_name?: string
+  company?: string
+  address_1: string
+  address_2?: string
+  city: string
+  postal_code: string
+  province?: string
+  country_code: string
+  phone?: string
+}
+
+export const acceptQuote = async (
+  quoteId: string,
+  shippingAddress?: QuoteDeliveryAddress
+) => {
   const headers = await getAuthHeaders()
+  const body = shippingAddress ? { shipping_address: shippingAddress } : undefined
   try {
     const res = await sdk.client.fetch<any>(
       `/store/quotes/${quoteId}/accept`,
       {
         method: "POST",
         headers,
+        body,
       }
     )
     revalidatePath("/[countryCode]/account/quotes", "page")
@@ -140,6 +163,7 @@ export const acceptQuote = async (quoteId: string) => {
         {
           method: "POST",
           headers,
+          body,
         }
       )
       revalidatePath("/[countryCode]/account/quotes", "page")

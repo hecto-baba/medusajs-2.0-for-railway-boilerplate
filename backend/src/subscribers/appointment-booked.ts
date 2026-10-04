@@ -1,8 +1,8 @@
-import { ContainerRegistrationKeys, Modules } from '@medusajs/framework/utils'
-import { INotificationModuleService } from '@medusajs/framework/types'
+import { ContainerRegistrationKeys } from '@medusajs/framework/utils'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
 import { EmailTemplates } from '../modules/email-notifications/templates'
-import { ZEPTOMAIL_FROM_EMAIL, STOREFRONT_URL } from '../lib/constants'
+import { STOREFRONT_URL } from '../lib/constants'
+import { sendEmail } from '../lib/send-email'
 import { APPOINTMENT_BOOKING_MODULE } from '../modules/appointment-booking'
 import type AppointmentBookingModuleService from '../modules/appointment-booking/service'
 import { signCancelToken } from '../modules/appointment-booking/lib/cancel-token'
@@ -28,7 +28,6 @@ export default async function appointmentBookedHandler({
     APPOINTMENT_BOOKING_MODULE
   )
   const query = container.resolve(ContainerRegistrationKeys.QUERY)
-  const notifications: INotificationModuleService = container.resolve(Modules.NOTIFICATION)
 
   const attendees = await service.listAppointmentAttendees(
     { order_id: data.order_id, status: 'confirmed', confirmation_sent_at: null },
@@ -79,7 +78,6 @@ export default async function appointmentBookedHandler({
   const vendorById = new Map((vendors as any[]).map((v) => [v.id, v]))
   const order = (orders as any[])[0]
 
-  const replyTo = process.env.ORDER_REPLY_TO_EMAIL || ZEPTOMAIL_FROM_EMAIL
   const sent: string[] = []
 
   // The storefront's routes are country-prefixed, so the link carries the
@@ -114,6 +112,7 @@ export default async function appointmentBookedHandler({
       order: { display_id: order?.display_id ?? data.order_id }
     }
 
+    let failed = false
     try {
       const buyerEmail = attendee.buyer_email ?? order?.email
       if (buyerEmail) {
@@ -121,21 +120,21 @@ export default async function appointmentBookedHandler({
           new Date(appointment.start_time).getTime() -
             resource.cancellation_window_hours * 3_600_000
         )
-        await notifications.createNotifications({
-          to: buyerEmail,
-          channel: 'email',
+        const result = await sendEmail(container, {
           template: EmailTemplates.APPOINTMENT_BOOKED,
+          to: buyerEmail,
+          subject: `Your appointment with ${vendor?.name ?? 'us'} is confirmed`,
+          idempotencyKey: `appointment-booked:${attendee.id}:buyer`,
+          resourceId: attendee.id,
+          resourceType: 'appointment_attendee',
           data: {
-            emailOptions: {
-              replyTo,
-              subject: `Your appointment with ${vendor?.name ?? 'us'} is confirmed`
-            },
             audience: 'buyer',
             ...base,
             cancelUrl: `${STOREFRONT_URL}/${countryCode}/appointments/booking/${attendee.id}?token=${signCancelToken(attendee.id)}`,
             cancelDeadline: deadline.toISOString()
           }
         })
+        if (result === 'failed') failed = true
       }
 
       const vendorEmails = ((vendor?.admins ?? []) as any[])
@@ -143,22 +142,22 @@ export default async function appointmentBookedHandler({
         .filter((e): e is string => !!e)
 
       for (const to of vendorEmails) {
-        await notifications.createNotifications({
-          to,
-          channel: 'email',
+        const result = await sendEmail(container, {
           template: EmailTemplates.APPOINTMENT_BOOKED,
-          data: {
-            emailOptions: {
-              replyTo,
-              subject: `New booking: ${base.appointment.service}`
-            },
-            audience: 'vendor',
-            ...base
-          }
+          to,
+          subject: `New booking: ${base.appointment.service}`,
+          idempotencyKey: `appointment-booked:${attendee.id}:vendor:${to}`,
+          resourceId: attendee.id,
+          resourceType: 'appointment_attendee',
+          data: { audience: 'vendor', ...base }
         })
+        if (result === 'failed') failed = true
       }
 
-      sent.push(attendee.id)
+      // Only a fully sent attendee is marked; a failed one is retried on
+      // redelivery, and the idempotency keys stop the emails that did go from
+      // being sent again.
+      if (!failed) sent.push(attendee.id)
     } catch (error) {
       // Leave the attendee unmarked so a redelivery can retry it.
       console.error('Error sending appointment confirmation notification:', error)

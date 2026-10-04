@@ -8,6 +8,7 @@ import { FulfillmentUpdateTemplate, FULFILLMENT_UPDATE, isFulfillmentUpdateTempl
 import { EnquiryRespondedTemplate, ENQUIRY_RESPONDED, isEnquiryRespondedTemplateData } from './enquiry-responded'
 import { AppointmentBookedTemplate, APPOINTMENT_BOOKED, isAppointmentBookedData } from './appointment-booked'
 import { AppointmentChangedTemplate, APPOINTMENT_CHANGED, isAppointmentChangedData } from './appointment-changed'
+import { NoticeTemplate, NOTICE_TEMPLATES, isNoticeData } from './notice'
 
 export const EmailTemplates = {
   INVITE_USER,
@@ -97,6 +98,15 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
       return <AppointmentChangedTemplate {...data} />
 
     default:
+      if ((NOTICE_TEMPLATES as readonly string[]).includes(templateKey)) {
+        if (!isNoticeData(data)) {
+          throw new MedusaError(
+            MedusaError.Types.INVALID_DATA,
+            `Invalid data for template "${templateKey}"`
+          )
+        }
+        return <NoticeTemplate {...data} />
+      }
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         `Unknown template key: "${templateKey}"`
@@ -104,4 +114,4 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
   }
 }
 
-export { InviteUserEmail, OrderPlacedTemplate, ResetPasswordEmail, TicketOrderPlacedTemplate, EnquiryRespondedTemplate, FulfillmentUpdateTemplate, AppointmentBookedTemplate, AppointmentChangedTemplate }
+export { InviteUserEmail, OrderPlacedTemplate, ResetPasswordEmail, TicketOrderPlacedTemplate, EnquiryRespondedTemplate, FulfillmentUpdateTemplate, AppointmentBookedTemplate, AppointmentChangedTemplate, NoticeTemplate }

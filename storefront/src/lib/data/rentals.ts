@@ -102,6 +102,7 @@ export async function addRentalToCart({
   rentalUnitsCount,
   pickupTime,
   returnTime,
+  fulfilment = "delivery",
 }: {
   variantId: string
   countryCode: string
@@ -112,6 +113,12 @@ export async function addRentalToCart({
   rentalUnitsCount: number
   pickupTime?: string | null
   returnTime?: string | null
+  /**
+   * "pickup" marks the rental, and its deposit, as needing no shipping so the
+   * cart asks for contact details instead of a delivery address. Anything else
+   * keeps the full address step.
+   */
+  fulfilment?: "pickup" | "delivery"
 }) {
   if (!variantId) {
     throw new Error("Missing variant ID when adding a rental to cart")
@@ -138,6 +145,7 @@ export async function addRentalToCart({
             rental_days: rentalDays,
             rental_unit: rentalUnit,
             rental_units_count: rentalUnitsCount,
+            rental_fulfilment: fulfilment,
             ...(pickupTime ? { rental_pickup_time: pickupTime } : {}),
             ...(returnTime ? { rental_return_time: returnTime } : {}),
           },

@@ -23,7 +23,7 @@ export const getProductsById = cache(async function ({
       query: {
         id: ids,
         region_id: regionId,
-        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,+variants.digital_product,+enquiry_configuration.*,+variants.eoi_configuration.*",
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,+variants.digital_product.id,+enquiry_configuration.*,+variants.eoi_configuration.*",
       },
       ...getSharedCacheDirectives("products", 60),
     })
@@ -42,7 +42,7 @@ export const getProductByHandle = cache(async function (
         region_id: regionId,
         // Same field set as getProductsById so the page does not need a second
         // /store/products?id= round trip just to learn enquiry/EOI config.
-        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,+variants.digital_product,+enquiry_configuration.*,+variants.eoi_configuration.*",
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,+variants.digital_product.id,+enquiry_configuration.*,+variants.eoi_configuration.*",
       },
       ...getSharedCacheDirectives("products", 60),
     })
@@ -80,7 +80,7 @@ export const getProductsList = cache(async function ({
         limit,
         offset,
         region_id: region.id,
-        fields: "*variants.calculated_price,+variants.inventory_quantity,+variants.digital_product,+rental_configuration.*,+enquiry_configuration.*",
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+variants.digital_product.id,+rental_configuration.*,+enquiry_configuration.*",
         ...queryParams,
       },
       ...getSharedCacheDirectives("products", 60),

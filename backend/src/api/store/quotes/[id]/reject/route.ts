@@ -1,6 +1,7 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { QUOTE_MODULE } from "../../../../../modules/quote"
 import { canAccessQuote } from "../../../helpers/quote-access"
+import { canDeclineQuote, quoteStatusMessage } from "../../../../../modules/quote/lib/transitions"
 
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const quoteModule = req.scope.resolve(QUOTE_MODULE) as any
@@ -17,6 +18,11 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
 
   if (!(await canAccessQuote(req, quote))) {
     return res.status(404).json({ message: "Quote not found" })
+  }
+
+  // Declining an accepted (already an order) or already-declined quote is not allowed.
+  if (!canDeclineQuote(quote.status)) {
+    return res.status(409).json({ message: quoteStatusMessage(quote.status) })
   }
 
   try {

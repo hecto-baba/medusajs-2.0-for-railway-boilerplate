@@ -7,6 +7,7 @@ import validateRentalDates from "../../utils/validate-rental-dates";
 import countRentalDays from "../../utils/count-rental-days";
 import countRentalUnits from "../../utils/count-rental-units";
 import { RentalUnit } from "../../utils/rental-unit";
+import { isCartApproved } from "../../utils/is-cart-approved";
 
 completeCartWorkflow.hooks.validate(
   async ({ cart }, { container }) => {
@@ -192,13 +193,14 @@ completeCartWorkflow.hooks.validate(
               fields: ["id", "cart_id", "statuses.*"],
               filters: { cart_id: cart.id },
             })
-            const isApproved = approvals?.some((app: any) =>
-              app.statuses?.some((s: any) => s.status === "approved")
-            )
-            if (isApproved) {
+            // The newest decision wins: approved-then-rejected is NOT approved.
+            if (isCartApproved(approvals as any)) {
               return
             }
-          } catch {}
+          } catch (approvalErr: any) {
+            // Could not read the approvals, so treat the cart as not approved.
+            console.error("Could not check manager approval for cart", cart.id, approvalErr?.message ?? approvalErr)
+          }
 
           throw new MedusaError(
             MedusaError.Types.NOT_ALLOWED,
@@ -206,10 +208,13 @@ completeCartWorkflow.hooks.validate(
           )
         }
       }
-    } catch (b2bErr) {
+    } catch (b2bErr: any) {
       if (b2bErr instanceof MedusaError) {
         throw b2bErr
       }
+      // The spending limit could not be checked. Checkout is not blocked for that
+      // (a lookup failure should not stop every B2B sale), but it must not be silent.
+      console.error("Could not check the spending limit for cart", cart.id, b2bErr?.message ?? b2bErr)
     }
   }
 )

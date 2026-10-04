@@ -14,6 +14,7 @@ type CreateRentalConfigurationInput = {
   security_deposit_amount?: number
   security_deposit_type?: "fixed" | "percentage"
   requires_time_selection?: boolean
+  fulfilment_modes?: "both" | "pickup" | "delivery"
   status?: "active" | "inactive"
 }
 
@@ -49,6 +50,7 @@ export const createRentalConfigurationStep = createStep(
         security_deposit_amount: input.security_deposit_amount,
         security_deposit_type: input.security_deposit_type,
         requires_time_selection: input.requires_time_selection,
+        fulfilment_modes: input.fulfilment_modes,
         status: input.status,
       })
 

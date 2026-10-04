@@ -3,7 +3,6 @@ import { getCollectionsList } from "@lib/data/collections"
 import { getStoreName } from "@lib/util/env"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import MedusaCTA from "@modules/layout/components/medusa-cta"
 import ThemeToggle from "@modules/layout/components/theme-toggle"
 
 const linkClass = "text-sm text-muted transition-colors hover:text-ink"
@@ -11,7 +10,7 @@ const linkClass = "text-sm text-muted transition-colors hover:text-ink"
 export default async function Footer() {
   const [{ collections }, { product_categories }] = await Promise.all([
     getCollectionsList(0, 6),
-    getCategoriesList(0, 6),
+    getCategoriesList(0, 100),
   ])
 
   return (
@@ -35,20 +34,13 @@ export default async function Footer() {
               <div className="flex flex-col gap-y-3">
                 <span className="text-sm font-bold">Categories</span>
                 <ul className="grid gap-2" data-testid="footer-categories">
-                  {product_categories.slice(0, 6).map((c) => {
-                    if (c.parent_category) {
-                      return null
-                    }
-
-                    const children =
-                      c.category_children?.map((child) => ({
-                        name: child.name,
-                        handle: child.handle,
-                        id: child.id,
-                      })) || null
-
-                    return (
-                      <li key={c.id} className="flex flex-col gap-2">
+                  {/* Top-level categories only. The list holds every level, so
+                      filter to the top level first and then cap at six. */}
+                  {product_categories
+                    .filter((c) => !c.parent_category)
+                    .slice(0, 6)
+                    .map((c) => (
+                      <li key={c.id}>
                         <LocalizedClientLink
                           className={linkClass}
                           href={`/categories/${c.handle}`}
@@ -56,24 +48,8 @@ export default async function Footer() {
                         >
                           {c.name}
                         </LocalizedClientLink>
-                        {children && (
-                          <ul className="ml-3 grid gap-2">
-                            {children.slice(0, 4).map((child) => (
-                              <li key={child.id}>
-                                <LocalizedClientLink
-                                  className={linkClass}
-                                  href={`/categories/${child.handle}`}
-                                  data-testid="category-link"
-                                >
-                                  {child.name}
-                                </LocalizedClientLink>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
                       </li>
-                    )
-                  })}
+                    ))}
                 </ul>
               </div>
             )}
@@ -124,7 +100,7 @@ export default async function Footer() {
           </span>
           <div className="flex flex-wrap items-center gap-4">
             <ThemeToggle />
-            <MedusaCTA />
+            <span>Hathavajra Technologies Private Limited</span>
           </div>
         </div>
       </div>

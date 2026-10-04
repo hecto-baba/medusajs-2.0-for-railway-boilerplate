@@ -2,6 +2,7 @@ import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { APPROVAL_MODULE } from "../../../../../modules/approval"
 import { canUseCart } from "../../../helpers/cart-access"
+import { emitSafely } from "../../../../../lib/emit-safely"
 
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const approvalModule = req.scope.resolve(APPROVAL_MODULE) as any
@@ -39,6 +40,9 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         },
       })
     }
+
+    // Managers are emailed from this event; a failed emit never fails the submit.
+    await emitSafely(req.scope, "approval.requested", { approval_id: approval.id })
 
     return res.status(201).json({
       success: true,

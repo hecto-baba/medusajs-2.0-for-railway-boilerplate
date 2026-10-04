@@ -404,6 +404,7 @@ export const uploadVendorImages = async (files: File[]) => {
 
 export type VendorRentalUnit = "hour" | "day" | "week" | "month" | "custom"
 export type VendorRentalDepositType = "fixed" | "percentage"
+export type VendorRentalFulfilmentModes = "both" | "pickup" | "delivery"
 
 export type VendorRentalConfig = {
   id: string
@@ -419,6 +420,8 @@ export type VendorRentalConfig = {
   security_deposit_amount: number
   security_deposit_type: VendorRentalDepositType
   requires_time_selection: boolean
+  // Absent on a configuration saved before this existed, which means "both".
+  fulfilment_modes?: VendorRentalFulfilmentModes
   status: "active" | "inactive"
 }
 
@@ -437,6 +440,7 @@ export const upsertVendorRentalConfig = (
     security_deposit_amount?: number
     security_deposit_type?: VendorRentalDepositType
     requires_time_selection?: boolean
+    fulfilment_modes?: VendorRentalFulfilmentModes
     status?: "active" | "inactive"
   }
 ) =>

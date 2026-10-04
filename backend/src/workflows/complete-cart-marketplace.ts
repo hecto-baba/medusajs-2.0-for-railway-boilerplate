@@ -141,6 +141,13 @@ export const completeCartMarketplaceWorkflow = createWorkflow(
           }))
         )
       ).config({ name: "link-ticket-purchases-marketplace" })
+
+      // The ticket email goes out on this event rather than on order.placed, which
+      // fires from inside the core completion - before the purchases above exist.
+      emitEventStep({
+        eventName: "ticket.purchased",
+        data: { order_id: order.id },
+      }).config({ name: "emit-ticket-purchased-marketplace" })
     })
 
     // ---- rentals

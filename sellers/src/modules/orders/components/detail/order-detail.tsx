@@ -221,11 +221,21 @@ export const OrderDetail = ({ id }: OrderDetailProps) => {
                     {[shipping.first_name, shipping.last_name].filter(Boolean).join(" ")}
                   </Text>
                   {shipping.address_1 && <Text>{shipping.address_1}</Text>}
-                  <Text>
-                    {[shipping.city, shipping.postal_code].filter(Boolean).join(" ")}
-                  </Text>
+                  {[shipping.city, shipping.postal_code].some(Boolean) && (
+                    <Text>
+                      {[shipping.city, shipping.postal_code].filter(Boolean).join(" ")}
+                    </Text>
+                  )}
                   {shipping.country_code && (
                     <Text className="uppercase">{shipping.country_code}</Text>
+                  )}
+                  {/* Tickets, appointments, digital, EOI and pickup rentals are
+                      ordered with contact details only, so a missing street is
+                      expected here, not an error. */}
+                  {!shipping.address_1 && (
+                    <Text className="text-ui-fg-muted">
+                      No delivery address - nothing to ship
+                    </Text>
                   )}
                 </>
               ) : (
@@ -246,9 +256,11 @@ export const OrderDetail = ({ id }: OrderDetailProps) => {
                     {[billing.first_name, billing.last_name].filter(Boolean).join(" ")}
                   </Text>
                   {billing.address_1 && <Text>{billing.address_1}</Text>}
-                  <Text>
-                    {[billing.city, billing.postal_code].filter(Boolean).join(" ")}
-                  </Text>
+                  {[billing.city, billing.postal_code].some(Boolean) && (
+                    <Text>
+                      {[billing.city, billing.postal_code].filter(Boolean).join(" ")}
+                    </Text>
+                  )}
                   {billing.country_code && (
                     <Text className="uppercase">{billing.country_code}</Text>
                   )}

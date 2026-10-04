@@ -5,7 +5,13 @@ import { Button, Heading, Text } from "@medusajs/ui"
 import { DocumentText, ChevronDown, CheckCircle, XCircle, ArrowRight } from "@medusajs/icons"
 import { convertToLocale } from "@lib/util/money"
 import Chip from "@modules/common/components/chip"
-import { acceptQuote, rejectQuote, sendCustomerQuoteMessage } from "@lib/data/quotes"
+import {
+  acceptQuote,
+  rejectQuote,
+  sendCustomerQuoteMessage,
+  type QuoteDeliveryAddress,
+} from "@lib/data/quotes"
+import Input from "@modules/common/components/input"
 
 const StatusTitles: Record<string, string> = {
   accepted: "Accepted",
@@ -84,11 +90,38 @@ export const QuotesList = ({ initialQuotes, countryCode }: QuotesListProps) => {
     }
   }
 
-  const handleAccept = async (quoteId: string) => {
+  // A quote with goods to deliver and no delivery address yet asks for one
+  // before it is accepted: accepting turns it into an order without passing
+  // through checkout, so this is the only point the buyer can be asked.
+  const [addressFormFor, setAddressFormFor] = useState<string | null>(null)
+  const [address, setAddress] = useState<Record<string, string>>({
+    country_code: countryCode,
+  })
+
+  const needsDeliveryAddress = (quote: any) =>
+    (quote.draft_order?.items ?? []).some(
+      (item: any) => item?.requires_shipping !== false
+    ) && !quote.draft_order?.shipping_address?.address_1
+
+  const requestAccept = (quote: any) => {
+    if (needsDeliveryAddress(quote)) {
+      setExpandedId(quote.id)
+      setAddressFormFor(quote.id)
+      setFeedback(null)
+      return
+    }
+    handleAccept(quote.id)
+  }
+
+  const handleAccept = async (
+    quoteId: string,
+    deliveryAddress?: QuoteDeliveryAddress
+  ) => {
     setLoadingId(quoteId)
     setFeedback(null)
-    const res = await acceptQuote(quoteId)
+    const res = await acceptQuote(quoteId, deliveryAddress)
     if (res.success) {
+      setAddressFormFor(null)
       setQuotes((prev) =>
         prev.map((q) => (q.id === quoteId ? { ...q, status: "accepted" } : q))
       )
@@ -97,6 +130,11 @@ export const QuotesList = ({ initialQuotes, countryCode }: QuotesListProps) => {
         text: "Quote accepted successfully! Your order has been placed.",
       })
     } else {
+      // The server decides whether goods need a delivery address, from the
+      // order itself. If it asks for one the list did not predict, show the form.
+      if (res.error?.includes("delivery address is needed")) {
+        setAddressFormFor(quoteId)
+      }
       setFeedback({
         type: "error",
         text: res.error || "Failed to accept quote. Please try again.",
@@ -250,7 +288,7 @@ export const QuotesList = ({ initialQuotes, countryCode }: QuotesListProps) => {
                       </Button>
                       <Button
                         size="small"
-                        onClick={() => handleAccept(quote.id)}
+                        onClick={() => requestAccept(quote)}
                         disabled={isProcessing}
                         isLoading={isProcessing}
                       >
@@ -597,13 +635,76 @@ export const QuotesList = ({ initialQuotes, countryCode }: QuotesListProps) => {
                     <Button
                       size="small"
                       className="ml-4 flex-shrink-0"
-                      onClick={() => handleAccept(quote.id)}
+                      onClick={() => requestAccept(quote)}
                       disabled={isProcessing}
                       isLoading={isProcessing}
                     >
                       Accept Offer Now
                     </Button>
                   </div>
+                )}
+
+                {isActionable && addressFormFor === quote.id && (
+                  <form
+                    className="flex flex-col gap-y-3 rounded-rounded border border-line p-4"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleAccept(quote.id, address as QuoteDeliveryAddress)
+                    }}
+                    data-testid="quote-delivery-address-form"
+                  >
+                    <Text className="txt-medium-plus text-ui-fg-base">
+                      Where should we deliver this order?
+                    </Text>
+                    <div className="grid grid-cols-2 gap-3">
+                      {(
+                        [
+                          ["first_name", "First name", true],
+                          ["last_name", "Last name", false],
+                          ["address_1", "Address", true],
+                          ["address_2", "Apartment, suite, etc.", false],
+                          ["postal_code", "Postal code", true],
+                          ["city", "City", true],
+                          ["province", "State / Province", false],
+                          ["country_code", "Country code (e.g. de)", true],
+                          ["phone", "Phone", false],
+                        ] as [string, string, boolean][]
+                      ).map(([name, label, required]) => (
+                        <Input
+                          key={name}
+                          label={label}
+                          name={name}
+                          value={address[name] ?? ""}
+                          required={required}
+                          onChange={(e) =>
+                            setAddress((prev) => ({
+                              ...prev,
+                              [name]: e.target.value,
+                            }))
+                          }
+                        />
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-end gap-x-2">
+                      <Button
+                        size="small"
+                        variant="secondary"
+                        type="button"
+                        onClick={() => setAddressFormFor(null)}
+                        disabled={isProcessing}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="small"
+                        type="submit"
+                        isLoading={isProcessing}
+                        disabled={isProcessing}
+                      >
+                        Confirm and accept
+                      </Button>
+                    </div>
+                  </form>
                 )}
               </div>
             )}

@@ -39,7 +39,8 @@ export const listOrders = cache(async function (
   return sdk.client
     .fetch<HttpTypes.StoreOrderListResponse>("/store/orders", {
       method: "GET",
-      query: { limit, offset },
+      // metadata carries the delivery id behind "Track your order".
+      query: { limit, offset, fields: "+metadata" },
       headers,
       ...(await getCacheDirectives("orders")),
     })

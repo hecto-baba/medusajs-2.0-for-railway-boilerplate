@@ -1,9 +1,13 @@
 "use client"
 
+import { useParams } from "next/navigation"
 import React, { useState, useEffect } from "react"
 import Input from "@modules/common/components/input"
+import AddressSelect from "../address-select"
 import CountrySelect from "../country-select"
 import { HttpTypes } from "@medusajs/types"
+import { Container } from "@medusajs/ui"
+import { mapKeys } from "lodash"
 
 /**
  * Every field defaults to "" rather than being left out, so the inputs below
@@ -26,14 +30,55 @@ const addressToFormData = (
   "billing_address.phone": address?.phone || "",
 })
 
-const BillingAddress = ({ cart }: { cart: HttpTypes.StoreCart | null }) => {
-  const [formData, setFormData] = useState<Record<string, string>>(() =>
-    addressToFormData(cart?.billing_address)
-  )
+const BillingAddress = ({
+  cart,
+  customer,
+}: {
+  cart: HttpTypes.StoreCart | null
+  customer?: HttpTypes.StoreCustomer | null
+}) => {
+  // The address on the cart if it has a real one, otherwise the customer's saved
+  // billing address, so a returning customer does not retype it.
+  const savedBilling = customer?.addresses?.find((a) => a.is_default_billing)
+  const params = useParams<{ countryCode?: string }>()
+
+  const [formData, setFormData] = useState<Record<string, string>>(() => {
+    const initial = addressToFormData(
+      cart?.billing_address?.address_1
+        ? cart.billing_address
+        : ((savedBilling as unknown as HttpTypes.StoreCart["billing_address"]) ??
+            cart?.billing_address)
+    )
+    // Start on the store's own country rather than an empty select.
+    if (!initial["billing_address.country_code"] && params?.countryCode) {
+      initial["billing_address.country_code"] = params.countryCode
+    }
+    return initial
+  })
 
   useEffect(() => {
-    setFormData(addressToFormData(cart?.billing_address))
+    // Only a real address on the cart replaces the form; one without a street
+    // would blank out the saved address the form was started with.
+    if (cart?.billing_address?.address_1) {
+      setFormData(addressToFormData(cart.billing_address))
+    }
   }, [cart?.billing_address])
+
+  // Saved addresses in the cart's region, as the shipping form offers them.
+  const countriesInRegion = cart?.region?.countries?.map((c) => c.iso_2)
+  const addressesInRegion = (customer?.addresses ?? []).filter(
+    (a) => a.country_code && countriesInRegion?.includes(a.country_code)
+  )
+
+  // The picker supplies an address alone. Only its fields are merged in, so
+  // choosing one never clears anything else on the form.
+  const selectSavedAddress = (address?: HttpTypes.StoreCartAddress) => {
+    if (!address) return
+    setFormData((prev) => ({
+      ...prev,
+      ...addressToFormData(address),
+    }))
+  }
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -48,6 +93,25 @@ const BillingAddress = ({ cart }: { cart: HttpTypes.StoreCart | null }) => {
 
   return (
     <>
+      {customer && addressesInRegion.length > 0 && (
+        <Container className="mb-6 flex flex-col gap-y-4 p-5">
+          <p className="text-small-regular">
+            {`Hi ${customer.first_name}, do you want to use one of your saved addresses?`}
+          </p>
+          {/* Only the address fields are carried into addressInput, so it is
+              not a whole StoreCartAddress; matching it against the saved
+              addresses is all AddressSelect reads it for. */}
+          <AddressSelect
+            addresses={customer.addresses}
+            addressInput={
+              mapKeys(formData, (_, key) =>
+                key.replace("billing_address.", "")
+              ) as unknown as HttpTypes.StoreCartAddress
+            }
+            onSelect={selectSavedAddress}
+          />
+        </Container>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <Input
           label="First name"

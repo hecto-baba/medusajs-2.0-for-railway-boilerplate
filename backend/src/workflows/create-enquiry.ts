@@ -3,7 +3,7 @@ import {
   WorkflowResponse,
   transform,
 } from "@medusajs/framework/workflows-sdk"
-import { useQueryGraphStep, createRemoteLinkStep } from "@medusajs/medusa/core-flows"
+import { useQueryGraphStep, createRemoteLinkStep, emitEventStep } from "@medusajs/medusa/core-flows"
 import { Modules } from "@medusajs/framework/utils"
 import { createEnquiryStep } from "./steps/create-enquiry"
 import { validateEnquirySubmissionStep } from "./steps/validate-enquiry-submission"
@@ -89,6 +89,12 @@ export const createEnquiryWorkflow = createWorkflow(
     )
 
     createRemoteLinkStep(linkData)
+
+    // Lets the product's seller (or the platform) know a question is waiting.
+    emitEventStep({
+      eventName: "enquiry.created",
+      data: transform({ enquiry }, (data) => ({ id: data.enquiry.id })),
+    })
 
     return new WorkflowResponse(enquiry)
   }

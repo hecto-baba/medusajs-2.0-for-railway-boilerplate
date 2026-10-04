@@ -17,6 +17,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "analyze": "ANALYZE=true next build",
+    "test:unit": "playwright test --config=playwright.unit.config.ts",
     "test-e2e": "playwright test e2e",
     "test:qa": "playwright test --config=playwright.qa.config.ts",
     "test:qa:ui": "playwright test --config=playwright.qa.config.ts --ui",

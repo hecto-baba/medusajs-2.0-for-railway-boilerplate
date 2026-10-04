@@ -136,10 +136,12 @@ const StripePaymentButton = ({
         payment_method: {
           card: card,
           billing_details: {
+            // Joined defensively: a no-shipping order collects only a name and
+            // country, and a missing part must not become the text "undefined".
             name:
-              cart.billing_address?.first_name +
-              " " +
-              cart.billing_address?.last_name,
+              [cart.billing_address?.first_name, cart.billing_address?.last_name]
+                .filter(Boolean)
+                .join(" ") || undefined,
             address: {
               city: cart.billing_address?.city ?? undefined,
               country: cart.billing_address?.country_code ?? undefined,

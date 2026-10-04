@@ -1,8 +1,8 @@
-import { ContainerRegistrationKeys, Modules } from '@medusajs/framework/utils'
-import { INotificationModuleService } from '@medusajs/framework/types'
+import { ContainerRegistrationKeys } from '@medusajs/framework/utils'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
 import { EmailTemplates } from '../modules/email-notifications/templates'
-import { STOREFRONT_URL, ZEPTOMAIL_FROM_EMAIL } from '../lib/constants'
+import { STOREFRONT_URL } from '../lib/constants'
+import { sendEmail } from '../lib/send-email'
 import { APPOINTMENT_BOOKING_MODULE } from '../modules/appointment-booking'
 import type AppointmentBookingModuleService from '../modules/appointment-booking/service'
 import { signCancelToken } from '../modules/appointment-booking/lib/cancel-token'
@@ -48,7 +48,6 @@ const sendChangeEmail = async ({
   const resource = await service.retrieveProvider(appointment.provider_id)
 
   const query = container.resolve(ContainerRegistrationKeys.QUERY)
-  const notifications: INotificationModuleService = container.resolve(Modules.NOTIFICATION)
 
   const [{ data: products }, { data: vendors }, { data: orders }] = await Promise.all([
     query.graph({ entity: 'product', fields: ['id', 'title'], filters: { id: appointment.service_product_id } }),
@@ -79,17 +78,20 @@ const sendChangeEmail = async ({
   )
 
   try {
-    await notifications.createNotifications({
-      to,
-      channel: 'email',
+    // A reschedule can happen several times, so its key includes how many have
+    // happened; a cancel happens once. A redelivered event sends nothing twice.
+    const result = await sendEmail(container, {
       template: EmailTemplates.APPOINTMENT_CHANGED,
+      to,
+      subject: rescheduled
+        ? `Your appointment with ${businessName || 'us'} has a new time`
+        : `Your appointment with ${businessName || 'us'} was cancelled`,
+      idempotencyKey: rescheduled
+        ? `appointment-rescheduled:${attendee.id}:${attendee.reschedule_count ?? new Date(attendee.rescheduled_from_start ?? 0).getTime()}`
+        : `appointment-cancelled:${attendee.id}`,
+      resourceId: attendee.id,
+      resourceType: 'appointment_attendee',
       data: {
-        emailOptions: {
-          replyTo: process.env.ORDER_REPLY_TO_EMAIL || ZEPTOMAIL_FROM_EMAIL,
-          subject: rescheduled
-            ? `Your appointment with ${businessName || 'us'} has a new time`
-            : `Your appointment with ${businessName || 'us'} was cancelled`
-        },
         kind: rescheduled ? 'rescheduled' : 'cancelled',
         appointment: {
           service: (products as any[])[0]?.title ?? 'Appointment',
@@ -112,6 +114,9 @@ const sendChangeEmail = async ({
         bookUrl: rescheduled ? null : `${STOREFRONT_URL}/${countryCode}/book`
       }
     })
+
+    // Left unmarked when the send failed, so a redelivery tries again.
+    if (result === 'failed') return
 
     await service.updateAppointmentAttendees({
       id: attendee.id,

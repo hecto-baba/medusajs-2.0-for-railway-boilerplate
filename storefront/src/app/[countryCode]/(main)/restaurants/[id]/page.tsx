@@ -14,6 +14,7 @@ import {
   SuccessBanner,
 } from "../_components/shared"
 import { addToCart, clearCartAndAdd } from "@lib/data/cart"
+import { isCartConflict, isCartFailure } from "@lib/util/cart-conflict"
 
 type ProductVariant = {
   id: string
@@ -201,7 +202,7 @@ export default function RestaurantDetailPage() {
     const currentSelectedAddons = selectedAddons[product.id] || []
 
     try {
-      await addToCart({
+      const result = await addToCart({
         variantId,
         quantity: 1,
         countryCode,
@@ -212,6 +213,18 @@ export default function RestaurantDetailPage() {
           addons: currentSelectedAddons,
         },
       })
+      if (isCartConflict(result)) {
+        setConflictModal({
+          open: true,
+          product,
+          message: result.message,
+        })
+        return
+      }
+      if (isCartFailure(result)) {
+        setErrorBanner(result.error)
+        return
+      }
       const portionName = activeVariant.title && activeVariant.title !== "Default" && activeVariant.title !== "Regular"
         ? ` (${activeVariant.title})`
         : ""
@@ -219,19 +232,7 @@ export default function RestaurantDetailPage() {
       setSuccessItemTitle(`${product.title}${portionName}${addonsSuffix}`)
       setTimeout(() => setSuccessItemTitle(null), 3500)
     } catch (err: any) {
-      const msg = err.message || "Failed to add item to cart"
-      if (
-        msg.includes("CONFLICT_RETAIL_EXISTS") ||
-        msg.includes("CONFLICT_RESTAURANT_EXISTS")
-      ) {
-        setConflictModal({
-          open: true,
-          product,
-          message: msg.replace(/^[A-Z_]+:\s*/, ""),
-        })
-      } else {
-        setErrorBanner(msg)
-      }
+      setErrorBanner(err.message || "Failed to add item to cart")
     } finally {
       setAddingVariantId(null)
     }
@@ -247,7 +248,7 @@ export default function RestaurantDetailPage() {
     setConflictModal({ open: false, product: null, message: "" })
 
     try {
-      await clearCartAndAdd({
+      const result = await clearCartAndAdd({
         variantId,
         quantity: 1,
         countryCode,
@@ -256,6 +257,14 @@ export default function RestaurantDetailPage() {
           restaurant_name: restaurant.name,
         },
       })
+      if (isCartConflict(result)) {
+        setErrorBanner(result.message)
+        return
+      }
+      if (isCartFailure(result)) {
+        setErrorBanner(result.error)
+        return
+      }
       setSuccessItemTitle(product.title)
       setTimeout(() => setSuccessItemTitle(null), 3000)
     } catch (err: any) {

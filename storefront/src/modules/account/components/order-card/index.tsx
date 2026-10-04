@@ -5,6 +5,7 @@ import { useMemo } from "react"
 
 import Thumbnail from "@modules/products/components/thumbnail"
 import Chip from "@modules/common/components/chip"
+import TrackOrderLink from "@modules/order/components/track-order-link"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
@@ -104,7 +105,8 @@ const OrderCard = ({ order }: OrderCardProps) => {
           </div>
         )}
       </div>
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <TrackOrderLink order={order} />
         <LocalizedClientLink href={`/account/orders/details/${order.id}`}>
           <Button
             data-testid="order-details-link"

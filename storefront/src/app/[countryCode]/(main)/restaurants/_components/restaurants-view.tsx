@@ -13,6 +13,7 @@ import {
   SuccessBanner,
 } from "./shared"
 import { addToCart, clearCartAndAdd } from "@lib/data/cart"
+import { isCartConflict, isCartFailure } from "@lib/util/cart-conflict"
 
 type ProductVariant = {
   id: string
@@ -110,7 +111,7 @@ export default function RestaurantsView({
     setErrorBanner(null)
 
     try {
-      await addToCart({
+      const result = await addToCart({
         variantId,
         quantity: 1,
         countryCode,
@@ -119,23 +120,23 @@ export default function RestaurantsView({
           restaurant_name: restaurant.name,
         },
       })
-      setSuccessItemTitle(product.title)
-      setTimeout(() => setSuccessItemTitle(null), 3000)
-    } catch (err: any) {
-      const msg = err.message || "Failed to add item to cart"
-      if (
-        msg.includes("CONFLICT_RETAIL_EXISTS") ||
-        msg.includes("CONFLICT_RESTAURANT_EXISTS")
-      ) {
+      if (isCartConflict(result)) {
         setConflictModal({
           open: true,
           product,
           restaurant,
-          message: msg.replace(/^[A-Z_]+:\s*/, ""),
+          message: result.message,
         })
-      } else {
-        setErrorBanner(msg)
+        return
       }
+      if (isCartFailure(result)) {
+        setErrorBanner(result.error)
+        return
+      }
+      setSuccessItemTitle(product.title)
+      setTimeout(() => setSuccessItemTitle(null), 3000)
+    } catch (err: any) {
+      setErrorBanner(err.message || "Failed to add item to cart")
     } finally {
       setAddingVariantId(null)
     }
@@ -151,7 +152,7 @@ export default function RestaurantsView({
     setConflictModal({ open: false, product: null, restaurant: null, message: "" })
 
     try {
-      await clearCartAndAdd({
+      const result = await clearCartAndAdd({
         variantId,
         quantity: 1,
         countryCode,
@@ -160,6 +161,14 @@ export default function RestaurantsView({
           restaurant_name: restaurant.name,
         },
       })
+      if (isCartConflict(result)) {
+        setErrorBanner(result.message)
+        return
+      }
+      if (isCartFailure(result)) {
+        setErrorBanner(result.error)
+        return
+      }
       setSuccessItemTitle(product.title)
       setTimeout(() => setSuccessItemTitle(null), 3000)
     } catch (err: any) {

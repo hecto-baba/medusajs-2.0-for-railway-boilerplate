@@ -4,6 +4,7 @@ import {
   getVendorRentalConfig,
   upsertVendorRentalConfig,
   type VendorRentalDepositType,
+  type VendorRentalFulfilmentModes,
   type VendorRentalUnit,
   type VendorProduct,
 } from "@lib/data/vendor-client"
@@ -22,6 +23,12 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 import { Row, Section } from "./section"
+
+const FULFILMENT_LABEL: Record<VendorRentalFulfilmentModes, string> = {
+  both: "Renter chooses",
+  pickup: "Pickup only",
+  delivery: "Delivery only",
+}
 
 const UNIT_LABEL: Record<VendorRentalUnit, string> = {
   hour: "Hour",
@@ -62,6 +69,8 @@ export const RentalSection = ({ product }: { product: VendorProduct }) => {
   const [depositType, setDepositType] = useState<VendorRentalDepositType>("fixed")
   const [depositAmount, setDepositAmount] = useState(0)
   const [requiresTimeSelection, setRequiresTimeSelection] = useState(false)
+  const [fulfilmentModes, setFulfilmentModes] =
+    useState<VendorRentalFulfilmentModes>("both")
 
   const { data, isLoading } = useQuery({
     queryKey: ["vendor-rental-config", product.id],
@@ -98,6 +107,7 @@ export const RentalSection = ({ product }: { product: VendorProduct }) => {
       setDepositType(config.security_deposit_type ?? "fixed")
       setDepositAmount(config.security_deposit_amount ?? 0)
       setRequiresTimeSelection(config.requires_time_selection ?? false)
+      setFulfilmentModes(config.fulfilment_modes ?? "both")
     }
   }, [config])
 
@@ -164,6 +174,7 @@ export const RentalSection = ({ product }: { product: VendorProduct }) => {
         security_deposit_amount: depositAmount,
         security_deposit_type: depositType,
         requires_time_selection: requiresTimeSelection,
+        fulfilment_modes: fulfilmentModes,
         status: config?.status ?? "active",
       })
       toast.success("Rental configuration saved.")
@@ -255,6 +266,9 @@ export const RentalSection = ({ product }: { product: VendorProduct }) => {
                 ? `${config.security_deposit_amount}% of total`
                 : config.security_deposit_amount.toFixed(2)
               : "None"}
+          </Row>
+          <Row label="Pickup or delivery">
+            {FULFILMENT_LABEL[config.fulfilment_modes ?? "both"]}
           </Row>
           <Row label="Pickup/Return Time">
             {config.requires_time_selection ? "Required" : "Not required"}
@@ -381,6 +395,32 @@ export const RentalSection = ({ product }: { product: VendorProduct }) => {
               <Text size="xsmall" className="text-ui-fg-muted">
                 Charged as a separate cart line item at checkout, refunded manually
                 once the item is returned.
+              </Text>
+            </div>
+
+            <hr />
+
+            <div className="flex flex-col gap-y-2">
+              <Label size="small" weight="plus" htmlFor="fulfilment-modes">
+                How renters get it
+              </Label>
+              <Select
+                value={fulfilmentModes}
+                onValueChange={(value) =>
+                  setFulfilmentModes(value as VendorRentalFulfilmentModes)
+                }
+              >
+                <Select.Trigger id="fulfilment-modes">
+                  <Select.Value />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Item value="both">Renter chooses pickup or delivery</Select.Item>
+                  <Select.Item value="pickup">Pickup only</Select.Item>
+                  <Select.Item value="delivery">Delivery only</Select.Item>
+                </Select.Content>
+              </Select>
+              <Text size="xsmall" className="text-ui-fg-muted">
+                Pickup needs no delivery address from the renter at checkout.
               </Text>
             </div>
 
