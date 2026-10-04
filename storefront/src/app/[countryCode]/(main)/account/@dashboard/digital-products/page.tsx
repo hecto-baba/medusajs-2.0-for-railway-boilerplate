@@ -13,9 +13,9 @@ export default async function DigitalProducts() {
 
   return (
     <div className="w-full" data-testid="digital-products-page-wrapper">
-      <div className="mb-8 flex flex-col gap-y-4">
-        <h1 className="text-2xl-semi">Digital Products</h1>
-        <p className="text-base-regular">
+      <div className="mb-4 flex flex-col gap-y-2 rounded-large bg-card p-5 shadow-lift">
+        <h1 className="font-display text-2xl font-extrabold tracking-tight">Digital Products</h1>
+        <p className="text-muted">
           View the digital products you&apos;ve purchased and download them.
         </p>
       </div>

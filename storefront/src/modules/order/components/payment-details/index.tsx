@@ -1,8 +1,7 @@
-import { Container, Heading, Text } from "@medusajs/ui"
+import { Text } from "@medusajs/ui"
 import { CreditCard } from "@medusajs/icons"
 
 import { isStripe, paymentInfoMap } from "@lib/constants"
-import Divider from "@modules/common/components/divider"
 import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
 
@@ -20,32 +19,32 @@ const PaymentDetails = ({ order }: PaymentDetailsProps) => {
   const providerInfo = payment?.provider_id ? paymentInfoMap[payment.provider_id] : null
 
   return (
-    <div>
-      <Heading level="h2" className="flex flex-row text-3xl-regular my-6">
+    <div className="rounded-large bg-card p-5 shadow-lift">
+      <h2 className="font-display text-xl font-extrabold tracking-tight mb-4">
         Payment
-      </Heading>
+      </h2>
       <div>
         {payment ? (
-          <div className="flex items-start gap-x-1 w-full">
-            <div className="flex flex-col w-1/3">
-              <Text className="txt-medium-plus text-ui-fg-base mb-1">
+          <div className="grid grid-cols-1 gap-4 small:grid-cols-[1fr_2fr] small:gap-x-8 w-full">
+            <div className="flex flex-col">
+              <Text className="text-xs font-bold uppercase tracking-wider text-muted mb-1">
                 Payment method
               </Text>
               <Text
-                className="txt-medium text-ui-fg-subtle"
+                className="text-ink"
                 data-testid="payment-method"
               >
                 {providerInfo?.title || payment.provider_id || "Direct Payment"}
               </Text>
             </div>
-            <div className="flex flex-col w-2/3">
-              <Text className="txt-medium-plus text-ui-fg-base mb-1">
+            <div className="flex flex-col">
+              <Text className="text-xs font-bold uppercase tracking-wider text-muted mb-1">
                 Payment details
               </Text>
-              <div className="flex gap-2 txt-medium text-ui-fg-subtle items-center">
-                <Container className="flex items-center h-7 w-fit p-2 bg-ui-button-neutral-hover">
+              <div className="flex gap-2 text-ink items-center">
+                <span className="flex items-center h-7 w-fit rounded-rounded bg-canvas border border-line p-2">
                   {providerInfo?.icon || <CreditCard />}
-                </Container>
+                </span>
                 <Text data-testid="payment-amount">
                   {isStripe(payment.provider_id) && payment.data?.card_last4
                     ? `**** **** **** ${payment.data.card_last4}`
@@ -60,42 +59,41 @@ const PaymentDetails = ({ order }: PaymentDetailsProps) => {
             </div>
           </div>
         ) : isB2BPaid ? (
-          <div className="flex items-start gap-x-1 w-full">
-            <div className="flex flex-col w-1/3">
-              <Text className="txt-medium-plus text-ui-fg-base mb-1">
+          <div className="grid grid-cols-1 gap-4 small:grid-cols-[1fr_2fr] small:gap-x-8 w-full">
+            <div className="flex flex-col">
+              <Text className="text-xs font-bold uppercase tracking-wider text-muted mb-1">
                 Payment method
               </Text>
               <Text
-                className="txt-medium text-ui-fg-subtle"
+                className="text-ink"
                 data-testid="payment-method"
               >
                 {b2bPaymentMethod}
               </Text>
             </div>
-            <div className="flex flex-col w-2/3">
-              <Text className="txt-medium-plus text-ui-fg-base mb-1">
+            <div className="flex flex-col">
+              <Text className="text-xs font-bold uppercase tracking-wider text-muted mb-1">
                 Payment status
               </Text>
-              <div className="flex gap-2 txt-medium text-emerald-700 font-medium items-center">
-                <Container className="flex items-center h-7 w-fit p-2 bg-emerald-50 border border-emerald-200">
-                  <CreditCard className="text-emerald-600" />
-                </Container>
+              <div className="flex gap-2 text-success font-bold items-center">
+                <span className="flex items-center h-7 w-fit rounded-rounded bg-success-soft p-2">
+                  <CreditCard className="text-success" />
+                </span>
                 <Text data-testid="payment-amount">
-                  ✓ Paid in full
+                  Paid in full
                   {b2bPaidAt && ` on ${new Date(b2bPaidAt).toLocaleString()}`}
                 </Text>
               </div>
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-x-2 text-ui-fg-subtle text-sm">
+          <div className="flex items-center gap-x-2 text-muted text-sm">
             <CreditCard className="w-4 h-4" />
             <span>Payment pending / Invoice on delivery</span>
           </div>
         )}
       </div>
 
-      <Divider className="mt-8" />
     </div>
   )
 }

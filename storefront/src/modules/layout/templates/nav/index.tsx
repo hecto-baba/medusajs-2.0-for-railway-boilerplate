@@ -1,23 +1,85 @@
-import { Suspense } from "react"
+import { listCategories } from "@lib/data/categories"
+import { getCustomer } from "@lib/data/customer"
 import { listRegions } from "@lib/data/regions"
+import { getDeliveryEta, getStoreName, isSearchEnabled } from "@lib/util/env"
 import { StoreRegion } from "@medusajs/types"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import {
+  BoltIcon,
+  PinIcon,
+  SearchIcon,
+  UserIcon,
+} from "@modules/common/icons/ui-icons"
 import CartButton from "@modules/layout/components/cart-button"
+import CategoryNav, {
+  NavCategory,
+  NavVerticalLink,
+} from "@modules/layout/components/category-nav"
 import SideMenu from "@modules/layout/components/side-menu"
-import { getStoreName, isSearchEnabled } from "@lib/util/env"
-import { getCustomer } from "@lib/data/customer"
 
-export default async function Nav() {
-  const regions = await listRegions().then((regions: StoreRegion[]) => regions)
-  const customer = await getCustomer().catch(() => null)
+export default async function Nav({ countryCode }: { countryCode?: string }) {
+  const [regions, customer, categories] = await Promise.all([
+    listRegions().then((regions: StoreRegion[]) => regions),
+    getCustomer().catch(() => null),
+    listCategories().catch(() => []),
+  ])
+
+  const eta = getDeliveryEta()
+  const country = regions
+    ?.flatMap((region) => region.countries ?? [])
+    .find((c) => c.iso_2 === countryCode)?.display_name
+
+  const address =
+    customer?.addresses?.find((a) => a.is_default_shipping) ??
+    customer?.addresses?.[0]
+
+  const navCategories: NavCategory[] = (categories ?? [])
+    .filter((c) => !c.parent_category_id)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      handle: c.handle,
+      children: (c.category_children ?? []).map((child) => ({
+        id: child.id,
+        name: child.name,
+        handle: child.handle,
+      })),
+    }))
+
+  const verticals: NavVerticalLink[] = [
+    {
+      label: "Restaurants",
+      href: "/restaurants",
+      testId: "nav-restaurants-link",
+    },
+    { label: "Book", href: "/book", testId: "nav-book-link" },
+    { label: "Rent", href: "/rent", testId: "nav-rent-link" },
+    {
+      label: "Digital Products",
+      href: "/digital-products",
+      testId: "nav-digital-products-link",
+    },
+    ...(customer
+      ? [
+          {
+            label: "My bookings",
+            href: "/appointments/my",
+            testId: "nav-my-bookings-link",
+          },
+        ]
+      : []),
+  ]
+
+  const locationText = address
+    ? [address.address_name || "Home", address.city].filter(Boolean).join(" · ")
+    : country
 
   return (
-    <div className="sticky top-0 inset-x-0 z-50 group">
-      <header className="relative h-16 mx-auto border-b duration-200 bg-white border-ui-border-base">
-        <nav className="content-container txt-xsmall-plus text-ui-fg-subtle flex items-center justify-between w-full h-full text-small-regular">
-          {/* Left: Side Menu */}
-          <div className="flex-1 basis-0 h-full flex items-center">
-            <div className="h-full">
+    <div className="sticky top-0 inset-x-0 z-50">
+      <header className="relative border-b border-line bg-card text-ink">
+        <div className="content-container">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 small:flex-nowrap small:gap-x-5">
+            <div className="flex items-center gap-1">
               <SideMenu
                 regions={regions}
                 customerInfo={
@@ -29,93 +91,72 @@ export default async function Nav() {
                     : null
                 }
               />
+              <LocalizedClientLink
+                href="/"
+                className="flex min-w-0 items-center gap-1 font-display text-2xl font-extrabold tracking-tight text-brand"
+                data-testid="nav-store-link"
+              >
+                <BoltIcon
+                  size={22}
+                  className="shrink-0 fill-pop stroke-brand"
+                  strokeWidth={1.5}
+                />
+                <span className="max-w-[4.5rem] truncate xsmall:max-w-[10rem] small:max-w-[14rem]">
+                  {getStoreName()}
+                </span>
+              </LocalizedClientLink>
             </div>
-          </div>
 
-          {/* Center: Store Brand Logo */}
-          <div className="flex items-center h-full">
-            <LocalizedClientLink
-              href="/"
-              className="txt-compact-xlarge-plus hover:text-ui-fg-base uppercase flex items-center gap-2"
-              data-testid="nav-store-link"
-            >
-              <span>{getStoreName()}</span>
-            </LocalizedClientLink>
-          </div>
+            {(eta || locationText) && (
+              <div
+                className="order-3 hidden min-w-0 items-center gap-2.5 small:order-none small:flex"
+                data-testid="nav-delivery-chip"
+              >
+                <PinIcon size={20} className="shrink-0 text-ink" />
+                <span className="min-w-0 leading-tight">
+                  <b className="block font-display text-base">
+                    {eta ? `Delivery in ${eta}` : "Delivering to"}
+                  </b>
+                  {locationText && (
+                    <small className="block max-w-[13rem] truncate text-xs text-muted">
+                      {locationText}
+                    </small>
+                  )}
+                </span>
+              </div>
+            )}
 
-          {/* Right: Buyer Navigation */}
-          <div className="flex items-center gap-x-6 h-full flex-1 basis-0 justify-end">
-            <div className="hidden small:flex items-center gap-x-6 h-full">
+            {isSearchEnabled() && (
               <LocalizedClientLink
-                className="hover:text-ui-fg-base"
-                href="/store"
-                data-testid="nav-store-catalog-link"
+                href="/search"
+                scroll={false}
+                data-testid="nav-search-link"
+                className="order-last flex h-11 min-w-0 basis-full items-center gap-3 rounded-large border border-line bg-canvas px-4 text-sm text-muted transition-colors hover:border-muted small:order-none small:flex-1 small:basis-auto"
               >
-                Store
+                <SearchIcon size={18} className="shrink-0" />
+                <span className="truncate">Search for products</span>
               </LocalizedClientLink>
+            )}
+
+            <div className="ml-auto flex items-center gap-1 small:ml-0 small:gap-2">
               <LocalizedClientLink
-                className="hover:text-ui-fg-base"
-                href="/digital-products"
-                data-testid="nav-digital-products-link"
-              >
-                Digital Products
-              </LocalizedClientLink>
-              <LocalizedClientLink
-                className="hover:text-ui-fg-base"
-                href="/restaurants"
-                data-testid="nav-restaurants-link"
-              >
-                Restaurants
-              </LocalizedClientLink>
-              <LocalizedClientLink
-                className="hover:text-ui-fg-base"
-                href="/book"
-                data-testid="nav-book-link"
-              >
-                Book
-              </LocalizedClientLink>
-              {customer && (
-                <LocalizedClientLink
-                  className="hover:text-ui-fg-base"
-                  href="/appointments/my"
-                  data-testid="nav-my-bookings-link"
-                >
-                  My bookings
-                </LocalizedClientLink>
-              )}
-              {isSearchEnabled() && (
-                <LocalizedClientLink
-                  className="hover:text-ui-fg-base"
-                  href="/search"
-                  scroll={false}
-                  data-testid="nav-search-link"
-                >
-                  Search
-                </LocalizedClientLink>
-              )}
-              <LocalizedClientLink
-                className="hover:text-ui-fg-base"
                 href="/account"
                 data-testid="nav-account-link"
+                className="flex h-11 items-center gap-2 rounded-rounded px-3 text-sm font-bold hover:bg-canvas"
               >
-                {customer?.first_name ? `Hi, ${customer.first_name}` : "Account"}
+                <UserIcon size={20} />
+                <span className="hidden small:inline">
+                  {customer?.first_name ? `Hi, ${customer.first_name}` : "Login"}
+                </span>
+                <span className="sr-only small:hidden">Account</span>
               </LocalizedClientLink>
-            </div>
-            <Suspense
-              fallback={
-                <LocalizedClientLink
-                  className="hover:text-ui-fg-base flex gap-2"
-                  href="/cart"
-                  data-testid="nav-cart-link"
-                >
-                  Cart (0)
-                </LocalizedClientLink>
-              }
-            >
               <CartButton />
-            </Suspense>
+            </div>
           </div>
-        </nav>
+        </div>
+        <div className="content-container">
+          <CategoryNav categories={navCategories} verticals={verticals} />
+        </div>
       </header>
     </div>
   )

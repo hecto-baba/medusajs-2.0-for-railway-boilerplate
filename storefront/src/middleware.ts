@@ -220,7 +220,11 @@ export const config = {
   // to the URL it puts in the og:image tag. Matching the path prefix handles
   // both. Verified by fetching it: without this entry the route answers 307 to
   // /gb/opengraph-image and every shared link loses its preview card.
+  //
+  // _next/image is the next/image optimizer. Its URL has no region prefix, so
+  // without this entry every product image request is 307'd to
+  // /gb/_next/image, which is a 404, and all images render blank.
   matcher: [
-    "/((?!api|_next/static|favicon.ico|sitemap.xml|robots.txt|opengraph-image|.*\\.png|.*\\.jpg|.*\\.gif|.*\\.svg).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|opengraph-image|.*\\.png|.*\\.jpg|.*\\.gif|.*\\.svg).*)",
   ],
 }

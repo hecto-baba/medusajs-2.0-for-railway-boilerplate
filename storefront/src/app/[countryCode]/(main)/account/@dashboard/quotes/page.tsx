@@ -12,11 +12,11 @@ export default async function QuotesPage({
 
   return (
     <div className="w-full flex flex-col gap-y-6">
-      <div>
-        <Heading level="h1" className="text-2xl-semi">
+      <div className="rounded-large bg-card p-5 shadow-lift">
+        <Heading level="h1" className="font-display text-2xl font-extrabold tracking-tight">
           Quotes
         </Heading>
-        <Text className="text-ui-fg-subtle text-sm mt-1">
+        <Text className="text-muted text-sm mt-1">
           Review negotiated bulk quotes, view revised merchant offers, and accept orders.
         </Text>
       </div>

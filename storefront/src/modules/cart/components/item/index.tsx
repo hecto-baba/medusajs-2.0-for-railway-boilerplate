@@ -172,7 +172,7 @@ const Item = ({ item, type = "full" }: ItemProps) => {
             {isTicket ? (
               <Text className="text-ui-fg-subtle">1</Text>
             ) : (
-              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white shadow-xs">
+              <div className="flex items-center border border-line rounded-lg overflow-hidden bg-card shadow-xs">
                 <button
                   type="button"
                   disabled={updating || Number(localQty) <= 1}
@@ -181,7 +181,7 @@ const Item = ({ item, type = "full" }: ItemProps) => {
                     setLocalQty(String(newQty))
                     handleQtyCommit(newQty)
                   }}
-                  className="w-7 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-30 text-sm font-semibold transition-colors select-none"
+                  className="w-7 h-8 flex items-center justify-center text-muted hover:bg-canvas disabled:opacity-30 text-sm font-semibold transition-colors select-none"
                   aria-label="Decrease quantity"
                 >
                   −
@@ -198,7 +198,7 @@ const Item = ({ item, type = "full" }: ItemProps) => {
                       handleQtyCommit(parseInt(localQty))
                     }
                   }}
-                  className="w-12 h-8 text-center text-xs font-semibold text-gray-900 border-x border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-12 h-8 text-center text-xs font-semibold text-ink border-x border-line focus:outline-none focus:ring-1 focus:ring-brand [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   data-testid="product-quantity-input"
                   aria-label="Quantity"
                 />
@@ -210,7 +210,7 @@ const Item = ({ item, type = "full" }: ItemProps) => {
                     setLocalQty(String(newQty))
                     handleQtyCommit(newQty)
                   }}
-                  className="w-7 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-30 text-sm font-semibold transition-colors select-none"
+                  className="w-7 h-8 flex items-center justify-center text-muted hover:bg-canvas disabled:opacity-30 text-sm font-semibold transition-colors select-none"
                   aria-label="Increase quantity"
                 >
                   +

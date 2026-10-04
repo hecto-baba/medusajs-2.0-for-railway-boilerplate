@@ -1,4 +1,5 @@
 import { Metadata } from "next"
+import { parseListingFilters } from "@lib/util/listing-filters"
 import { notFound } from "next/navigation"
 
 import { getCollectionByHandle } from "@lib/data/collections"
@@ -11,6 +12,9 @@ type Props = {
   searchParams: Promise<{
     page?: string
     sortBy?: SortOptions
+    onSale?: string
+    min?: string
+    max?: string
   }>
 }
 
@@ -54,7 +58,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CollectionPage({ params, searchParams }: Props) {
   const { handle, countryCode } = await params
-  const { sortBy, page } = await searchParams
+  const { sortBy, page, onSale, min, max } = await searchParams
+  const filters = parseListingFilters({ onSale, min, max })
 
   const collection = await getCollectionByHandle(handle)
 
@@ -67,6 +72,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
       collection={collection}
       page={page}
       sortBy={sortBy}
+      filters={filters}
       countryCode={countryCode}
     />
   )

@@ -53,7 +53,7 @@ const BookingActions = ({
 
   if (!canCancel && !canReschedule) {
     return (
-      <p className="text-ui-fg-subtle txt-small">
+      <p className="text-sm text-muted">
         This booking can no longer be changed online. Please contact the business
         {contact ? <> on {contact}</> : null}.
       </p>
@@ -66,23 +66,23 @@ const BookingActions = ({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-ui-fg-subtle txt-small">
+      <p className="text-sm text-muted">
         You can change or cancel until {deadlineLabel}.
       </p>
       {error ? (
-        <p className="text-ui-fg-error" role="alert">
+        <p className="text-brand" role="alert">
           {error}
         </p>
       ) : null}
 
       {confirming ? (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="txt-small">Cancel this booking? This cannot be undone.</span>
+          <span className="text-sm text-ink">Cancel this booking? This cannot be undone.</span>
           <button
             type="button"
             onClick={run}
             disabled={busy}
-            className="bg-ui-button-danger rounded-md px-4 py-2 text-white disabled:opacity-50"
+            className="rounded-rounded bg-brand px-4 py-2 font-extrabold text-brand-ink hover:opacity-90 disabled:opacity-50"
           >
             {busy ? "Cancelling..." : "Yes, cancel"}
           </button>
@@ -90,7 +90,7 @@ const BookingActions = ({
             type="button"
             onClick={() => setConfirming(false)}
             disabled={busy}
-            className="rounded-md border px-4 py-2"
+            className="rounded-rounded border border-line bg-card px-4 py-2 font-bold text-ink hover:bg-canvas"
           >
             Keep it
           </button>
@@ -100,7 +100,7 @@ const BookingActions = ({
           {canReschedule ? (
             <LocalizedClientLink
               href={rescheduleHref}
-              className="bg-ui-button-inverted text-ui-fg-on-inverted w-fit rounded-md px-4 py-2"
+              className="w-fit rounded-large bg-brand px-5 py-2.5 font-extrabold text-brand-ink hover:opacity-90"
               data-testid="reschedule-booking-button"
             >
               Reschedule
@@ -110,7 +110,7 @@ const BookingActions = ({
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="w-fit rounded-md border px-4 py-2"
+              className="w-fit rounded-large border-[1.5px] border-brand bg-card px-5 py-2.5 font-extrabold text-brand hover:bg-brand-soft"
               data-testid="cancel-booking-button"
             >
               Cancel booking
@@ -120,12 +120,12 @@ const BookingActions = ({
       )}
 
       {canReschedule ? (
-        <p className="text-ui-fg-subtle txt-small">
+        <p className="text-sm text-muted">
           You have {reschedulesLeft} reschedule{reschedulesLeft === 1 ? "" : "s"} left for this
           booking.
         </p>
       ) : null}
-      <p className="text-ui-fg-subtle txt-small">
+      <p className="text-sm text-muted">
         Cancelling does not refund your payment automatically; the business will handle any
         refund.
       </p>

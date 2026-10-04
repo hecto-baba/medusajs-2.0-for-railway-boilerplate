@@ -1,9 +1,10 @@
 "use client"
 
-import { Badge, Button } from "@medusajs/ui"
+import { Button } from "@medusajs/ui"
 import { useMemo } from "react"
 
 import Thumbnail from "@modules/products/components/thumbnail"
+import Chip from "@modules/common/components/chip"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
@@ -29,60 +30,53 @@ const OrderCard = ({ order }: OrderCardProps) => {
   }, [order])
 
   return (
-    <div className="bg-white flex flex-col p-4 sm:p-6 rounded-lg border shadow-sm" data-testid="order-card">
-      <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-        <div className="uppercase text-large-semi font-mono">
-          #<span data-testid="order-display-id">{order.display_id}</span>
+    <div
+      className="flex flex-col rounded-large bg-card p-5 shadow-lift"
+      data-testid="order-card"
+    >
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="font-display text-lg font-extrabold tracking-tight">
+          Order #<span data-testid="order-display-id">{order.display_id}</span>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           {fulfillmentStatus === "delivered" ? (
-            <Badge color="green" size="xsmall" className="gap-1 font-semibold">
-              🚚 Delivered
-            </Badge>
-          ) : (fulfillmentStatus === "shipped" || fulfillmentStatus === "partially_shipped") ? (
-            <Badge color="blue" size="xsmall" className="gap-1 font-semibold">
-              📦 In Transit
-            </Badge>
-          ) : (fulfillmentStatus === "fulfilled" || fulfillmentStatus === "partially_fulfilled") ? (
-            <Badge color="purple" size="xsmall" className="gap-1 font-semibold">
-              📦 Packed
-            </Badge>
+            <Chip tone="success">Delivered</Chip>
+          ) : fulfillmentStatus === "shipped" ||
+            fulfillmentStatus === "partially_shipped" ? (
+            <Chip tone="pop">In Transit</Chip>
+          ) : fulfillmentStatus === "fulfilled" ||
+            fulfillmentStatus === "partially_fulfilled" ? (
+            <Chip tone="pop">Packed</Chip>
           ) : (
-            <Badge color="grey" size="xsmall" className="gap-1">
-              🕒 Confirmed
-            </Badge>
+            <Chip tone="muted">Confirmed</Chip>
           )}
 
-          {(paymentStatus === "captured" || paymentStatus === "paid") ? (
-            <Badge color="green" size="xsmall" className="gap-1 font-semibold">
-              💳 Paid
-            </Badge>
-          ) : (paymentStatus === "authorized" || paymentStatus === "partially_authorized") ? (
-            <Badge color="blue" size="xsmall" className="gap-1">
-              💳 Authorized
-            </Badge>
+          {paymentStatus === "captured" || paymentStatus === "paid" ? (
+            <Chip tone="success">Paid</Chip>
+          ) : paymentStatus === "authorized" ||
+            paymentStatus === "partially_authorized" ? (
+            <Chip tone="muted">Authorized</Chip>
           ) : (
-            <Badge color="orange" size="xsmall" className="gap-1">
-              ⏳ Awaiting Payment
-            </Badge>
+            <Chip tone="warning">Awaiting Payment</Chip>
           )}
         </div>
       </div>
-      <div className="flex items-center divide-x divide-gray-200 text-small-regular text-ui-fg-base">
-        <span className="pr-2" data-testid="order-created-at">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
+        <span data-testid="order-created-at">
           {new Date(order.created_at).toDateString()}
         </span>
-        <span className="px-2" data-testid="order-amount">
+        <span>{`${numberOfLines} ${numberOfLines > 1 ? "items" : "item"}`}</span>
+        <span
+          className="ml-auto font-display text-xl font-extrabold tracking-tight text-ink"
+          data-testid="order-amount"
+        >
           {convertToLocale({
             amount: order.total,
             currency_code: order.currency_code,
           })}
         </span>
-        <span className="pl-2">{`${numberOfLines} ${
-          numberOfLines > 1 ? "items" : "item"
-        }`}</span>
       </div>
-      <div className="grid grid-cols-2 small:grid-cols-4 gap-4 my-4">
+      <div className="my-4 grid grid-cols-2 gap-4 small:grid-cols-4">
         {order.items?.slice(0, 3).map((i) => {
           return (
             <div
@@ -91,31 +85,32 @@ const OrderCard = ({ order }: OrderCardProps) => {
               data-testid="order-item"
             >
               <Thumbnail thumbnail={i.thumbnail} images={[]} size="full" />
-              <div className="flex items-center text-small-regular text-ui-fg-base">
-                <span
-                  className="text-ui-fg-base font-semibold"
-                  data-testid="item-title"
-                >
+              <div className="flex items-center text-sm">
+                <span className="truncate font-bold" data-testid="item-title">
                   {i.title}
                 </span>
-                <span className="ml-2">x</span>
-                <span data-testid="item-quantity">{i.quantity}</span>
+                <span className="ml-2 text-muted">x</span>
+                <span className="text-muted" data-testid="item-quantity">
+                  {i.quantity}
+                </span>
               </div>
             </div>
           )
         })}
         {numberOfProducts > 4 && (
-          <div className="w-full h-full flex flex-col items-center justify-center">
-            <span className="text-small-regular text-ui-fg-base">
-              + {numberOfLines - 4}
-            </span>
-            <span className="text-small-regular text-ui-fg-base">more</span>
+          <div className="flex h-full w-full flex-col items-center justify-center">
+            <span className="text-sm text-muted">+ {numberOfLines - 4}</span>
+            <span className="text-sm text-muted">more</span>
           </div>
         )}
       </div>
       <div className="flex justify-end">
         <LocalizedClientLink href={`/account/orders/details/${order.id}`}>
-          <Button data-testid="order-details-link" variant="secondary">
+          <Button
+            data-testid="order-details-link"
+            variant="secondary"
+            className="!rounded-large !border-[1.5px] !border-brand !bg-card !font-extrabold !text-brand !shadow-none hover:!bg-brand-soft"
+          >
             See details
           </Button>
         </LocalizedClientLink>

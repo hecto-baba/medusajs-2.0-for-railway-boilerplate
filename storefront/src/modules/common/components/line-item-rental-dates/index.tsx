@@ -56,12 +56,12 @@ const LineItemRentalDates = ({
 
   return (
     <div className="flex flex-col w-full" data-testid={dataTestid}>
-      <Text className="inline-block txt-medium text-ui-fg-subtle w-full overflow-hidden text-ellipsis">
+      <Text className="inline-block txt-medium text-muted w-full overflow-hidden text-ellipsis">
         Rental: {start} - {end}
         {quantityLabel ? ` (${quantityLabel})` : ""}
       </Text>
       {(pickupTime || returnTime) && (
-        <Text className="inline-block txt-small text-ui-fg-subtle w-full overflow-hidden text-ellipsis">
+        <Text className="inline-block txt-small text-muted w-full overflow-hidden text-ellipsis">
           Pickup {pickupTime ?? "—"} / Return {returnTime ?? "—"}
         </Text>
       )}

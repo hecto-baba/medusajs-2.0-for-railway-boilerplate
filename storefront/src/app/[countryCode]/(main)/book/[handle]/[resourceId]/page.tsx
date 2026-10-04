@@ -1,5 +1,5 @@
 import { getBusiness } from "@lib/data/appointments"
-import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import Breadcrumbs from "@modules/common/components/breadcrumbs"
 import SlotPicker from "@modules/appointments/components/slot-picker"
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
@@ -28,26 +28,22 @@ export default async function BookResourcePage({ params, searchParams }: Props) 
   if (!detail || !resource) notFound()
 
   return (
-    <div className="content-container py-12">
-      <LocalizedClientLink
-        href={`/book/${detail.business.handle}`}
-        className="text-ui-fg-subtle txt-small hover:underline"
-      >
-        &larr; {detail.business.name}
-      </LocalizedClientLink>
+    <div className="bg-canvas">
+      <div className="content-container py-8 small:py-12">
+        <Breadcrumbs
+          items={[
+            { label: "Book", href: "/book" },
+            { label: detail.business.name, href: `/book/${detail.business.handle}` },
+            { label: resource.name ?? "Booking" },
+          ]}
+        />
 
-      <div className="mt-4 mb-8 flex items-center gap-4">
-        {resource.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={resource.image_url} alt="" className="h-16 w-16 rounded-md object-cover" />
-        ) : null}
-        <div>
-          <h1 className="text-3xl-regular">{resource.name}</h1>
-          <p className="text-ui-fg-subtle">{detail.business.name}</p>
-        </div>
+        <SlotPicker
+          resource={resource}
+          initialProductId={service}
+          businessName={detail.business.name}
+        />
       </div>
-
-      <SlotPicker resource={resource} initialProductId={service} />
     </div>
   )
 }

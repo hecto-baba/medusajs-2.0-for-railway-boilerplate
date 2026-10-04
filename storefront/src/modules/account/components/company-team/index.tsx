@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Badge, Button, Heading, Input, Label, Switch, Table, Text, toast } from "@medusajs/ui"
+import { Button, Heading, Input, Label, Switch, Table, Text, toast } from "@medusajs/ui"
 import { Plus, User, CheckCircle, XCircle } from "@medusajs/icons"
+import Chip from "@modules/common/components/chip"
 import { addCompanyEmployee, CompanyEmployee } from "@lib/data/company"
 
 type CompanyTeamProps = {
@@ -78,14 +79,14 @@ export const CompanyTeam = ({
   const currency = currencyCode.toUpperCase()
 
   return (
-    <div className="border rounded-lg p-6 bg-white shadow-sm flex flex-col gap-y-6">
+    <div className="rounded-large bg-card p-5 shadow-lift flex flex-col gap-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+      <div className="flex flex-col small:flex-row small:items-center justify-between gap-4 border-b border-line pb-4">
         <div>
-          <Heading level="h3" className="text-lg-semi">
+          <Heading level="h3" className="font-display text-lg font-extrabold tracking-tight">
             Company Team & Permissions
           </Heading>
-          <Text className="text-xs text-ui-fg-subtle mt-1">
+          <Text className="text-xs text-muted mt-1">
             Colleagues in your organization authorized to purchase or manage business orders.
           </Text>
         </div>
@@ -94,7 +95,7 @@ export const CompanyTeam = ({
           <Button
             size="small"
             onClick={() => setShowAddModal(true)}
-            className="gap-x-1.5 flex-shrink-0"
+            className="gap-x-1.5 flex-shrink-0 !rounded-large !border-0 !bg-brand !font-extrabold !text-brand-ink !shadow-none hover:!opacity-90"
           >
             <Plus className="w-4 h-4" />
             <span>Add Team Member</span>
@@ -103,7 +104,7 @@ export const CompanyTeam = ({
       </div>
 
       {/* Team Table */}
-      <Table>
+      <div className="overflow-x-auto"><Table>
         <Table.Header>
           <Table.Row>
             <Table.HeaderCell>Colleague</Table.HeaderCell>
@@ -114,7 +115,7 @@ export const CompanyTeam = ({
         <Table.Body>
           {employees.length === 0 ? (
             <Table.Row>
-              <Table.Cell {...({ colSpan: 3 } as any)} className="text-center py-6 text-ui-fg-subtle">
+              <Table.Cell {...({ colSpan: 3 } as any)} className="text-center py-6 text-muted">
                 No colleagues registered yet.
               </Table.Cell>
             </Table.Row>
@@ -136,27 +137,23 @@ export const CompanyTeam = ({
                 <Table.Row key={emp.id}>
                   <Table.Cell>
                     <div className="flex items-center gap-x-3">
-                      <div className="w-8 h-8 rounded-full bg-ui-bg-subtle flex items-center justify-center text-xs font-semibold text-ui-fg-subtle">
+                      <div className="w-8 h-8 rounded-circle bg-brand-soft flex items-center justify-center text-xs font-bold text-muted">
                         {customer.first_name ? customer.first_name[0] : "E"}
                       </div>
                       <div>
-                        <div className="font-medium text-sm text-ui-fg-base">{name}</div>
-                        <div className="text-xs text-ui-fg-subtle font-mono">{email}</div>
+                        <div className="font-bold text-sm text-ink">{name}</div>
+                        <div className="text-xs text-muted font-mono">{email}</div>
                       </div>
                     </div>
                   </Table.Cell>
                   <Table.Cell>
                     {emp.is_admin ? (
-                      <Badge color="purple" size="xsmall">
-                        🛡️ Manager
-                      </Badge>
+                      <Chip tone="warning">Manager</Chip>
                     ) : (
-                      <Badge color="blue" size="xsmall">
-                        👤 Buyer
-                      </Badge>
+                      <Chip tone="success">Buyer</Chip>
                     )}
                   </Table.Cell>
-                  <Table.Cell className="text-right font-mono text-sm font-semibold">
+                  <Table.Cell className="text-right font-mono text-sm font-bold">
                     {limit}
                   </Table.Cell>
                 </Table.Row>
@@ -164,24 +161,24 @@ export const CompanyTeam = ({
             })
           )}
         </Table.Body>
-      </Table>
+      </Table></div>
 
       {/* Add Employee Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full border p-6 flex flex-col gap-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-xs p-4">
+          <div className="bg-card rounded-large shadow-pop max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-3">
               <div>
-                <Heading level="h3" className="text-base-semi">
+                <Heading level="h3" className="font-display text-base font-extrabold tracking-tight">
                   Add Team Member
                 </Heading>
-                <Text className="text-xs text-ui-fg-subtle">
+                <Text className="text-xs text-muted">
                   Invite an employee or manager to purchase for your company.
                 </Text>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="text-ui-fg-subtle hover:text-ui-fg-base text-xl leading-none"
+                className="text-muted hover:text-ink text-xl leading-none"
               >
                 &times;
               </button>
@@ -236,15 +233,15 @@ export const CompanyTeam = ({
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password123!"
                 />
-                <span className="text-[11px] text-ui-fg-subtle">
+                <span className="text-[11px] text-muted">
                   The employee can use this password to sign into their storefront account.
                 </span>
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg border bg-gray-50">
+              <div className="flex items-center justify-between p-3 rounded-[12px] border border-line bg-canvas">
                 <div>
-                  <Label className="text-sm font-medium">Company Manager (Admin)</Label>
-                  <Text className="text-xs text-ui-fg-subtle">
+                  <Label className="text-sm font-bold">Company Manager (Admin)</Label>
+                  <Text className="text-xs text-muted">
                     Allow this user to approve orders and manage team members.
                   </Text>
                 </div>
@@ -265,13 +262,13 @@ export const CompanyTeam = ({
                     value={spendingLimit}
                     onChange={(e) => setSpendingLimit(e.target.value)}
                   />
-                  <span className="text-[11px] text-ui-fg-subtle">
+                  <span className="text-[11px] text-muted">
                     Orders exceeding this limit require manager approval at checkout.
                   </span>
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-x-2 pt-4 border-t">
+              <div className="flex items-center justify-end gap-x-2 pt-4 border-t border-line">
                 <Button
                   type="button"
                   variant="secondary"
@@ -284,6 +281,7 @@ export const CompanyTeam = ({
                   type="submit"
                   size="small"
                   isLoading={isSubmitting}
+                  className="!rounded-large !border-0 !bg-brand !font-extrabold !text-brand-ink !shadow-none hover:!opacity-90"
                 >
                   Add Colleague
                 </Button>

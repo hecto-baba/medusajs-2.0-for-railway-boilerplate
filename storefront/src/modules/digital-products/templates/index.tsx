@@ -19,17 +19,20 @@ const DigitalProductsTemplate = ({
 
   return (
     <div
-      className="flex flex-col small:flex-row small:items-start py-6 content-container"
+      className="content-container flex flex-col py-8 small:flex-row small:items-start"
       data-testid="digital-products-container"
     >
       <RefinementList sortBy={sort} data-testid="sort-by-container" />
       <div className="w-full">
-        <div className="mb-8">
-          <h1 className="text-2xl-semi text-ui-fg-base mb-2" data-testid="digital-products-title">
+        <div className="mb-6">
+          <h1
+            className="mb-1 font-display text-3xl font-extrabold tracking-tight text-ink small:text-4xl"
+            data-testid="digital-products-title"
+          >
             Digital Products
           </h1>
-          <p className="text-ui-fg-subtle text-base-regular">
-            Browse our collection of downloadable e-books, automation guides, workflows & digital assets.
+          <p className="text-sm text-muted">
+            Browse our collection of downloadable e-books, automation guides, workflows &amp; digital assets.
           </p>
         </div>
         <Suspense fallback={<SkeletonProductGrid />}>

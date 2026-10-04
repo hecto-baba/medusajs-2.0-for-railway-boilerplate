@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, Text, clx } from "@medusajs/ui"
+import { clx } from "@medusajs/ui"
 import { useEffect, useMemo, useState, useTransition } from "react"
 import { useParams } from "next/navigation"
 import {
@@ -29,6 +29,13 @@ const formatTime = (value: string) =>
     hour: "numeric",
     minute: "2-digit",
   })
+
+const TIER_SEAT: Record<string, string> = {
+  vip: "border-pop-ink/30 bg-pop text-pop-ink hover:border-ink",
+  premium: "border-brand/40 bg-brand-soft text-brand hover:border-brand",
+  balcony: "border-success/40 bg-success-soft text-success hover:border-success",
+  standard: "border-line bg-card text-ink hover:border-ink",
+}
 
 const seatKey = (rowNumber: string, seatNumber: string) =>
   `${rowNumber}-${seatNumber}`
@@ -132,16 +139,19 @@ const SeatSelector = ({ productId, availability }: SeatSelectorProps) => {
 
   if (!availability.length) {
     return (
-      <Text className="text-ui-fg-subtle">
-        No performances are currently on sale.
-      </Text>
+      <p className="text-muted">No performances are currently on sale.</p>
     )
   }
 
+  // Tiers present in the current map, in the order they first appear.
+  const tiersInMap = seatMap
+    ? Array.from(new Set(seatMap.seat_map.map((row) => row.row_type)))
+    : []
+
   return (
-    <div className="flex flex-col gap-y-6">
+    <div className="flex flex-col gap-y-5" data-testid="seat-selector">
       <div className="flex flex-col gap-y-3">
-        <Text className="text-ui-fg-base font-medium">Choose a date</Text>
+        <p className="font-extrabold text-ink">Choose a date</p>
         <div className="flex flex-wrap gap-2">
           {availability.map((date) => {
             const isSelected = date.date === selectedDate
@@ -151,23 +161,23 @@ const SeatSelector = ({ productId, availability }: SeatSelectorProps) => {
                 key={date.date}
                 type="button"
                 disabled={date.is_sold_out}
+                aria-pressed={isSelected}
                 onClick={() => setSelectedDate(date.date)}
                 className={clx(
-                  "flex flex-col items-start rounded-rounded border px-3 py-2 text-left transition-colors",
+                  "flex flex-col items-start rounded-[12px] border px-3 py-2 text-left transition-colors",
                   {
-                    "border-ui-border-interactive bg-ui-bg-interactive text-ui-fg-on-color":
-                      isSelected,
-                    "border-ui-border-base hover:border-ui-border-interactive":
+                    "border-brand bg-brand-soft text-brand": isSelected,
+                    "border-line bg-card text-ink hover:border-brand":
                       !isSelected && !date.is_sold_out,
-                    "border-ui-border-base opacity-50 cursor-not-allowed":
+                    "cursor-not-allowed border-line bg-canvas text-muted opacity-60":
                       date.is_sold_out,
                   }
                 )}
               >
-                <span className="text-small-regular">
+                <span className="text-sm font-extrabold" suppressHydrationWarning>
                   {formatDate(date.date)}
                 </span>
-                <span className="text-xsmall-regular opacity-80">
+                <span className="text-xs opacity-80" suppressHydrationWarning>
                   {date.is_sold_out
                     ? "Sold out"
                     : `${formatTime(date.date)} · ${date.seats_available} left`}
@@ -178,26 +188,24 @@ const SeatSelector = ({ productId, availability }: SeatSelectorProps) => {
         </div>
       </div>
 
-      {isLoadingSeats && (
-        <Text className="text-ui-fg-subtle">Loading seats...</Text>
-      )}
+      {isLoadingSeats && <p className="text-muted">Loading seats...</p>}
 
       {seatMap && !isLoadingSeats && (
-        <div className="flex flex-col gap-y-4">
-          <div className="rounded-rounded bg-ui-bg-subtle py-1 text-center">
-            <Text className="text-xsmall-regular uppercase tracking-wider text-ui-fg-subtle">
+        <div className="flex flex-col gap-y-4 rounded-large bg-card p-4 shadow-lift">
+          <div className="rounded-rounded bg-ink py-1.5 text-center">
+            <span className="text-xs font-extrabold uppercase tracking-[0.2em] text-canvas">
               Stage
-            </Text>
+            </span>
           </div>
 
-          <div className="flex flex-col gap-y-2">
+          <div className="flex flex-col gap-y-2 overflow-x-auto">
             {seatMap.seat_map.map((row) => (
               <div key={row.venue_row_id} className="flex items-center gap-x-3">
-                <Text className="w-6 shrink-0 text-xsmall-regular text-ui-fg-subtle">
+                <span className="w-6 shrink-0 text-xs font-bold text-muted">
                   {row.row_number}
-                </Text>
+                </span>
 
-                <div className="flex flex-1 flex-wrap gap-1">
+                <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
                   {row.seats.map((seat) => {
                     const isSelected = selectedKeys.has(
                       seatKey(row.row_number, seat.seat_number)
@@ -216,14 +224,13 @@ const SeatSelector = ({ productId, availability }: SeatSelectorProps) => {
                         }`}
                         aria-pressed={isSelected}
                         className={clx(
-                          "h-6 w-6 rounded-sm border text-[10px] leading-none transition-colors",
+                          "h-7 w-7 rounded-[6px] border text-[10px] font-bold leading-none transition-colors",
                           {
-                            "border-ui-border-interactive bg-ui-bg-interactive text-ui-fg-on-color":
-                              isSelected,
-                            "border-ui-border-base bg-ui-bg-base hover:border-ui-border-interactive":
+                            "border-ink bg-ink text-canvas": isSelected,
+                            [TIER_SEAT[row.row_type] ?? TIER_SEAT.standard]:
                               !isSelected && !isDisabled,
-                            "border-ui-border-base bg-ui-bg-disabled text-ui-fg-disabled cursor-not-allowed":
-                              isDisabled,
+                            "cursor-not-allowed border-line bg-canvas text-muted opacity-50 line-through":
+                              isDisabled && !isSelected,
                           }
                         )}
                       >
@@ -233,51 +240,78 @@ const SeatSelector = ({ productId, availability }: SeatSelectorProps) => {
                   })}
                 </div>
 
-                <Text className="w-16 shrink-0 text-right text-xsmall-regular text-ui-fg-muted">
+                <span className="hidden w-16 shrink-0 text-right text-xs text-muted xsmall:block">
                   {ROW_TYPE_LABELS[row.row_type] ?? row.row_type}
-                </Text>
+                </span>
               </div>
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <div
+            className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line pt-3"
+            data-testid="seat-legend"
+          >
+            {tiersInMap.map((tier) => (
+              <span key={tier} className="flex items-center gap-x-1.5">
+                <span
+                  className={clx(
+                    "h-3.5 w-3.5 rounded-[4px] border",
+                    TIER_SEAT[tier] ?? TIER_SEAT.standard
+                  )}
+                />
+                <span className="text-xs text-muted">
+                  {ROW_TYPE_LABELS[tier] ?? tier}
+                </span>
+              </span>
+            ))}
             <span className="flex items-center gap-x-1.5">
-              <span className="h-3 w-3 rounded-sm border border-ui-border-base bg-ui-bg-base" />
-              <Text className="text-xsmall-regular text-ui-fg-subtle">
-                Available
-              </Text>
+              <span className="h-3.5 w-3.5 rounded-[4px] border border-ink bg-ink" />
+              <span className="text-xs text-muted">Selected</span>
             </span>
             <span className="flex items-center gap-x-1.5">
-              <span className="h-3 w-3 rounded-sm border border-ui-border-interactive bg-ui-bg-interactive" />
-              <Text className="text-xsmall-regular text-ui-fg-subtle">
-                Selected
-              </Text>
-            </span>
-            <span className="flex items-center gap-x-1.5">
-              <span className="h-3 w-3 rounded-sm border border-ui-border-base bg-ui-bg-disabled" />
-              <Text className="text-xsmall-regular text-ui-fg-subtle">Taken</Text>
+              <span className="h-3.5 w-3.5 rounded-[4px] border border-line bg-canvas opacity-50" />
+              <span className="text-xs text-muted">Taken</span>
             </span>
           </div>
         </div>
       )}
 
-      {error && (
-        <Text className="text-ui-fg-error text-small-regular">{error}</Text>
-      )}
+      {error && <p className="text-sm font-bold text-brand">{error}</p>}
 
-      <Button
-        onClick={handleAddToCart}
-        disabled={!selected.length || isPending}
-        isLoading={isPending}
-        className="w-full h-10"
-        data-testid="add-tickets-button"
+      <div
+        className="sticky bottom-3 z-10 flex flex-col gap-y-2 rounded-large border border-line bg-card p-4 shadow-pop"
+        data-testid="seat-summary"
       >
-        {selected.length
-          ? `Add ${selected.length} ${
-              selected.length === 1 ? "ticket" : "tickets"
-            } to cart`
-          : "Select a seat"}
-      </Button>
+        {selected.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {selected.map((seat) => (
+              <span
+                key={seatKey(seat.row_number, seat.seat_number)}
+                className="rounded-circle bg-canvas px-2.5 py-1 text-xs font-bold text-ink"
+              >
+                Row {seat.row_number}, seat {seat.seat_number}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">No seats selected yet.</p>
+        )}
+        <button
+          type="button"
+          onClick={handleAddToCart}
+          disabled={!selected.length || isPending}
+          className="h-12 w-full rounded-large bg-brand text-base font-extrabold text-brand-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          data-testid="add-tickets-button"
+        >
+          {isPending
+            ? "Adding..."
+            : selected.length
+            ? `Add ${selected.length} ${
+                selected.length === 1 ? "ticket" : "tickets"
+              } to cart`
+            : "Select a seat"}
+        </button>
+      </div>
     </div>
   )
 }

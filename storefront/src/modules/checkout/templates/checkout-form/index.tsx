@@ -11,9 +11,11 @@ import { isNoShippingCart } from "types/appointment"
 export default async function CheckoutForm({
   cart,
   customer,
+  step,
 }: {
   cart: HttpTypes.StoreCart | null
   customer: HttpTypes.StoreCustomer | null
+  step?: string
 }) {
   if (!cart) {
     return null
@@ -32,7 +34,27 @@ export default async function CheckoutForm({
   // billing address only.
   const isTicketsOnly = isNoShippingCart(cart.items)
 
-  const paymentMethods = await listCartPaymentMethods(cart.region?.id ?? "")
+  // Each lookup costs the backend a run of database queries (shipping options
+  // about 17), so a step fetches only what it can show. Payment methods are
+  // listed only while the payment step is open. Shipping options are needed
+  // while the delivery step is open, and afterwards to name the chosen method
+  // in its collapsed summary; on the address step nothing uses them yet.
+  // They are independent, so they are requested together.
+  const needsPaymentMethods = step === "payment"
+  const needsShippingGroups =
+    !isTicketsOnly &&
+    (step === "delivery" || (cart.shipping_methods?.length ?? 0) > 0)
+
+  const [paymentMethods, shippingGroups] = await Promise.all([
+    needsPaymentMethods
+      ? listCartPaymentMethods(cart.region?.id ?? "")
+      : Promise.resolve([] as any[]),
+    isTicketsOnly
+      ? Promise.resolve(null)
+      : needsShippingGroups
+        ? listCartShippingGroups(cart.id)
+        : Promise.resolve([]),
+  ])
 
   if (!paymentMethods) {
     return null
@@ -57,8 +79,6 @@ export default async function CheckoutForm({
       </div>
     )
   }
-
-  const shippingGroups = await listCartShippingGroups(cart.id)
 
   if (!shippingGroups) {
     return null

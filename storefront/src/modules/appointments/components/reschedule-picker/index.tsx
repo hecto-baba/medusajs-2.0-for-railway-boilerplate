@@ -159,28 +159,28 @@ const ReschedulePicker = ({
 
   return (
     <div className="flex flex-col gap-8" data-testid="reschedule-picker">
-      <div className="border-ui-border-base flex flex-col gap-1 rounded-lg border p-5">
-        <div className="text-ui-fg-subtle txt-small">Current booking</div>
-        <div className="txt-large-plus">
+      <div className="flex flex-col gap-1 rounded-large bg-card p-5 shadow-lift">
+        <div className="text-sm text-muted">Current booking</div>
+        <div className="font-display text-lg font-extrabold text-ink">
           {serviceTitle} with {resourceName}
         </div>
-        <div className="text-ui-fg-muted line-through">{fullWhen(currentStart, tz)}</div>
-        <div className="text-ui-fg-subtle txt-small">Times are shown in {tz}</div>
+        <div className="text-muted line-through">{fullWhen(currentStart, tz)}</div>
+        <div className="text-sm text-muted">Times are shown in {tz}</div>
       </div>
 
       <section aria-label="Pick a day">
-        <h2 className="txt-large-plus mb-3">1. Pick a day</h2>
+        <h2 className="mb-3 font-display text-lg font-extrabold text-ink">1. Pick a day</h2>
         {loading ? (
-          <p className="text-ui-fg-subtle">Loading available times...</p>
+          <p className="text-muted">Loading available times...</p>
         ) : loadError ? (
-          <p className="text-ui-fg-error">{loadError}</p>
+          <p className="text-brand">{loadError}</p>
         ) : !days.length ? (
-          <p className="text-ui-fg-subtle">
+          <p className="text-muted">
             No other times are available in the next {WINDOW_DAYS} days. Please check back later or
             contact the business.
           </p>
         ) : (
-          <div className="flex flex-wrap gap-2" role="list">
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2" role="list">
             {days.map((d) => (
               <button
                 key={d}
@@ -190,14 +190,14 @@ const ReschedulePicker = ({
                   setSlot(null)
                 }}
                 aria-pressed={day === d}
-                className={`rounded-md border px-3 py-2 text-left ${
+                className={`shrink-0 rounded-[12px] border-[1.5px] px-3 py-2 text-left text-ink ${
                   day === d
-                    ? "bg-ui-button-inverted text-ui-fg-on-inverted"
-                    : "border-ui-border-base hover:bg-ui-bg-base-hover"
+                    ? "border-brand bg-brand-soft"
+                    : "border-line bg-card hover:border-brand"
                 }`}
               >
-                <div className="txt-compact-small-plus">{dayLabel(d)}</div>
-                <div className="txt-compact-xsmall opacity-70">
+                <div className="text-sm font-bold">{dayLabel(d)}</div>
+                <div className="text-xs text-muted">
                   {byDay.get(d)?.length} time{byDay.get(d)?.length === 1 ? "" : "s"}
                 </div>
               </button>
@@ -208,7 +208,7 @@ const ReschedulePicker = ({
 
       {day ? (
         <section aria-label="Pick a time">
-          <h2 className="txt-large-plus mb-3">2. Pick a time — {dayLabel(day)}</h2>
+          <h2 className="mb-3 font-display text-lg font-extrabold text-ink">2. Pick a time — {dayLabel(day)}</h2>
           <div className="grid grid-cols-2 gap-2 small:grid-cols-4 medium:grid-cols-6">
             {daySlots.map((s) => (
               <button
@@ -217,15 +217,15 @@ const ReschedulePicker = ({
                 onClick={() => setSlot(s)}
                 aria-pressed={slot?.start === s.start}
                 data-testid="slot-button"
-                className={`rounded-md border px-3 py-2 ${
+                className={`rounded-[12px] border-[1.5px] px-3 py-2 text-center text-ink ${
                   slot?.start === s.start
-                    ? "bg-ui-button-inverted text-ui-fg-on-inverted"
-                    : "border-ui-border-base hover:bg-ui-bg-base-hover"
+                    ? "border-brand bg-brand-soft"
+                    : "border-line bg-card hover:border-brand"
                 }`}
               >
-                <div className="txt-compact-small-plus">{time(s.start, tz)}</div>
+                <div className="text-sm font-bold">{time(s.start, tz)}</div>
                 {s.capacity > 1 ? (
-                  <div className="txt-compact-xsmall opacity-70">{s.spots_left} left</div>
+                  <div className="text-xs text-muted">{s.spots_left} left</div>
                 ) : null}
               </button>
             ))}
@@ -234,23 +234,23 @@ const ReschedulePicker = ({
       ) : null}
 
       {slot ? (
-        <div className="bg-ui-bg-subtle flex max-w-xl flex-col gap-1 rounded-md p-4">
+        <div className="flex max-w-xl flex-col gap-1 rounded-large bg-card p-4 text-ink shadow-lift">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ui-fg-muted line-through">{fullWhen(currentStart, tz)}</span>
+            <span className="text-muted line-through">{fullWhen(currentStart, tz)}</span>
             <span aria-hidden>to</span>
             <strong>{fullWhen(slot.start, tz)}</strong>
           </div>
-          <div className="text-ui-fg-subtle txt-small">
+          <div className="text-sm text-muted">
             Same service, same price. You will not be charged again.
           </div>
-          <div className="text-ui-fg-subtle txt-small">
+          <div className="text-sm text-muted">
             Your cancellation deadline moves with the new time.
           </div>
         </div>
       ) : null}
 
       {submitError ? (
-        <p className="text-ui-fg-error" role="alert">
+        <p className="text-brand" role="alert">
           {submitError}
         </p>
       ) : null}
@@ -260,14 +260,14 @@ const ReschedulePicker = ({
           type="button"
           onClick={confirm}
           disabled={!slot || submitting}
-          className="bg-ui-button-inverted text-ui-fg-on-inverted w-fit rounded-md px-6 py-3 disabled:opacity-50"
+          className="w-fit rounded-large bg-brand px-6 py-3 font-extrabold text-brand-ink hover:opacity-90 disabled:opacity-50"
           data-testid="confirm-reschedule-button"
         >
           {submitting ? "Moving..." : "Confirm new time"}
         </button>
         <a
           href={`/${countryCode}/appointments/booking/${id}${backQuery}`}
-          className="underline"
+          className="font-bold text-brand hover:underline"
         >
           Keep current time
         </a>

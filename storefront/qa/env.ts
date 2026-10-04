@@ -46,6 +46,8 @@ const read = (key: string, fallback: string): string =>
 export const qaEnv = {
   baseURL: read("QA_BASE_URL", read("NEXT_PUBLIC_BASE_URL", "http://localhost:8000")),
   backendURL: read("NEXT_PUBLIC_MEDUSA_BACKEND_URL", "http://localhost:9000"),
+  /** Lets tests read the catalogue over the API to pick products by kind. */
+  publishableKey: read("NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY", ""),
   /** Mirrors the storefront default in src/lib/util/env.ts. */
   storeName: read("NEXT_PUBLIC_STORE_NAME", "Your Store"),
   /** Must match a country covered by a region in Medusa. */

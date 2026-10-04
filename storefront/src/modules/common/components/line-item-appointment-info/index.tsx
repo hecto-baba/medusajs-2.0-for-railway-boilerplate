@@ -46,7 +46,7 @@ const Countdown = ({ expiresAt }: { expiresAt: string }) => {
 
   if (remaining <= 0) {
     return (
-      <Text className="txt-compact-small text-ui-fg-error mt-0.5" role="alert">
+      <Text className="txt-compact-small text-brand mt-0.5" role="alert">
         Your reservation has expired. Remove this and choose the time again.
       </Text>
     )
@@ -56,7 +56,7 @@ const Countdown = ({ expiresAt }: { expiresAt: string }) => {
   const seconds = Math.floor((remaining % 60_000) / 1000)
 
   return (
-    <Text className="txt-compact-small text-ui-fg-subtle mt-0.5">
+    <Text className="txt-compact-small text-muted mt-0.5">
       Reserved for you: {minutes}:{String(seconds).padStart(2, "0")}
     </Text>
   )
@@ -84,7 +84,7 @@ const LineItemAppointmentInfo = ({
 
   return (
     <div data-testid={dataTestid}>
-      <Text className="inline-block txt-medium text-ui-fg-subtle w-full overflow-hidden text-ellipsis">
+      <Text className="inline-block txt-medium text-muted w-full overflow-hidden text-ellipsis">
         {resource ? `${resource} · ` : ""}
         {format(start, tz, true)}
         {end

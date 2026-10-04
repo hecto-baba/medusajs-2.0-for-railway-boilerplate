@@ -618,9 +618,6 @@ export default defineMiddlewares({
       ],
     },
     {
-      matcher: "/store/enquiries",
-      methods: ["POST"],
-    {
       matcher: "/store/appointments/bookings/:id/slots",
       methods: ["GET"],
       middlewares: [
@@ -636,6 +633,9 @@ export default defineMiddlewares({
         validateAndTransformBody(PostBuyerRescheduleSchema),
       ],
     },
+    {
+      matcher: "/store/enquiries",
+      methods: ["POST"],
       middlewares: [
         enquiryRateLimit,
         validateAndTransformBody(PostStoreEnquirySchema)
@@ -1319,6 +1319,16 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [validateAndTransformBody(CancelAppointmentSchema)],
     },
+    {
+      matcher: "/vendors/appointments/:id/reschedule-slots",
+      methods: ["GET"],
+      middlewares: [validateAndTransformQuery(GetRescheduleSlotsSchema, {})],
+    },
+    {
+      matcher: "/vendors/appointments/:id/reschedule",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(RescheduleAppointmentSchema)],
+    },
     // ---- admin oversight of resources (Plan 3, phase 8). /admin/* is already
     // authenticated by the framework; these add validation only.
     {
@@ -1347,6 +1357,16 @@ export default defineMiddlewares({
       middlewares: [validateAndTransformBody(CancelAppointmentSchema)],
     },
     {
+      matcher: "/admin/appointments/:id/reschedule-slots",
+      methods: ["GET"],
+      middlewares: [validateAndTransformQuery(GetRescheduleSlotsSchema, {})],
+    },
+    {
+      matcher: "/admin/appointments/:id/reschedule",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(RescheduleAppointmentSchema)],
+    },
+    {
       matcher: "/admin/providers/:id/recurring-availability",
       methods: ["POST"],
       middlewares: [
@@ -1355,16 +1375,6 @@ export default defineMiddlewares({
     },
     {
       matcher: "/admin/providers/:id/exceptions/:exceptionId",
-    {
-      matcher: "/vendors/appointments/:id/reschedule-slots",
-      methods: ["GET"],
-      middlewares: [validateAndTransformQuery(GetRescheduleSlotsSchema, {})],
-    },
-    {
-      matcher: "/vendors/appointments/:id/reschedule",
-      methods: ["POST"],
-      middlewares: [validateAndTransformBody(RescheduleAppointmentSchema)],
-    },
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(PostAdminAvailabilityExceptionSchema)
@@ -1391,16 +1401,6 @@ export default defineMiddlewares({
         validateAndTransformBody(PostAppointmentConfigBodySchema)
       ]
     },
-    },
-    {
-      matcher: "/admin/appointments/:id/reschedule-slots",
-      methods: ["GET"],
-      middlewares: [validateAndTransformQuery(GetRescheduleSlotsSchema, {})],
-    },
-    {
-      matcher: "/admin/appointments/:id/reschedule",
-      methods: ["POST"],
-      middlewares: [validateAndTransformBody(RescheduleAppointmentSchema)],
     {
       matcher:
         "/vendors/products/:id/variants/:variant_id/inventory-levels",

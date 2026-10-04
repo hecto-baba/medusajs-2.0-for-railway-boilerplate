@@ -102,6 +102,9 @@ const StripePaymentButton = ({
 
   const onPaymentCompleted = async () => {
     await placeOrder()
+      .then((res) => {
+        if (res && "error" in res) setErrorMessage(res.error ?? null)
+      })
       .catch((err) => {
         setErrorMessage(err.message)
       })
@@ -188,6 +191,7 @@ const StripePaymentButton = ({
         disabled={disabled || notReady}
         onClick={handlePayment}
         size="large"
+        className="!rounded-large !border-0 !bg-brand !font-extrabold !text-brand-ink !shadow-none hover:!opacity-90 disabled:!bg-line disabled:!text-muted"
         isLoading={submitting}
         data-testid={dataTestId}
       >
@@ -218,6 +222,9 @@ const PayPalPaymentButton = ({
 
   const onPaymentCompleted = async () => {
     await placeOrder()
+      .then((res) => {
+        if (res && "error" in res) setErrorMessage(res.error ?? null)
+      })
       .catch((err) => {
         setErrorMessage(err.message)
       })
@@ -286,6 +293,9 @@ const ManualTestPaymentButton = ({
 
   const onPaymentCompleted = async () => {
     await placeOrder()
+      .then((res) => {
+        if (res && "error" in res) setErrorMessage(res.error ?? null)
+      })
       .catch((err) => {
         setErrorMessage(err.message)
       })
@@ -313,6 +323,7 @@ const ManualTestPaymentButton = ({
         isLoading={submitting}
         onClick={handlePayment}
         size="large"
+        className="!rounded-large !border-0 !bg-brand !font-extrabold !text-brand-ink !shadow-none hover:!opacity-90 disabled:!bg-line disabled:!text-muted"
         data-testid="submit-order-button"
       >
         Place order

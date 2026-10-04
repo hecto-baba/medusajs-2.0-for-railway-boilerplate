@@ -2,6 +2,70 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+/*
+ * Storefront design tokens. RGB triplets so Tailwind opacity modifiers work.
+ * Light is the default. Dark applies when <html> has the "dark" class, which
+ * the inline script in app/layout.tsx sets from the saved preference.
+ */
+@layer base {
+  :root {
+    --c-canvas: 244 243 247;
+    --c-card: 255 255 255;
+    --c-ink: 29 27 36;
+    --c-muted: 108 105 122;
+    --c-line: 230 228 236;
+    --c-brand: 214 58 34;
+    --c-brand-ink: 255 255 255;
+    --c-brand-soft: 253 232 227;
+    --c-pop: 211 242 106;
+    --c-pop-ink: 42 56 0;
+    --c-success: 18 128 79;
+    --c-success-ink: 255 255 255;
+    --c-success-soft: 221 243 231;
+    --shadow-lift: 0 1px 2px rgba(29, 27, 36, 0.06),
+      0 8px 24px rgba(29, 27, 36, 0.06);
+    --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.25);
+  }
+
+  .dark {
+    --c-canvas: 18 17 22;
+    --c-card: 30 29 37;
+    --c-ink: 243 241 247;
+    --c-muted: 162 158 175;
+    --c-line: 46 44 55;
+    --c-brand: 255 106 80;
+    --c-brand-ink: 26 10 6;
+    --c-brand-soft: 59 31 25;
+    --c-pop: 201 236 92;
+    --c-pop-ink: 31 42 0;
+    --c-success: 77 203 140;
+    --c-success-ink: 4 33 15;
+    --c-success-soft: 22 48 31;
+    --shadow-lift: 0 1px 2px rgba(0, 0, 0, 0.4),
+      0 8px 24px rgba(0, 0, 0, 0.35);
+    --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-brand));
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
 @layer utilities {
   /* Chrome, Safari and Opera */
   .no-scrollbar::-webkit-scrollbar {
@@ -51,7 +115,7 @@
 
 @layer components {
   .content-container {
-    @apply max-w-[1440px] w-full mx-auto px-6;
+    @apply max-w-[1280px] w-full mx-auto px-4 small:px-6;
   }
 
   .contrast-btn {

@@ -20,50 +20,50 @@ export default async function CompanyPage() {
 
   return (
     <div className="w-full">
-      <div className="mb-8 flex flex-col gap-y-4">
-        <h1 className="text-2xl-semi">Company Overview</h1>
-        <p className="text-base-regular text-ui-fg-subtle">
+      <div className="mb-4 flex flex-col gap-y-2 rounded-large bg-card p-5 shadow-lift">
+        <h1 className="font-display text-2xl font-extrabold tracking-tight">Company Overview</h1>
+        <p className="text-muted">
           View your corporate account profile, membership status, and spending privileges.
         </p>
       </div>
 
       {!company ? (
-        <div className="border border-dashed rounded-lg p-8 text-center bg-gray-50">
-          <p className="text-base-semi mb-2">Individual Customer Account</p>
-          <p className="text-sm text-ui-fg-subtle max-w-md mx-auto">
+        <div className="rounded-large bg-card p-8 text-center shadow-lift">
+          <p className="font-display text-lg font-extrabold tracking-tight mb-2">Individual Customer Account</p>
+          <p className="text-sm text-muted max-w-md mx-auto">
             You are currently shopping as an individual customer. If your organization has a corporate wholesale account, contact your company manager to invite this email.
           </p>
         </div>
       ) : (
         <div className="flex flex-col gap-y-6 w-full">
           {/* Company Card */}
-          <div className="border rounded-lg p-6 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b pb-4 mb-4">
+          <div className="rounded-large p-5 bg-card shadow-lift">
+            <div className="flex items-center justify-between border-b border-line pb-4 mb-4">
               <div>
-                <h2 className="text-xl-semi">{company.name}</h2>
-                <p className="text-sm text-ui-fg-subtle">{company.email}</p>
+                <h2 className="font-display text-xl font-extrabold tracking-tight">{company.name}</h2>
+                <p className="text-sm text-muted">{company.email}</p>
               </div>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              <span className="inline-flex items-center rounded-circle bg-brand-soft px-2.5 py-1 text-xs font-bold leading-none text-brand">
                 Corporate Account
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 small:grid-cols-3 gap-4 text-sm">
               <div>
-                <span className="text-ui-fg-subtle block">Phone</span>
-                <span className="font-medium">{company.phone || "—"}</span>
+                <span className="text-muted block">Phone</span>
+                <span className="font-bold">{company.phone || "—"}</span>
               </div>
               <div>
-                <span className="text-ui-fg-subtle block">Address</span>
-                <span className="font-medium">
+                <span className="text-muted block">Address</span>
+                <span className="font-bold">
                   {[company.address, company.city, company.state]
                     .filter(Boolean)
                     .join(", ") || "—"}
                 </span>
               </div>
               <div>
-                <span className="text-ui-fg-subtle block">Operating Currency</span>
-                <span className="font-medium">
+                <span className="text-muted block">Operating Currency</span>
+                <span className="font-bold">
                   {(company.currency_code || "EUR").toUpperCase()}
                 </span>
               </div>
@@ -71,43 +71,43 @@ export default async function CompanyPage() {
           </div>
 
           {/* Membership & Privileges Card */}
-          <div className="border rounded-lg p-6 bg-white shadow-sm">
-            <h3 className="text-lg-semi mb-4">Your Membership & Purchasing Role</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-md bg-gray-50 border">
-                <span className="text-xs text-ui-fg-subtle uppercase block font-semibold mb-1">
+          <div className="rounded-large p-5 bg-card shadow-lift">
+            <h3 className="font-display text-lg font-extrabold tracking-tight mb-4">Your Membership & Purchasing Role</h3>
+            <div className="grid grid-cols-1 small:grid-cols-2 gap-4">
+              <div className="p-4 rounded-[12px] bg-canvas border border-line">
+                <span className="text-xs text-muted uppercase block font-bold mb-1">
                   Designated Role
                 </span>
                 <div className="flex items-center gap-x-2 my-1">
                   {is_manager ? (
-                    <span className="inline-flex items-center gap-x-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-purple-100 text-purple-800 border border-purple-200">
-                      🛡️ Company Manager
+                    <span className="inline-flex items-center gap-x-1.5 rounded-circle bg-brand-soft px-3 py-1 text-sm font-bold text-brand">
+                      Company Manager
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-x-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800 border border-blue-200">
-                      👤 Company Employee (Buyer)
+                    <span className="inline-flex items-center gap-x-1.5 rounded-circle bg-success-soft px-3 py-1 text-sm font-bold text-success">
+                      Company Employee (Buyer)
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-ui-fg-subtle mt-1">
+                <p className="text-xs text-muted mt-1">
                   {is_manager
                     ? "You have administrative privileges to manage spending rules and approve team orders."
                     : "You can place orders on behalf of the company within your designated budget."}
                 </p>
               </div>
 
-              <div className="p-4 rounded-md bg-gray-50 border">
-                <span className="text-xs text-ui-fg-subtle uppercase block font-semibold mb-1">
+              <div className="p-4 rounded-[12px] bg-canvas border border-line">
+                <span className="text-xs text-muted uppercase block font-bold mb-1">
                   Per-Order Spending Limit
                 </span>
-                <div className="text-lg font-semibold">
+                <div className="text-lg font-extrabold">
                   {is_manager
                     ? "Unlimited"
                     : spending_limit
                     ? `${spending_limit.toLocaleString()} ${(company.currency_code || "EUR").toUpperCase()}`
                     : "No Limit Set"}
                 </div>
-                <p className="text-xs text-ui-fg-subtle mt-1">
+                <p className="text-xs text-muted mt-1">
                   {is_manager
                     ? "Managers do not require purchase authorization."
                     : "Orders exceeding this amount must be submitted to your manager for approval."}

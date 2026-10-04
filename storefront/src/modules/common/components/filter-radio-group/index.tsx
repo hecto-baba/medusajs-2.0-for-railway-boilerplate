@@ -1,5 +1,4 @@
-import { EllipseMiniSolid } from "@medusajs/icons"
-import { Label, RadioGroup, Text, clx } from "@medusajs/ui"
+import { Label, RadioGroup, clx } from "@medusajs/ui"
 
 type FilterRadioGroupProps = {
   title: string
@@ -12,6 +11,10 @@ type FilterRadioGroupProps = {
   "data-testid"?: string
 }
 
+/**
+ * Single-choice filter shown as a row of pills. Still a real radio group
+ * underneath, so it is keyboard and screen reader friendly.
+ */
 const FilterRadioGroup = ({
   title,
   items,
@@ -20,30 +23,28 @@ const FilterRadioGroup = ({
   "data-testid": dataTestId,
 }: FilterRadioGroupProps) => {
   return (
-    <div className="flex gap-x-3 flex-col gap-y-3">
-      <Text className="txt-compact-small-plus text-ui-fg-muted">{title}</Text>
-      <RadioGroup data-testid={dataTestId} onValueChange={handleChange}>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <span className="text-sm font-bold text-muted">{title}</span>
+      <RadioGroup
+        data-testid={dataTestId}
+        onValueChange={handleChange}
+        className="flex flex-wrap gap-2"
+      >
         {items?.map((i) => (
-          <div
-            key={i.value}
-            className={clx("flex gap-x-2 items-center", {
-              "ml-[-23px]": i.value === value,
-            })}
-          >
-            {i.value === value && <EllipseMiniSolid />}
+          <div key={i.value}>
             <RadioGroup.Item
               checked={i.value === value}
-              className="hidden peer"
+              className="peer hidden"
               id={i.value}
               value={i.value}
             />
             <Label
               htmlFor={i.value}
               className={clx(
-                "!txt-compact-small !transform-none text-ui-fg-subtle hover:cursor-pointer",
-                {
-                  "text-ui-fg-base": i.value === value,
-                }
+                "!txt-compact-small !transform-none inline-flex cursor-pointer items-center rounded-circle border px-3.5 py-1.5 font-semibold transition-colors",
+                i.value === value
+                  ? "border-ink bg-ink text-canvas"
+                  : "border-line bg-card text-ink hover:border-muted"
               )}
               data-testid="radio-label"
               data-active={i.value === value}

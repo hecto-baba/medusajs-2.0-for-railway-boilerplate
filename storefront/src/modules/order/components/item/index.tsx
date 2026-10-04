@@ -25,12 +25,12 @@ const Item = ({ item }: ItemProps) => {
         <Table.Cell className="!pl-0 p-4 w-24" />
         <Table.Cell className="text-left">
           <Text
-            className="txt-medium-plus text-ui-fg-base"
+            className="font-bold text-ink"
             data-testid="product-name"
           >
             Security Deposit
           </Text>
-          <Text className="txt-small text-ui-fg-subtle">
+          <Text className="text-sm text-muted">
             Refundable, held separately from the rental fee.
           </Text>
         </Table.Cell>
@@ -53,7 +53,7 @@ const Item = ({ item }: ItemProps) => {
 
       <Table.Cell className="text-left">
         <Text
-          className="txt-medium-plus text-ui-fg-base"
+          className="font-bold text-ink"
           data-testid="product-name"
         >
           {item.title}
@@ -78,7 +78,7 @@ const Item = ({ item }: ItemProps) => {
       <Table.Cell className="!pr-0">
         <span className="!pr-0 flex flex-col items-end h-full justify-center">
           <span className="flex gap-x-1 ">
-            <Text className="text-ui-fg-muted">
+            <Text className="text-muted">
               <span data-testid="product-quantity">{item.quantity}</span>x{" "}
             </Text>
             <LineItemUnitPrice item={item} style="tight" />

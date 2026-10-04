@@ -1,4 +1,5 @@
 import { Metadata } from "next"
+import { parseListingFilters } from "@lib/util/listing-filters"
 import { notFound } from "next/navigation"
 
 import { getCategoryByHandle, listCategories } from "@lib/data/categories"
@@ -13,6 +14,9 @@ type Props = {
   searchParams: Promise<{
     sortBy?: SortOptions
     page?: string
+    onSale?: string
+    min?: string
+    max?: string
   }>
 }
 
@@ -71,7 +75,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CategoryPage({ params, searchParams }: Props) {
   const { category, countryCode } = await params
-  const { sortBy, page } = await searchParams
+  const { sortBy, page, onSale, min, max } = await searchParams
+  const filters = parseListingFilters({ onSale, min, max })
 
   const { product_categories } = await getCategoryByHandle(category)
 
@@ -83,6 +88,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     <CategoryTemplate
       categories={product_categories}
       sortBy={sortBy}
+      filters={filters}
       page={page}
       countryCode={countryCode}
     />

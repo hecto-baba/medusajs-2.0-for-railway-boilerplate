@@ -31,8 +31,9 @@ export default async function RescheduleBookingPage({
   const back = token ? `/appointments/booking/${id}?token=${encodeURIComponent(token)}` : `/appointments/booking/${id}`
 
   return (
-    <div className="content-container max-w-3xl py-12" data-testid="reschedule-page">
-      <h1 className="text-3xl-regular mb-6">Choose a new time</h1>
+    <div className="bg-canvas">
+    <div className="content-container max-w-3xl py-8 small:py-12" data-testid="reschedule-page">
+      <h1 className="mb-6 font-display text-3xl font-extrabold tracking-tight text-ink">Choose a new time</h1>
 
       {booking.can_reschedule ? (
         <ReschedulePicker
@@ -44,19 +45,20 @@ export default async function RescheduleBookingPage({
           resourceName={booking.resource.name ?? "your appointment"}
         />
       ) : (
-        <div className="flex flex-col gap-4">
-          <p className="text-ui-fg-subtle">
+        <div className="flex flex-col gap-4 rounded-large bg-card p-5 shadow-lift">
+          <p className="text-muted">
             {booking.status === "cancelled"
               ? "This booking was cancelled, so it cannot be moved."
               : booking.reschedules_left === 0
                 ? "This booking has already been moved the maximum number of times. Please contact the business to change it again."
                 : "This booking can no longer be changed online. Please contact the business."}
           </p>
-          <LocalizedClientLink href={back} className="underline">
+          <LocalizedClientLink href={back} className="font-bold text-brand hover:underline">
             Back to your booking
           </LocalizedClientLink>
         </div>
       )}
+    </div>
     </div>
   )
 }
