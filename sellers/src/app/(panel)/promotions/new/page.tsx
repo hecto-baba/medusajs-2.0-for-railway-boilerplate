@@ -1,4 +1,4 @@
-import { PromotionForm } from "@modules/promotions"
+import { PromotionForm } from "@modules/promotions/components/promotion-form"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Create promotion" }

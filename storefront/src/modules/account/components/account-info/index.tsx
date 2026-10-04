@@ -1,7 +1,7 @@
 "use client"
 
 import { Disclosure } from "@headlessui/react"
-import { Badge, Button, clx } from "@medusajs/ui"
+import { Button, clx } from "@medusajs/ui"
 import { useEffect } from "react"
 
 import useToggleState from "@lib/hooks/use-toggle-state"
@@ -50,13 +50,13 @@ const AccountInfo = ({
   }, [isSuccess, close])
 
   return (
-    <div className="text-small-regular" data-testid={dataTestid}>
+    <div className="text-sm" data-testid={dataTestid}>
       <div className="flex items-end justify-between">
         <div className="flex flex-col">
-          <span className="uppercase text-ui-fg-base">{label}</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-muted">{label}</span>
           <div className="flex items-center flex-1 basis-0 justify-end gap-x-4">
             {typeof currentInfo === "string" ? (
-              <span className="font-semibold" data-testid="current-info">{currentInfo}</span>
+              <span className="font-bold text-ink" data-testid="current-info">{currentInfo}</span>
             ) : (
               currentInfo
             )}
@@ -66,7 +66,7 @@ const AccountInfo = ({
           <div>
             <Button
               variant="secondary"
-              className="w-[100px] min-h-[25px] py-1"
+              className="w-[100px] min-h-[25px] py-1 !rounded-large !border-[1.5px] !border-brand !bg-card !font-bold !text-brand !shadow-none hover:!bg-brand-soft"
               onClick={handleToggle}
               type={state ? "reset" : "button"}
               data-testid="edit-button"
@@ -91,9 +91,9 @@ const AccountInfo = ({
           )}
           data-testid="success-message"
         >
-          <Badge className="p-2 my-4" color="green">
+          <div className="my-4 inline-flex rounded-rounded bg-success-soft px-3 py-2 font-bold text-success">
             <span>{label} updated succesfully</span>
-          </Badge>
+          </div>
         </Disclosure.Panel>
       </Disclosure>
 
@@ -110,9 +110,9 @@ const AccountInfo = ({
           )}
           data-testid="error-message"
         >
-          <Badge className="p-2 my-4" color="red">
+          <div className="my-4 inline-flex rounded-rounded bg-brand-soft px-3 py-2 font-bold text-brand">
             <span>{errorMessage}</span>
-          </Badge>
+          </div>
         </Disclosure.Panel>
       </Disclosure>
 
@@ -138,7 +138,7 @@ const AccountInfo = ({
               <div className="flex items-center justify-end mt-2">
                 <Button
                   isLoading={pending}
-                  className="w-full small:max-w-[140px]"
+                  className="w-full small:max-w-[140px] !rounded-large !border-0 !bg-brand !font-extrabold !text-brand-ink !shadow-none hover:!opacity-90"
                   type="submit"
                   data-testid="save-button"
                 >

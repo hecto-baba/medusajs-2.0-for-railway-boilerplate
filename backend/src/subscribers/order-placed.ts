@@ -1,14 +1,15 @@
 import { Modules } from '@medusajs/framework/utils'
-import { INotificationModuleService, IOrderModuleService } from '@medusajs/framework/types'
+import { IOrderModuleService } from '@medusajs/framework/types'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
 import { EmailTemplates } from '../modules/email-notifications/templates'
-import { RESEND_FROM_EMAIL } from '../lib/constants'
+import { sendEmail } from '../lib/send-email'
+import { buildEoiNotice, eoiItemsOf } from '../lib/eoi-email'
+import { sendNotice } from '../lib/email-notice'
 
-export default async function orderPlacedHandler({
+async function orderPlacedHandler({
   event: { data },
   container,
 }: SubscriberArgs<any>) {
-  const notificationModuleService: INotificationModuleService = container.resolve(Modules.NOTIFICATION)
   const orderModuleService: IOrderModuleService = container.resolve(Modules.ORDER)
   
   const order = await orderModuleService.retrieveOrder(data.id, { relations: ['items', 'summary', 'shipping_address'] })
@@ -28,27 +29,50 @@ export default async function orderPlacedHandler({
     }
   }
 
-  try {
-    await notificationModuleService.createNotifications({
+  // A reservation (EOI) order pays only a deposit. Its own email says so and
+  // names the balance; when EVERY line is a reservation that email replaces the
+  // generic "order confirmation", otherwise both are sent.
+  const eoiItems = eoiItemsOf(order)
+  const eoiOnly = eoiItems.length > 0 && eoiItems.length === (order.items ?? []).length
+
+  if (eoiItems.length) {
+    await sendNotice(container, {
+      template: 'eoi-confirmation',
       to: order.email,
-      channel: 'email',
-      template: EmailTemplates.ORDER_PLACED,
-      data: {
-        emailOptions: {
-          // RESEND_FROM_EMAIL comes from lib/constants, which falls back to
-          // RESEND_FROM. Reading process.env directly here missed that
-          // fallback, so the reply-to was empty on every deploy configured
-          // with RESEND_FROM, which is what the Railway template sets.
-          replyTo: process.env.ORDER_REPLY_TO_EMAIL || RESEND_FROM_EMAIL,
-          subject: 'Your order has been placed'
-        },
-        order,
-        shippingAddress,
-        preview: 'Thank you for your order!'
-      }
+      subject: 'Your reservation is confirmed',
+      resourceId: order.id,
+      resourceType: 'order',
+      notice: buildEoiNotice(order, eoiItems),
     })
-  } catch (error) {
-    console.error('Error sending order confirmation notification:', error)
+  }
+
+  if (eoiOnly) return
+
+  await sendEmail(container, {
+    template: EmailTemplates.ORDER_PLACED,
+    to: order.email,
+    subject: 'Your order has been placed',
+    idempotencyKey: `order-placed:${order.id}`,
+    resourceId: order.id,
+    resourceType: 'order',
+    data: {
+      order,
+      shippingAddress,
+      preview: 'Thank you for your order!'
+    }
+  })
+}
+
+/**
+ * Whatever goes wrong while preparing the email (a record deleted since the
+ * event, a failed lookup) must not surface as an unhandled error in the event
+ * bus: the order, invite or reply that triggered this has already succeeded.
+ */
+export default async function orderPlacedHandlerSafe(args: Parameters<typeof orderPlacedHandler>[0]) {
+  try {
+    await orderPlacedHandler(args)
+  } catch (error: any) {
+    console.error('Error sending order confirmation:', error?.message ?? error)
   }
 }
 

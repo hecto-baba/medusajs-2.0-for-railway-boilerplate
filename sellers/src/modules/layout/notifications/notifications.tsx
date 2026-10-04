@@ -62,7 +62,12 @@ export const Notifications = () => {
   }, [])
 
   // Fetch notifications
+  const inFlight = React.useRef(false)
   const fetchNotifications = React.useCallback(async () => {
+    // Skip while a request is already running so Strict Mode's double mount and
+    // overlapping triggers (poll + open) do not stack identical calls.
+    if (inFlight.current) return
+    inFlight.current = true
     try {
       setIsLoading(true)
       const res = await fetch("/api/vendors/notifications?limit=50")
@@ -81,6 +86,7 @@ export const Notifications = () => {
     } catch {
       // Fallback
     } finally {
+      inFlight.current = false
       setIsLoading(false)
     }
   }, [lastReadAt])

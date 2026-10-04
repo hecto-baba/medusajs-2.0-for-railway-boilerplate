@@ -20,17 +20,17 @@ export default async function ApprovalsPage() {
 
   return (
     <div className="w-full">
-      <div className="mb-8 flex flex-col gap-y-4">
-        <h1 className="text-2xl-semi">Team Approvals</h1>
-        <p className="text-base-regular text-ui-fg-subtle">
+      <div className="mb-4 flex flex-col gap-y-2 rounded-large bg-card p-5 shadow-lift">
+        <h1 className="font-display text-2xl font-extrabold tracking-tight">Team Approvals</h1>
+        <p className="text-muted">
           Review purchase requests submitted by employees exceeding spending limits.
         </p>
       </div>
 
       {!is_manager ? (
-        <div className="border border-dashed rounded-lg p-8 text-center bg-gray-50">
-          <p className="text-base-semi mb-2">Manager Access Required</p>
-          <p className="text-sm text-ui-fg-subtle max-w-md mx-auto">
+        <div className="rounded-large bg-card p-8 text-center shadow-lift">
+          <p className="font-display text-lg font-extrabold tracking-tight mb-2">Manager Access Required</p>
+          <p className="text-sm text-muted max-w-md mx-auto">
             Only designated Company Managers can review and approve purchase requests. If you should be a manager, contact your administrator.
           </p>
         </div>

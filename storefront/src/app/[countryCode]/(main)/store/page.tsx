@@ -1,4 +1,5 @@
 import { Metadata } from "next"
+import { parseListingFilters } from "@lib/util/listing-filters"
 
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import StoreTemplate from "@modules/store/templates"
@@ -12,6 +13,9 @@ type Params = {
   searchParams: Promise<{
     sortBy?: SortOptions
     page?: string
+    onSale?: string
+    min?: string
+    max?: string
   }>
   params: Promise<{
     countryCode: string
@@ -19,8 +23,14 @@ type Params = {
 }
 
 export default async function StorePage({ searchParams, params }: Params) {
-  const { sortBy, page } = await searchParams
+  const { sortBy, page, onSale, min, max } = await searchParams
+  const filters = parseListingFilters({ onSale, min, max })
   const { countryCode } = await params
 
-  return <StoreTemplate sortBy={sortBy} page={page} countryCode={countryCode} />
+  return <StoreTemplate
+      sortBy={sortBy}
+      page={page}
+      countryCode={countryCode}
+      filters={filters}
+    />
 }

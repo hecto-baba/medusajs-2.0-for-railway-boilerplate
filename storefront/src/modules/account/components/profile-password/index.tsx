@@ -47,26 +47,26 @@ const ProfilePassword: React.FC<MyInformationProps> = ({ customer }) => {
         data-testid="account-password-editor"
       />
 
-      <div className="text-small-regular text-ui-fg-subtle pb-8 -mt-4">
+      <div className="text-sm text-muted -mt-4">
         {state.success ? (
           <span data-testid="password-reset-requested">
             A link to set a new password is on its way to {customer.email}. It
             can be used once and expires in 15 minutes.
           </span>
         ) : (
-          <form action={formAction} className="flex items-center gap-x-2">
+          <form action={formAction} className="flex flex-wrap items-center gap-x-2">
             <input type="hidden" name="email" value={customer.email ?? ""} />
             <span>To change it, we send you a link by email.</span>
             <button
               type="submit"
-              className="underline"
+              className="font-bold text-brand hover:underline"
               data-testid="request-password-reset-button"
             >
               Send me a reset link
             </button>
             {state.error && (
               <span
-                className="text-rose-500"
+                className="text-brand"
                 data-testid="password-reset-error"
               >
                 {state.error}

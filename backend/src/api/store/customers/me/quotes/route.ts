@@ -207,6 +207,7 @@ export const GET = async (
           "draft_order.total",
           "draft_order.currency_code",
           "draft_order.items.*",
+          "draft_order.shipping_address.*",
           "cart.*",
           "cart.total",
           "cart.currency_code",

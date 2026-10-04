@@ -28,19 +28,19 @@ const ResetPassword = ({ token, email }: Props) => {
   if (state.success) {
     return (
       <div
-        className="max-w-sm w-full flex flex-col items-center"
+        className="w-full flex flex-col items-center"
         data-testid="reset-password-page"
       >
-        <h1 className="text-large-semi uppercase mb-6">Password updated</h1>
+        <h1 className="font-display text-3xl font-extrabold tracking-tight mb-2 text-center">Password updated</h1>
         <p
-          className="text-center text-base-regular text-ui-fg-base mb-8"
+          className="text-center text-base text-muted mb-8"
           data-testid="reset-password-success"
         >
           Your password has been changed. You can sign in with it now.
         </p>
         <LocalizedClientLink
           href="/account"
-          className="underline text-small-regular"
+          className="text-sm font-bold text-brand hover:underline"
           data-testid="go-to-sign-in-link"
         >
           Go to sign in
@@ -51,11 +51,11 @@ const ResetPassword = ({ token, email }: Props) => {
 
   return (
     <div
-      className="max-w-sm w-full flex flex-col items-center"
+      className="w-full flex flex-col items-center"
       data-testid="reset-password-page"
     >
-      <h1 className="text-large-semi uppercase mb-6">Set a new password</h1>
-      <p className="text-center text-base-regular text-ui-fg-base mb-8">
+      <h1 className="font-display text-3xl font-extrabold tracking-tight mb-2 text-center">Set a new password</h1>
+      <p className="text-center text-base text-muted mb-8">
         {email ? (
           <>
             Choose a new password for <strong>{email}</strong>.
@@ -106,11 +106,11 @@ const ResetPassword = ({ token, email }: Props) => {
         </SubmitButton>
       </form>
 
-      <span className="text-center text-ui-fg-base text-small-regular mt-6">
+      <span className="text-center text-muted text-sm mt-6">
         Link expired?{" "}
         <LocalizedClientLink
           href="/account"
-          className="underline"
+          className="font-bold text-brand hover:underline"
           data-testid="request-new-link"
         >
           Request a new one

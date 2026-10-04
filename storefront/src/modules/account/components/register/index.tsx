@@ -19,13 +19,13 @@ const Register = ({ setCurrentView }: Props) => {
 
   return (
     <div
-      className="max-w-sm flex flex-col items-center"
+      className="w-full flex flex-col items-center"
       data-testid="register-page"
     >
-      <h1 className="text-large-semi uppercase mb-6">
+      <h1 className="font-display text-3xl font-extrabold tracking-tight mb-2 text-center">
         Become a {getStoreName()} Member
       </h1>
-      <p className="text-center text-base-regular text-ui-fg-base mb-4">
+      <p className="text-center text-base text-muted mb-6">
         Create your {getStoreName()} Member profile, and get access to an enhanced
         shopping experience.
       </p>
@@ -70,18 +70,18 @@ const Register = ({ setCurrentView }: Props) => {
           />
         </div>
         <ErrorMessage error={message} data-testid="register-error" />
-        <span className="text-center text-ui-fg-base text-small-regular mt-6">
+        <span className="text-center text-muted text-sm mt-6">
           By creating an account, you agree to {getStoreName()}&apos;s{" "}
           <LocalizedClientLink
             href="/content/privacy-policy"
-            className="underline"
+            className="font-bold text-brand hover:underline"
           >
             Privacy Policy
           </LocalizedClientLink>{" "}
           and{" "}
           <LocalizedClientLink
             href="/content/terms-of-use"
-            className="underline"
+            className="font-bold text-brand hover:underline"
           >
             Terms of Use
           </LocalizedClientLink>
@@ -91,11 +91,11 @@ const Register = ({ setCurrentView }: Props) => {
           Join
         </SubmitButton>
       </form>
-      <span className="text-center text-ui-fg-base text-small-regular mt-6">
+      <span className="text-center text-muted text-sm mt-6">
         Already a member?{" "}
         <button
           onClick={() => setCurrentView(LOGIN_VIEW.SIGN_IN)}
-          className="underline"
+          className="font-bold text-brand hover:underline"
         >
           Sign in
         </button>

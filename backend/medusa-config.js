@@ -7,10 +7,10 @@ import {
   DATABASE_URL,
   JWT_SECRET,
   REDIS_URL,
-  RESEND_API_KEY,
-  RESEND_FROM_EMAIL,
-  SENDGRID_API_KEY,
-  SENDGRID_FROM_EMAIL,
+  ZEPTOMAIL_API_KEY,
+  ZEPTOMAIL_FROM_EMAIL,
+  ZEPTOMAIL_FROM_NAME,
+  ZEPTOMAIL_API_URL,
   SHOULD_DISABLE_ADMIN,
   STORE_CORS,
   STRIPE_API_KEY,
@@ -153,34 +153,20 @@ const medusaConfig = {
         }
       }
     }] : []),
-    ...(RESEND_API_KEY && RESEND_FROM_EMAIL ? [{
+    ...(ZEPTOMAIL_API_KEY && ZEPTOMAIL_FROM_EMAIL ? [{
       key: Modules.NOTIFICATION,
       resolve: '@medusajs/notification',
       options: {
         providers: [
           {
             resolve: './src/modules/email-notifications',
-            id: 'resend',
+            id: 'zeptomail',
             options: {
               channels: ['email'],
-              api_key: RESEND_API_KEY,
-              from: RESEND_FROM_EMAIL,
-            },
-          },
-        ]
-      }
-    }] : SENDGRID_API_KEY && SENDGRID_FROM_EMAIL ? [{
-      key: Modules.NOTIFICATION,
-      resolve: '@medusajs/notification',
-      options: {
-        providers: [
-          {
-            resolve: '@medusajs/notification-sendgrid',
-            id: 'sendgrid',
-            options: {
-              channels: ['email'],
-              api_key: SENDGRID_API_KEY,
-              from: SENDGRID_FROM_EMAIL,
+              api_key: ZEPTOMAIL_API_KEY,
+              from: ZEPTOMAIL_FROM_EMAIL,
+              from_name: ZEPTOMAIL_FROM_NAME,
+              api_url: ZEPTOMAIL_API_URL,
             },
           },
         ]

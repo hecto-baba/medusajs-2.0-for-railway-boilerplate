@@ -58,6 +58,7 @@ export const createEoiOrderWorkflow = createWorkflow(
         "items.id",
         "items.variant_id",
         "items.product_id",
+        "items.quantity",
         "items.metadata",
       ],
       filters: { id: order.id },

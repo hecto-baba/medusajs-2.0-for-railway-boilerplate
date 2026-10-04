@@ -1,5 +1,5 @@
 import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
-import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
+import { ContainerRegistrationKeys, MedusaError, Modules } from "@medusajs/framework/utils"
 
 /**
  * Generic vendor-ownership helpers for entities linked directly off `vendor`
@@ -50,75 +50,129 @@ export const resolveVendorAdmin = async (
       return byAdminId
     }
 
-    // 2. Match vendor_admin by vendor_id (when actor_id is vendor.id)
+    // 2. Match vendor_admin when actor_id is vendor.id (query vendor's admins)
     const {
-      data: [byVendorId],
+      data: [byVendor],
     } = await query.graph({
-      entity: "vendor_admin",
-      fields,
-      filters: { vendor_id: [req.auth_context.actor_id] },
+      entity: "vendor",
+      fields: ["admins.id"],
+      filters: { id: [req.auth_context.actor_id] },
     }).catch(() => ({ data: [] }))
 
-    if (byVendorId) {
-      return byVendorId
+    if (byVendor?.admins?.[0]?.id) {
+      const {
+        data: [byAdmin],
+      } = await query.graph({
+        entity: "vendor_admin",
+        fields,
+        filters: { id: [byVendor.admins[0].id] },
+      }).catch(() => ({ data: [] }))
+
+      if (byAdmin) {
+        return byAdmin
+      }
     }
   }
 
   // 3. Fallback: resolve from auth_identity app_metadata or email
   if (req.auth_context?.auth_identity_id) {
-    const {
-      data: [authIdentity],
-    } = await query.graph({
-      entity: "auth_identity",
-      fields: ["app_metadata", "provider_identities.*"],
-      filters: { id: [req.auth_context.auth_identity_id] },
-    }).catch((err: any) => {
-      console.warn("[resolveVendorAdmin] query auth_identity failed:", err?.message || err)
-      return { data: [] }
-    })
-
-    const vendorAdminId = (authIdentity?.app_metadata as Record<string, any> | undefined)?.vendor_id
-    if (vendorAdminId) {
+    // 3a. Try resolving via auth_identity app_metadata.vendor_id
+    try {
       const {
-        data: [byAppMetadataAdmin],
+        data: [authIdentity],
       } = await query.graph({
-        entity: "vendor_admin",
-        fields,
-        filters: { id: [vendorAdminId] },
-      }).catch(() => ({ data: [] }))
-
-      if (byAppMetadataAdmin) {
-        return byAppMetadataAdmin
-      }
-
-      const {
-        data: [byAppMetadataVendor],
-      } = await query.graph({
-        entity: "vendor_admin",
-        fields,
-        filters: { vendor_id: [vendorAdminId] },
-      }).catch(() => ({ data: [] }))
-
-      if (byAppMetadataVendor) {
-        return byAppMetadataVendor
-      }
-    }
-
-    const email = authIdentity?.provider_identities?.[0]?.entity_id
-    if (email) {
-      const {
-        data: [byEmail],
-      } = await query.graph({
-        entity: "vendor_admin",
-        fields,
-        filters: { email: [email] },
+        entity: "auth_identity",
+        fields: ["app_metadata", "provider_identities.*"],
+        filters: { id: [req.auth_context.auth_identity_id] },
       }).catch((err: any) => {
-        console.warn("[resolveVendorAdmin] query by email failed:", err?.message || err)
+        console.warn("[resolveVendorAdmin] query auth_identity failed:", err?.message || err)
         return { data: [] }
       })
 
-      if (byEmail) {
-        return byEmail
+      const vendorAdminId = (authIdentity?.app_metadata as Record<string, any> | undefined)?.vendor_id
+      if (vendorAdminId) {
+        const {
+          data: [byAppMetadataAdmin],
+        } = await query.graph({
+          entity: "vendor_admin",
+          fields,
+          filters: { id: [vendorAdminId] },
+        }).catch(() => ({ data: [] }))
+
+        if (byAppMetadataAdmin) {
+          return byAppMetadataAdmin
+        }
+
+        const {
+          data: [byAppVendor],
+        } = await query.graph({
+          entity: "vendor",
+          fields: ["admins.id"],
+          filters: { id: [vendorAdminId] },
+        }).catch(() => ({ data: [] }))
+
+        if (byAppVendor?.admins?.[0]?.id) {
+          const {
+            data: [byAdminFromVendor],
+          } = await query.graph({
+            entity: "vendor_admin",
+            fields,
+            filters: { id: [byAppVendor.admins[0].id] },
+          }).catch(() => ({ data: [] }))
+
+          if (byAdminFromVendor) {
+            return byAdminFromVendor
+          }
+        }
+      }
+    } catch {
+      // Continue to email fallback
+    }
+
+    // 3b. Try resolving via email from authModule or query
+    try {
+      const authModule = req.scope.resolve(Modules.AUTH)
+      const [authIdentity] = await authModule.listAuthIdentities(
+        { id: [req.auth_context.auth_identity_id] },
+        { relations: ["provider_identities"] }
+      )
+
+      const email = authIdentity?.provider_identities?.[0]?.entity_id
+      if (email) {
+        const {
+          data: [byEmail],
+        } = await query.graph({
+          entity: "vendor_admin",
+          fields,
+          filters: { email: [email] },
+        }).catch(() => ({ data: [] }))
+
+        if (byEmail) {
+          return byEmail
+        }
+      }
+    } catch {
+      const {
+        data: [authIdentity],
+      } = await query.graph({
+        entity: "auth_identity",
+        fields: ["provider_identities.*"],
+        filters: { id: [req.auth_context.auth_identity_id] },
+      }).catch(() => ({ data: [] }))
+
+      const email = authIdentity?.provider_identities?.[0]?.entity_id
+      if (email) {
+        const {
+          data: [byEmail],
+        } = await query.graph({
+          entity: "vendor_admin",
+          fields,
+          filters: { email: [email] },
+        }).catch(() => ({ data: [] }))
+
+        if (byEmail) {
+          return byEmail
+        }
       }
     }
   }

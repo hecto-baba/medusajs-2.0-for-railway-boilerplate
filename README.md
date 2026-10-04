@@ -220,7 +220,7 @@ Yes. R2 is S3-compatible, so it uses the same `S3_*` variables as everything els
 
 ### Do I need Stripe and Resend to deploy?
 
-No. Every integration is optional and each one switches on only when its environment variables are present. Without Stripe the checkout offers manual payment; without Resend or SendGrid, no order confirmations are sent. You can add either later without redeploying from scratch.
+No. Every integration is optional and each one switches on only when its environment variables are present. Without Stripe the checkout offers manual payment; without ZeptoMail, no order confirmations are sent. You can add either later without redeploying from scratch.
 
 ### Can I use npm or yarn?
 

@@ -46,8 +46,8 @@ const formatAmount = (amount: unknown, currencyCode?: string): string => {
  * Quantities come back as BigNumber objects, not numbers.
  *
  * React refuses to render an object child, so printing one raw threw
- * "Objects are not valid as a React child (found: 1)" from inside the Resend
- * SDK, which failed the whole email rather than just that cell. Amounts were
+ * "Objects are not valid as a React child (found: 1)" while the
+ * email was rendered, which failed the whole email rather than just that cell. Amounts were
  * already coerced by formatAmount above; the quantity was the one value still
  * being handed to React untouched.
  */
@@ -97,7 +97,9 @@ export const OrderPlacedTemplate: React.FC<OrderPlacedTemplateProps> & {
 
         <Hr style={{ margin: '20px 0' }} />
 
-        {shippingAddress && (
+        {/* An order with nothing to ship (tickets, digital, EOI) carries no street
+            address, so there is nothing to print and no empty block to leave. */}
+        {shippingAddress?.address_1 && (
           <>
             <Text style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 10px' }}>
               Shipping Address

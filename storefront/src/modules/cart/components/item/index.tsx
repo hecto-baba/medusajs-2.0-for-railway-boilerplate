@@ -10,6 +10,8 @@ import DeleteButton from "@modules/common/components/delete-button"
 import LineItemOptions from "@modules/common/components/line-item-options"
 import LineItemRentalDates from "@modules/common/components/line-item-rental-dates"
 import LineItemSeatInfo from "@modules/common/components/line-item-seat-info"
+import LineItemAppointmentInfo from "@modules/common/components/line-item-appointment-info"
+import { isAppointmentLineItem } from "types/appointment"
 import { isTicketLineItem } from "types/ticket"
 import LineItemPrice from "@modules/common/components/line-item-price"
 import LineItemUnitPrice from "@modules/common/components/line-item-unit-price"
@@ -32,7 +34,10 @@ const Item = ({ item, type = "full" }: ItemProps) => {
 
   const { handle } = item.variant?.product ?? {}
 
-  const isTicket = isTicketLineItem(item.metadata)
+  // A ticket is one seat and an appointment is one booking: neither has a
+  // quantity to choose (the backend fixes both at 1).
+  const isTicket =
+    isTicketLineItem(item.metadata) || isAppointmentLineItem(item.metadata)
   const isDeposit = !!item.metadata?.is_rental_deposit
 
   const [localQty, setLocalQty] = useState<string>(String(item.quantity))
@@ -42,6 +47,8 @@ const Item = ({ item, type = "full" }: ItemProps) => {
   }, [item.quantity])
 
   const handleQtyCommit = (val: number) => {
+    // Enter then blur both commit; ignore the second while the first is in flight.
+    if (updating) return
     if (isNaN(val) || val < 1) {
       setLocalQty(String(item.quantity))
       return
@@ -66,6 +73,9 @@ const Item = ({ item, type = "full" }: ItemProps) => {
       })
       .catch((err) => {
         setError(err.message)
+        // The update was rejected, so item.quantity never changes and the
+        // effect above won't resync the box - put the real value back.
+        setLocalQty(String(item.quantity))
       })
       .finally(() => {
         setUpdating(false)
@@ -141,6 +151,11 @@ const Item = ({ item, type = "full" }: ItemProps) => {
           metadata={item.metadata}
           data-testid="product-seat-info"
         />
+        <LineItemAppointmentInfo
+          metadata={item.metadata}
+          showHold={type === "full"}
+          data-testid="product-appointment-info"
+        />
         {typeof item.metadata?.restaurant_name === "string" && (
           <Text className="txt-compact-xsmall text-ui-fg-subtle mt-0.5">
             Restaurant: {String(item.metadata.restaurant_name)}
@@ -157,7 +172,7 @@ const Item = ({ item, type = "full" }: ItemProps) => {
             {isTicket ? (
               <Text className="text-ui-fg-subtle">1</Text>
             ) : (
-              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white shadow-xs">
+              <div className="flex items-center border border-line rounded-lg overflow-hidden bg-card shadow-xs">
                 <button
                   type="button"
                   disabled={updating || Number(localQty) <= 1}
@@ -166,7 +181,7 @@ const Item = ({ item, type = "full" }: ItemProps) => {
                     setLocalQty(String(newQty))
                     handleQtyCommit(newQty)
                   }}
-                  className="w-7 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-30 text-sm font-semibold transition-colors select-none"
+                  className="w-7 h-8 flex items-center justify-center text-muted hover:bg-canvas disabled:opacity-30 text-sm font-semibold transition-colors select-none"
                   aria-label="Decrease quantity"
                 >
                   −
@@ -183,7 +198,7 @@ const Item = ({ item, type = "full" }: ItemProps) => {
                       handleQtyCommit(parseInt(localQty))
                     }
                   }}
-                  className="w-12 h-8 text-center text-xs font-semibold text-gray-900 border-x border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-12 h-8 text-center text-xs font-semibold text-ink border-x border-line focus:outline-none focus:ring-1 focus:ring-brand [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   data-testid="product-quantity-input"
                   aria-label="Quantity"
                 />
@@ -195,7 +210,7 @@ const Item = ({ item, type = "full" }: ItemProps) => {
                     setLocalQty(String(newQty))
                     handleQtyCommit(newQty)
                   }}
-                  className="w-7 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 disabled:opacity-30 text-sm font-semibold transition-colors select-none"
+                  className="w-7 h-8 flex items-center justify-center text-muted hover:bg-canvas disabled:opacity-30 text-sm font-semibold transition-colors select-none"
                   aria-label="Increase quantity"
                 >
                   +

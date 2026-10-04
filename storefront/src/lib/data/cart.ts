@@ -9,10 +9,15 @@ import {
   getAuthHeaders,
   getCacheDirectives,
   getCartId,
+  getSaveAddressChoice,
   removeCartId,
   revalidateCacheTag,
   setCartId,
+  setSaveAddressChoice,
 } from "./cookies"
+import compareAddresses from "@lib/util/compare-addresses"
+import type { CartConflict, CartResult } from "@lib/util/cart-conflict"
+import { getCustomer } from "./customer"
 import { getProductsById } from "./products"
 import { getRegion } from "./regions"
 
@@ -99,17 +104,43 @@ export async function updateCart(data: HttpTypes.StoreUpdateCart) {
     .catch(medusaError)
 }
 
-export async function addToCart({
-  variantId,
-  quantity,
-  countryCode,
-  metadata,
-}: {
+type AddToCartInput = {
   variantId: string
   quantity: number
   countryCode: string
   metadata?: Record<string, any>
-}) {
+  isDigital?: boolean
+}
+
+// Messages here are shown to shoppers, so they must not carry ids or backend
+// detail. The real error is already logged by medusaError / the catch below.
+const friendlyAddError = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : ""
+  if (/stock location|inventory|out of stock/i.test(message)) {
+    return "This item is currently unavailable."
+  }
+  if (/could not reach the store/i.test(message)) {
+    return "Could not reach the store. Please try again."
+  }
+  return "We couldn't add this item to your cart. Please try again."
+}
+
+export async function addToCart(input: AddToCartInput): Promise<CartResult> {
+  try {
+    return await addToCartOrThrow(input)
+  } catch (error) {
+    console.error("addToCart failed:", error)
+    return { error: friendlyAddError(error) }
+  }
+}
+
+async function addToCartOrThrow({
+  variantId,
+  quantity,
+  countryCode,
+  metadata,
+  isDigital,
+}: AddToCartInput): Promise<CartConflict | void> {
   if (!variantId) {
     throw new Error("Missing variant ID when adding to cart")
   }
@@ -127,17 +158,20 @@ export async function addToCart({
   if (metadata?.restaurant_id) {
     // Attempting to add a restaurant food dish
     if (hasRetailItems) {
-      throw new Error(
-        "CONFLICT_RETAIL_EXISTS: Your cart contains standard store products. Food delivery orders cannot be combined with standard retail merchandise."
-      )
+      return {
+        conflict: "CONFLICT_RETAIL_EXISTS",
+        message:
+          "Your cart contains standard store products. Food delivery orders cannot be combined with standard retail merchandise.",
+      }
     }
 
     if (existingRestaurantId && existingRestaurantId !== metadata.restaurant_id) {
-      throw new Error(
-        `CONFLICT_RESTAURANT_EXISTS: Your cart already contains items from ${
+      return {
+        conflict: "CONFLICT_RESTAURANT_EXISTS",
+        message: `Your cart already contains items from ${
           cart.metadata?.restaurant_name || "another restaurant"
-        }. Orders can only be placed from one restaurant at a time.`
-      )
+        }. Orders can only be placed from one restaurant at a time.`,
+      }
     }
 
     if (!existingRestaurantId) {
@@ -157,10 +191,29 @@ export async function addToCart({
   } else {
     // Attempting to add a standard store product
     if (hasRestaurantItems || existingRestaurantId) {
-      throw new Error(
-        "CONFLICT_FOOD_EXISTS: Your cart contains food items from a restaurant. Standard retail products cannot be combined with restaurant food delivery orders."
-      )
+      return {
+        conflict: "CONFLICT_FOOD_EXISTS",
+        message:
+          "Your cart contains food items from a restaurant. Standard retail products cannot be combined with restaurant food delivery orders.",
+      }
     }
+  }
+
+  // A digital download is delivered by email, so its line is created by a
+  // dedicated route that marks it as needing no shipping. Medusa's own
+  // add-to-cart would leave it needing an address and a shipping method.
+  if (isDigital) {
+    await sdk.client
+      .fetch(`/store/carts/${cart.id}/line-items/digital`, {
+        method: "POST",
+        body: { variant_id: variantId, quantity },
+        headers: { ...(await getAuthHeaders()) },
+      })
+      .then(async () => {
+        await revalidateCacheTag("carts")
+      })
+      .catch(medusaError)
+    return
   }
 
   await sdk.store.cart
@@ -220,6 +273,29 @@ export async function deleteLineItem(lineId: string) {
       await revalidateCacheTag("carts")
     })
     .catch(medusaError)
+
+  // Taking out the last dish must also take off the restaurant tag, or the next
+  // thing put in this cart (a booking, a rental) would inherit it. The cart is
+  // read again after the delete rather than worked out from an earlier copy:
+  // two dishes removed together would each see the other still there.
+  // The item is already gone, so a failure here is logged, not shown.
+  try {
+    const cart = await retrieveCart()
+    if (
+      cart?.metadata?.restaurant_id &&
+      !(cart.items ?? []).some((item) => item.metadata?.restaurant_id)
+    ) {
+      await sdk.store.cart.update(
+        cartId,
+        { metadata: { ...cart.metadata, restaurant_id: null, restaurant_name: null } },
+        {},
+        await getAuthHeaders()
+      )
+      await revalidateCacheTag("carts")
+    }
+  } catch (err) {
+    console.error("Failed to clear the restaurant tag from the cart:", err)
+  }
 }
 
 export async function clearCart() {
@@ -260,8 +336,13 @@ export async function clearCartAndAdd({
   quantity: number
   countryCode: string
   metadata?: Record<string, any>
-}) {
-  await clearCart()
+}): Promise<CartResult> {
+  try {
+    await clearCart()
+  } catch (error) {
+    console.error("clearCart failed:", error)
+    return { error: "We couldn't clear your cart. Please try again." }
+  }
   return await addToCart({
     variantId,
     quantity,
@@ -440,6 +521,59 @@ export async function submitPromotionForm(
   }
 }
 
+/**
+ * Adds the shipping address to a signed-in customer's address book so the next
+ * order can start from it. Skipped for guests, and when the same address is
+ * already saved, so ordering twice does not pile up duplicates.
+ *
+ * Never throws: a failed save must not stop the shopper from checking out.
+ */
+async function saveAddressToBook(address: HttpTypes.StoreCartAddress) {
+  try {
+    // A cart that began as a no-shipping order only carries a name and a
+    // country; that is not an address worth keeping.
+    if (!address?.address_1) return
+
+    const customer = await getCustomer()
+    if (!customer) return
+
+    // Only the address fields. A cart's address also carries its own id and
+    // timestamps, which must not be copied into the address book. Blank and
+    // missing fields compare equal, as the book stores one and the form
+    // submits the other.
+    const normalise = (a: Record<string, any>) =>
+      Object.fromEntries(
+        [
+          "first_name",
+          "last_name",
+          "company",
+          "address_1",
+          "address_2",
+          "city",
+          "postal_code",
+          "province",
+          "country_code",
+          "phone",
+        ].map((k) => [k, typeof a[k] === "string" ? a[k] : ""])
+      )
+    const wanted = normalise(address)
+
+    const alreadySaved = (customer.addresses ?? []).some((saved) =>
+      compareAddresses(normalise(saved as any), wanted)
+    )
+    if (alreadySaved) return
+
+    await sdk.store.customer.createAddress(
+      wanted as any,
+      {},
+      await getAuthHeaders()
+    )
+    await revalidateCacheTag("customers")
+  } catch {
+    // Saving is a convenience; the order itself must go on.
+  }
+}
+
 // TODO: Pass a POJO instead of a form entity here
 export async function setAddresses(currentState: unknown, formData: FormData) {
   // Tickets are delivered by email, so such a cart collects a billing address
@@ -476,18 +610,26 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
     // the billing address stands in for both rather than leaving the cart
     // half-addressed.
     if (isTicketsOnly) {
-      const billingAddress = {
-        first_name: formData.get("billing_address.first_name"),
-        last_name: formData.get("billing_address.last_name"),
-        address_1: formData.get("billing_address.address_1"),
-        address_2: (formData.get("billing_address.address_2") as string) || "",
-        company: formData.get("billing_address.company"),
-        postal_code: formData.get("billing_address.postal_code"),
-        city: formData.get("billing_address.city"),
-        country_code: formData.get("billing_address.country_code"),
-        province: formData.get("billing_address.province"),
-        phone: formData.get("billing_address.phone"),
-      }
+      // Only what the contact form collects: a name, an optional phone and a
+      // country. Fields the shopper was never asked for are left off rather
+      // than sent as empty strings, so nothing blank overwrites an address
+      // already on the cart.
+      const billingAddress = Object.fromEntries(
+        [
+          "first_name",
+          "last_name",
+          "address_1",
+          "address_2",
+          "company",
+          "postal_code",
+          "city",
+          "country_code",
+          "province",
+          "phone",
+        ]
+          .map((field) => [field, formData.get(`billing_address.${field}`)])
+          .filter(([, value]) => typeof value === "string" && value !== "")
+      )
 
       await updateCart({
         billing_address: billingAddress,
@@ -513,6 +655,13 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
         }
 
       await updateCart(data)
+
+      // The checkbox is only offered to signed-in customers. The address is not
+      // saved yet - the shopper may still abandon the cart - so the choice is
+      // remembered and placeOrder acts on it once the order exists.
+      await setSaveAddressChoice(
+        formData.get("save_address") === "on" ? await getCartId() ?? null : null
+      )
     }
   } catch (e: any) {
     return e.message
@@ -555,9 +704,27 @@ export async function placeOrder() {
       await revalidateCacheTag("orders")
       return cartRes
     })
-    .catch(medusaError)
+    // Returned, not thrown. Next replaces the message of anything a server
+    // action throws with a generic "Server Components render" error in
+    // production, so the shopper never learned why the order failed.
+    .catch((e: any) => {
+      try {
+        medusaError(e)
+      } catch (err: any) {
+        return { error: (err?.message as string) || "Could not place the order." }
+      }
+    })
+
+  if (cartRes && "error" in cartRes) return { error: cartRes.error as string }
 
   if (cartRes?.type === "order") {
+    // Add the delivery address to the customer's address book if they asked for
+    // that on the address step. Done only now, with the order placed.
+    if ((await getSaveAddressChoice()) === cartId && cart?.shipping_address) {
+      await saveAddressToBook(cart.shipping_address)
+    }
+    await setSaveAddressChoice(null)
+
     // Ticket orders have no shipping address at all, so the billing address is
     // the fallback here. Without it the redirect used to interpolate
     // "undefined" as the country code and land on a 404.
@@ -568,24 +735,25 @@ export async function placeOrder() {
     )?.toLowerCase()
 
     // Step 13: Order Delivery Creation on Checkout
-    const restaurantId =
-      (cart?.metadata?.restaurant_id as string) ||
-      (cart?.items ?? []).find((item: any) => item.metadata?.restaurant_id)?.metadata?.restaurant_id
+    // Only the dishes in the cart say whether this is a food order. The cart's
+    // own restaurant_id is a leftover once the dishes are removed, and used to
+    // turn a booking or rental into a delivery.
+    const restaurantId = (cart?.items ?? []).find((item: any) => item.metadata?.restaurant_id)
+      ?.metadata?.restaurant_id as string | undefined
 
-    let deliveryId: string | null = null
     if (restaurantId) {
       try {
-        const deliveryRes: any = await sdk.client.fetch(`/store/deliveries`, {
+        await sdk.client.fetch(`/store/deliveries`, {
           method: "POST",
           body: {
             cart_id: cartId,
             restaurant_id: restaurantId,
+            order_id: cartRes.order.id,
           },
           headers: { ...(await getAuthHeaders()) },
         })
-        if (deliveryRes?.delivery?.id) {
-          deliveryId = deliveryRes.delivery.id
-        }
+        // The order pages read the delivery id from the order.
+        await revalidateCacheTag("orders")
       } catch (err) {
         console.error("Failed to create order delivery workflow:", err)
       }
@@ -593,14 +761,12 @@ export async function placeOrder() {
 
     await removeCartId()
 
-    if (deliveryId) {
-      redirect(`/${countryCode}/deliveries/${deliveryId}`)
-    } else {
-      redirect(`/${countryCode}/order/confirmed/${cartRes?.order.id}`)
-    }
+    // Every order lands on its confirmation; a food order gets a "Track your
+    // order" link there.
+    redirect(`/${countryCode}/order/confirmed/${cartRes.order.id}`)
   }
 
-  return cartRes.cart
+  return { cart: cartRes?.cart }
 }
 
 /**

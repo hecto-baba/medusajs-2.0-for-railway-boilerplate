@@ -1,10 +1,8 @@
 import { requireVendorSession } from "@lib/data/vendor"
-import {
-  EditProfileForm,
-  ProfileGeneralSection,
-  ProfileMfaSection,
-} from "@modules/settings"
-import { RouteDrawer } from "@modules/common"
+import { EditProfileForm } from "@modules/settings/components/edit-profile-form"
+import { ProfileGeneralSection } from "@modules/settings/components/profile-general-section"
+import { ProfileMfaSection } from "@modules/settings/components/profile-mfa-section"
+import { RouteDrawer } from "@modules/common/components/route-drawer/route-drawer"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Edit profile" }

@@ -6,12 +6,14 @@ import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { DELIVERY_MODULE } from "../../../../modules/delivery"
 import DeliveryModuleService from "../../../../modules/delivery/service"
 import { DeliveryStatus } from "../../../../modules/delivery/types"
+import { assertVendorOwnsDelivery } from "../../shared/ownership-scope"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
   const { id } = req.params
+  await assertVendorOwnsDelivery(req, id)
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   try {
@@ -52,6 +54,7 @@ export const POST = async (
   res: MedusaResponse
 ) => {
   const { id } = req.params
+  await assertVendorOwnsDelivery(req, id)
   const deliveryModule: DeliveryModuleService = req.scope.resolve(DELIVERY_MODULE)
   const body = (req.body || {}) as any
 

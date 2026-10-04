@@ -1,5 +1,12 @@
 import { test, expect, devices } from "@playwright/test"
-import { expectCartCount, newCustomer, qaEnv, register, url } from "./helpers"
+import {
+  expectCartCount,
+  newCustomer,
+  purchasableHandle,
+  qaEnv,
+  register,
+  url,
+} from "./helpers"
 
 /**
  * The storefront ships a separate mobile experience: a sticky action bar on
@@ -58,7 +65,10 @@ test.describe("Mobile", () => {
   test("a variant can be picked and added from the mobile sheet", async ({
     page,
   }) => {
-    await page.goto(url("products/t-shirt"))
+    const handle = await purchasableHandle(page.request, "t-shirt", {
+      multiVariant: true,
+    }).catch(() => "t-shirt")
+    await page.goto(url(`products/${handle}`))
     await revealMobileBar(page)
 
     await chooseVariantInSheet(page)
@@ -101,7 +111,10 @@ test.describe("Mobile", () => {
   })
 
   test("checkout is completable on a phone", async ({ page }) => {
-    await page.goto(url("products/shorts"))
+    const handle = await purchasableHandle(page.request, "shorts", {
+      multiVariant: true,
+    }).catch(() => "shorts")
+    await page.goto(url(`products/${handle}`))
     await revealMobileBar(page)
     await chooseVariantInSheet(page)
     await page.getByTestId("mobile-cart-button").click()

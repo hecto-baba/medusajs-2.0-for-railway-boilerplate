@@ -71,7 +71,7 @@ The local `docker-compose.yml` in the repository root provides all four.
 | Path | What it is |
 | ---- | ---------- |
 | `medusa-config.js` | Registers every optional integration behind a presence check on its environment variables, so an unconfigured store starts rather than crashing. |
-| `src/modules/email-notifications/` | Resend provider with react-email templates for order confirmation and admin invites. [Its own README](src/modules/email-notifications/README.md). |
+| `src/modules/email-notifications/` | ZeptoMail provider with react-email templates for order confirmation and admin invites. [Its own README](src/modules/email-notifications/README.md). |
 | `src/subscribers/` | `order-placed` and `invite-created`, which send those emails. |
 | `src/search/products.ts` | The product search index definition consumed by Medusa 2.19's Search Module. |
 | `src/api/key-exchange/` | Hands the storefront its publishable API key at boot, since the two services deploy independently. |
@@ -90,8 +90,7 @@ published in this repository:
   warning at boot when a production deploy is still on the placeholder.
 - `MEDUSA_ADMIN_PASSWORD` is the login to your own dashboard.
 
-Email needs both halves of one provider: `RESEND_API_KEY` **and**
-`RESEND_FROM_EMAIL` (or the SendGrid pair). With only one set, the notification
+Email needs both `ZEPTOMAIL_API_KEY` **and** `ZEPTOMAIL_FROM_EMAIL`. With only one set, the notification
 module is not registered at all and no order confirmations or admin invites
 send, silently.
 

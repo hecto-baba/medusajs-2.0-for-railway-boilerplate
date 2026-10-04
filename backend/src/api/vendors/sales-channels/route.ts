@@ -136,6 +136,13 @@ export const GET = async (
     (vendorAdmin?.vendor?.products || []).map((p: any) => p.id)
   )
 
+  // The store's default channel, so the product form can pre-select it the way
+  // the admin does.
+  const {
+    data: [store],
+  } = await query.graph({ entity: "store", fields: ["default_sales_channel_id"] })
+  const defaultChannelId = store?.default_sales_channel_id
+
   const channelsWithStats = allChannels.map((sc: any) => {
     const matchingProducts = (sc.products || []).filter((p: any) =>
       vendorProductIds.has(p.id)
@@ -144,6 +151,7 @@ export const GET = async (
       ...sc,
       products_count: matchingProducts.length,
       is_vendor_owned: vendorChannelIds.has(sc.id),
+      is_default: sc.id === defaultChannelId,
     }
   })
 

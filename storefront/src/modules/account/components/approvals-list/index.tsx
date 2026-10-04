@@ -39,9 +39,9 @@ export const ApprovalsList = ({ initialApprovals }: ApprovalsListProps) => {
 
   if (approvals.length === 0) {
     return (
-      <div className="border border-dashed rounded-lg p-12 text-center bg-gray-50">
-        <p className="text-base-semi mb-1">No Orders Pending Approval</p>
-        <p className="text-sm text-ui-fg-subtle">
+      <div className="rounded-large bg-card p-12 text-center shadow-lift">
+        <p className="font-display text-lg font-extrabold tracking-tight mb-1">No Orders Pending Approval</p>
+        <p className="text-sm text-muted">
           When employees place orders exceeding company spending rules, they will appear here for your review.
         </p>
       </div>
@@ -51,7 +51,7 @@ export const ApprovalsList = ({ initialApprovals }: ApprovalsListProps) => {
   return (
     <div className="flex flex-col gap-y-4">
       {message && (
-        <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded text-sm">
+        <div className="rounded-large bg-brand-soft p-3 text-sm font-bold text-brand">
           {message}
         </div>
       )}
@@ -72,27 +72,27 @@ export const ApprovalsList = ({ initialApprovals }: ApprovalsListProps) => {
         return (
           <div
             key={approval.id}
-            className="border rounded-lg p-6 bg-white shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+            className="rounded-large bg-card p-5 shadow-lift flex flex-col small:flex-row small:items-center justify-between gap-4"
           >
             <div>
               <div className="flex items-center gap-x-3 mb-1">
-                <span className="font-semibold text-base">{employeeName}</span>
+                <span className="font-extrabold text-base">{employeeName}</span>
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  className={`rounded-circle px-2.5 py-1 text-xs font-bold leading-none ${
                     latestStatus === "approved"
-                      ? "bg-green-100 text-green-800"
+                      ? "bg-success-soft text-success"
                       : latestStatus === "rejected"
-                      ? "bg-red-100 text-red-800"
-                      : "bg-amber-100 text-amber-800"
+                      ? "bg-brand-soft text-brand"
+                      : "bg-pop text-pop-ink"
                   }`}
                 >
                   {latestStatus.toUpperCase()}
                 </span>
               </div>
-              <p className="text-xs text-ui-fg-subtle font-mono">
+              <p className="text-xs text-muted font-mono">
                 Cart: {approval.cart_id}
               </p>
-              <p className="text-sm font-medium mt-2">Order Total: {total}</p>
+              <p className="text-sm font-bold mt-2">Order Total: {total}</p>
             </div>
 
             {latestStatus === "pending" && (
@@ -101,7 +101,7 @@ export const ApprovalsList = ({ initialApprovals }: ApprovalsListProps) => {
                   type="button"
                   onClick={() => handleAction(approval.id, "rejected")}
                   disabled={loadingId === approval.id}
-                  className="px-4 py-2 text-sm border rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-bold border border-line bg-card rounded-large text-ink hover:bg-canvas disabled:opacity-50"
                 >
                   Reject
                 </button>
@@ -109,7 +109,7 @@ export const ApprovalsList = ({ initialApprovals }: ApprovalsListProps) => {
                   type="button"
                   onClick={() => handleAction(approval.id, "approved")}
                   disabled={loadingId === approval.id}
-                  className="px-4 py-2 text-sm bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-extrabold bg-brand text-brand-ink rounded-large hover:opacity-90 disabled:opacity-50"
                 >
                   {loadingId === approval.id ? "Processing..." : "Approve Order"}
                 </button>

@@ -11,23 +11,36 @@ import {
 import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 import { sdk } from "../lib/sdk"
+import type { AvailabilityException } from "../types/appointment-booking"
+
+type Kind = "day_off" | "time_off" | "extra_hours"
 
 type CreateExceptionModalProps = {
   onCreated: () => void
   endpoint: string
+  /** When set, the modal edits this entry (opened immediately) instead of adding one. */
+  entry?: AvailabilityException | null
+  /** Called when an edit modal closes, saved or not. */
+  onClose?: () => void
 }
 
-export const CreateExceptionModal = ({ onCreated, endpoint }: CreateExceptionModalProps) => {
-  const [open, setOpen] = useState(false)
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
-  const [type, setType] = useState<"blackout" | "extra_hours">("blackout")
-  const [startTime, setStartTime] = useState("09:00")
-  const [endTime, setEndTime] = useState("17:00")
-  const [reason, setReason] = useState("")
+const kindOf = (e: AvailabilityException): Kind =>
+  e.type === "extra_hours" ? "extra_hours" : e.start_time && e.end_time ? "time_off" : "day_off"
+
+export const CreateExceptionModal = ({ onCreated, endpoint, entry, onClose }: CreateExceptionModalProps) => {
+  const [openState, setOpen] = useState(false)
+  const open = entry ? true : openState
+  const [date, setDate] = useState(entry ? entry.date.slice(0, 10) : new Date().toISOString().slice(0, 10))
+  const [kind, setKind] = useState<Kind>(entry ? kindOf(entry) : "day_off")
+  const [startTime, setStartTime] = useState(entry?.start_time ?? "09:00")
+  const [endTime, setEndTime] = useState(entry?.end_time ?? "17:00")
+  const [reason, setReason] = useState(entry?.reason ?? "")
+  const type = kind === "extra_hours" ? "extra_hours" : "blackout"
+  const timed = kind !== "day_off"
 
   const reset = () => {
     setDate(new Date().toISOString().slice(0, 10))
-    setType("blackout")
+    setKind("day_off")
     setStartTime("09:00")
     setEndTime("17:00")
     setReason("")
@@ -35,33 +48,35 @@ export const CreateExceptionModal = ({ onCreated, endpoint }: CreateExceptionMod
 
   const validationError = (() => {
     if (!date) return "A date is required"
-    if (type === "extra_hours" && startTime >= endTime)
+    if (timed && (!startTime || !endTime)) return "Enter a start and end time"
+    if (timed && startTime >= endTime)
       return "Start time must be before end time"
     return null
   })()
 
   const createMutation = useMutation({
     mutationFn: () =>
-      sdk.client.fetch(endpoint, {
+      sdk.client.fetch(entry ? `${endpoint}/${entry.id}` : endpoint, {
         method: "POST",
         body: {
           date,
           type,
-          start_time: type === "extra_hours" ? startTime : null,
-          end_time: type === "extra_hours" ? endTime : null,
+          start_time: timed ? startTime : null,
+          end_time: timed ? endTime : null,
           reason: reason.trim() || null,
         },
       }),
     onSuccess: () => {
       toast.success(
-        type === "blackout" ? "Day blocked off" : "Extra hours added"
+        entry ? "Changes saved" : type === "blackout" ? "Time blocked off" : "Extra hours added"
       )
       reset()
       setOpen(false)
+      onClose?.()
       onCreated()
     },
     onError: (error: any) => {
-      toast.error(error?.message || "Could not add exception")
+      toast.error(error?.message || (entry ? "Could not save changes" : "Could not add exception"))
     },
   })
 
@@ -70,14 +85,19 @@ export const CreateExceptionModal = ({ onCreated, endpoint }: CreateExceptionMod
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
-        if (!next) reset()
+        if (!next) {
+          if (!entry) reset()
+          onClose?.()
+        }
       }}
     >
-      <FocusModal.Trigger asChild>
-        <Button size="small" variant="secondary">
-          Add exception
-        </Button>
-      </FocusModal.Trigger>
+      {entry ? null : (
+        <FocusModal.Trigger asChild>
+          <Button size="small" variant="secondary">
+            Add exception
+          </Button>
+        </FocusModal.Trigger>
+      )}
 
       <FocusModal.Content>
         <FocusModal.Header>
@@ -88,7 +108,7 @@ export const CreateExceptionModal = ({ onCreated, endpoint }: CreateExceptionMod
               isLoading={createMutation.isPending}
               disabled={!!validationError}
             >
-              Add exception
+              {entry ? "Save" : "Add exception"}
             </Button>
           </div>
         </FocusModal.Header>
@@ -119,20 +139,21 @@ export const CreateExceptionModal = ({ onCreated, endpoint }: CreateExceptionMod
                 Type
               </Label>
               <Select
-                value={type}
-                onValueChange={(value) => setType(value as "blackout" | "extra_hours")}
+                value={kind}
+                onValueChange={(value) => setKind(value as Kind)}
               >
                 <Select.Trigger>
                   <Select.Value />
                 </Select.Trigger>
                 <Select.Content>
-                  <Select.Item value="blackout">Block off the whole day</Select.Item>
+                  <Select.Item value="day_off">Block off the whole day</Select.Item>
+                  <Select.Item value="time_off">Block off part of the day</Select.Item>
                   <Select.Item value="extra_hours">Add extra hours</Select.Item>
                 </Select.Content>
               </Select>
             </div>
 
-            {type === "extra_hours" && (
+            {timed && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
                   <Label size="small" weight="plus">

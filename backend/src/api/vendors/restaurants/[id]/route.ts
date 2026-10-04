@@ -41,6 +41,7 @@ export async function assertVendorOwnsRestaurant(
       "products.*",
       "products.variants.*",
       "products.variants.prices.*",
+      "products.options.*",
       "admins.*",
       "deliveries.*",
       "deliveries.driver.*",
@@ -57,24 +58,54 @@ export async function assertVendorOwnsRestaurant(
     (a: any) => a.email?.toLowerCase() === vendorAdmin.email?.toLowerCase()
   )
 
-  if (isAdmin) {
-    return restaurant
+  let isLinked = isAdmin
+  if (!isLinked) {
+    // Also check if linked via vendor.restaurants
+    try {
+      const { data: [vendor] } = await query.graph({
+        entity: "vendor",
+        fields: ["id", "restaurants.id"],
+        filters: { id: [vendorAdmin.vendor.id] },
+      })
+      isLinked = (vendor?.restaurants || []).some((r: any) => r.id === restaurantId)
+    } catch {}
   }
 
-  // Also check if linked via vendor.restaurants
-  try {
-    const { data: [vendor] } = await query.graph({
-      entity: "vendor",
-      fields: ["id", "restaurants.id"],
-      filters: { id: [vendorAdmin.vendor.id] },
-    })
-    const hasRestaurant = (vendor?.restaurants || []).some((r: any) => r.id === restaurantId)
-    if (hasRestaurant) {
-      return restaurant
-    }
-  } catch {}
+  if (!isLinked) {
+    throw new MedusaError(MedusaError.Types.NOT_FOUND, "Restaurant not found.")
+  }
 
-  throw new MedusaError(MedusaError.Types.NOT_FOUND, "Restaurant not found.")
+  restaurant.products = restaurant.products || []
+
+  // Ensure vendor products marked for this restaurant are included
+  if (vendorAdmin?.vendor?.id) {
+    try {
+      const { data: [vendorWithProds] } = await query.graph({
+        entity: "vendor",
+        fields: [
+          "id",
+          "products.*",
+          "products.variants.*",
+          "products.variants.prices.*",
+          "products.options.*",
+        ],
+        filters: { id: [vendorAdmin.vendor.id] },
+      })
+      const vProds = vendorWithProds?.products || []
+      for (const vp of vProds) {
+        const isDish =
+          vp.metadata?.is_restaurant_item === true ||
+          vp.metadata?.restaurant_id === restaurantId ||
+          vp.metadata?.dietary ||
+          vp.metadata?.dietary_type
+        if (isDish && !restaurant.products.some((existing: any) => existing.id === vp.id)) {
+          restaurant.products.push(vp)
+        }
+      }
+    } catch {}
+  }
+
+  return restaurant
 }
 
 export const GET = async (

@@ -1,4 +1,5 @@
-import { RefundReasonEditDrawer, RefundReasonsTable } from "@modules/settings"
+import { RefundReasonEditDrawer } from "@modules/settings/components/refund-reason-edit-drawer"
+import { RefundReasonsTable } from "@modules/settings/components/refund-reasons-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Edit refund reason" }

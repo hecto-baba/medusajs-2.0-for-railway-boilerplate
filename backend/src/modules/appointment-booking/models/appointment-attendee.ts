@@ -6,20 +6,50 @@ export const AppointmentAttendee = model.define("appointment_attendee", {
   appointment: model.belongsTo(() => Appointment, {
     mappedBy: "attendees",
   }),
-  customer_id: model.text(),
+  // Null for guest buyers. Registered customers are also identified by it, so
+  // a customer cannot hold the same slot twice (partial unique index created
+  // in the migration - it ignores cancelled rows so a cancelled customer can
+  // rebook).
+  customer_id: model.text().nullable(),
+  buyer_name: model.text().nullable(),
+  buyer_email: model.text().nullable(),
+  buyer_phone: model.text().nullable(),
+  notes: model.text().nullable(),
   order_id: model.text().nullable(),
   line_item_id: model.text().nullable(),
+  // reserved = held while the buyer pays (expires_at set); confirmed = paid.
   status: model
     .enum(["reserved", "confirmed", "cancelled"])
     .default("reserved"),
+  // Only meaningful while status = reserved.
+  expires_at: model.dateTime().nullable(),
+  // Set once the confirmation emails have gone out, so a redelivered event can
+  // never email the same booking twice.
+  confirmation_sent_at: model.dateTime().nullable(),
+  cancelled_at: model.dateTime().nullable(),
+  cancelled_by: model
+    .enum(["buyer", "vendor", "admin", "system"])
+    .nullable(),
+  cancel_reason: model.text().nullable(),
+  // Set once the "your booking was cancelled" email has gone out (see
+  // confirmation_sent_at for why).
+  cancellation_sent_at: model.dateTime().nullable(),
+  // Reschedule history. The start time the booking had before its latest move
+  // (kept as a time, not a slot id, because a booking alone in its slot is moved
+  // by editing that slot in place).
+  rescheduled_from_start: model.dateTime().nullable(),
+  rescheduled_by: model
+    .enum(["buyer", "vendor", "admin", "system"])
+    .nullable(),
+  reschedule_count: model.number().default(0),
+  // Set once the "your booking moved" email for the latest move has gone out.
+  reschedule_notified_at: model.dateTime().nullable(),
 })
 .indexes([
   {
     on: ["appointment_id"],
   },
-  // One customer can't double-book the same slot.
   {
-    on: ["appointment_id", "customer_id"],
-    unique: true,
+    on: ["customer_id"],
   },
 ])

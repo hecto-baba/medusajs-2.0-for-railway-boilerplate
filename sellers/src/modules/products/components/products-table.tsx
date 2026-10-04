@@ -2,16 +2,15 @@
 
 import {
   deleteVendorProduct,
-  listVendorCollections,
   listVendorProducts,
   listVendorProductTags,
   listVendorProductTypes,
   listVendorSalesChannels,
+  type ListResponse,
   type VendorProduct,
 } from "@lib/data/vendor-client"
 import {
   Button,
-  Container,
   createDataTableColumnHelper,
   createDataTableCommandHelper,
   createDataTableFilterHelper,
@@ -25,23 +24,30 @@ import {
   useDataTable,
   usePrompt,
 } from "@medusajs/ui"
-import { Sparkles } from "@medusajs/icons"
+import { Plus } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import Link from "next/link"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import {
-  DataTableAddFilter,
   ListSummaryCell,
   PlaceholderCell,
   ProductCell,
   ProductStatusCell,
-  createMedusaDateFilter,
-  resolveMedusaDateFilter,
 } from "@modules/common"
 import { ProductExportButton } from "./product-export-button"
 import { ProductImportModal } from "./product-import-modal"
-import { AddProductModal } from "./add-product-modal"
+
+// Only mounted after "Add Product" is clicked, so keep it (and its drag-and-drop
+// dependencies) out of the initial list-page bundle.
+const ProductCreateFlow = dynamic(() =>
+  import("./product-create-flow").then((m) => m.ProductCreateFlow)
+)
+
+// Types, tags and sales channels rarely change while a seller is on this page, so
+// the filter menus reuse them for 5 minutes instead of refetching all three lists
+// on every visit (the app-wide default is 30s).
+const FILTER_OPTIONS_STALE_MS = 5 * 60_000
 
 const columnHelper = createDataTableColumnHelper<VendorProduct>()
 const filterHelper = createDataTableFilterHelper<VendorProduct>()
@@ -159,8 +165,14 @@ const useColumns = (onDelete: (product: VendorProduct) => void) => [
   }),
 ]
 
-export const ProductsTable = () => {
+export const ProductsTable = ({
+  initialData,
+}: {
+  /** First page (20, unfiltered) read on the server; null falls back to a client fetch. */
+  initialData?: ListResponse<{ products: VendorProduct[] }> | null
+}) => {
   const router = useRouter()
+  const [creating, setCreating] = useState(false)
   const queryClient = useQueryClient()
   const prompt = usePrompt()
 
@@ -169,10 +181,7 @@ export const ProductsTable = () => {
   const [rowSelection, setRowSelection] = useState<DataTableRowSelectionState>(
     {}
   )
-  const [sorting, setSorting] = useState<DataTableSortingState | null>({
-    id: "title",
-    desc: false,
-  })
+  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -180,58 +189,27 @@ export const ProductsTable = () => {
 
   const limit = pagination.pageSize
   const offset = pagination.pageIndex * limit
-  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false)
 
   // Fetch filter options
   const { data: typesData } = useQuery({
     queryKey: ["vendor-types-filter"],
     queryFn: () => listVendorProductTypes({ limit: 100, offset: 0 }),
-  })
-  const { data: collectionsData } = useQuery({
-    queryKey: ["vendor-collections-filter"],
-    queryFn: () => listVendorCollections({ limit: 100, offset: 0 }),
+    staleTime: FILTER_OPTIONS_STALE_MS,
   })
   const { data: tagsData } = useQuery({
     queryKey: ["vendor-tags-filter"],
     queryFn: () => listVendorProductTags({ limit: 100, offset: 0 }),
+    staleTime: FILTER_OPTIONS_STALE_MS,
   })
   const { data: salesChannelsData } = useQuery({
     queryKey: ["vendor-channels-filter"],
     queryFn: () => listVendorSalesChannels({ limit: 100, offset: 0 }),
+    staleTime: FILTER_OPTIONS_STALE_MS,
   })
 
   // Dynamic filter definitions
   const filters = useMemo(() => {
     const list: any[] = [
-      filterHelper.custom({
-        id: "status",
-        label: "Status",
-        type: "select",
-        options: [
-          { label: "Draft", value: "draft" },
-          { label: "Proposed", value: "proposed" },
-          { label: "Published", value: "published" },
-          { label: "Rejected", value: "rejected" },
-        ],
-      }),
-      filterHelper.custom({
-        id: "collection_id",
-        label: "Collection",
-        type: "select",
-        options: (collectionsData?.collections ?? []).map((c) => ({
-          label: c.title,
-          value: c.id,
-        })),
-      }),
-      filterHelper.custom({
-        id: "sales_channel_id",
-        label: "Sales Channel",
-        type: "select",
-        options: (salesChannelsData?.sales_channels ?? []).map((sc) => ({
-          label: sc.name,
-          value: sc.id,
-        })),
-      }),
       filterHelper.custom({
         id: "type_id",
         label: "Type",
@@ -250,12 +228,50 @@ export const ProductsTable = () => {
           value: t.id,
         })),
       }),
-      createMedusaDateFilter(filterHelper, "created_at", "Created"),
-      createMedusaDateFilter(filterHelper, "updated_at", "Updated"),
+      filterHelper.custom({
+        id: "sales_channel_id",
+        label: "Sales Channel",
+        type: "select",
+        options: (salesChannelsData?.sales_channels ?? []).map((sc) => ({
+          label: sc.name,
+          value: sc.id,
+        })),
+      }),
+      filterHelper.custom({
+        id: "status",
+        label: "Status",
+        type: "select",
+        options: [
+          { label: "Draft", value: "draft" },
+          { label: "Proposed", value: "proposed" },
+          { label: "Published", value: "published" },
+          { label: "Rejected", value: "rejected" },
+        ],
+      }),
+      filterHelper.custom({
+        id: "created_at_gte",
+        label: "Created",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      }),
+      filterHelper.custom({
+        id: "updated_at_gte",
+        label: "Updated",
+        type: "select",
+        options: [
+          { label: "Last 7 days", value: "7d" },
+          { label: "Last 30 days", value: "30d" },
+          { label: "Last 90 days", value: "90d" },
+        ],
+      }),
     ]
 
     return list
-  }, [typesData, tagsData, salesChannelsData, collectionsData])
+  }, [typesData, tagsData, salesChannelsData])
 
   // A select filter's value arrives either as a bare array or wrapped in an
   // operator object depending on how it was set, so it is normalised here.
@@ -271,25 +287,36 @@ export const ProductsTable = () => {
   const typeId = extractFilterVal(filtering.type_id)
   const tagId = extractFilterVal(filtering.tag_id)
   const salesChannelId = extractFilterVal(filtering.sales_channel_id)
-
+  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
+  const updatedFilterVal = extractFilterVal(filtering.updated_at_gte)
   const createdAtGte = useMemo(() => {
-    return (
-      resolveMedusaDateFilter(filtering.created_at) ??
-      resolveMedusaDateFilter(filtering.created_at_gte)
-    )
-  }, [filtering.created_at, filtering.created_at_gte])
-
+    if (!dateFilterVal) return undefined
+    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [dateFilterVal])
   const updatedAtGte = useMemo(() => {
-    return (
-      resolveMedusaDateFilter(filtering.updated_at) ??
-      resolveMedusaDateFilter(filtering.updated_at_gte)
-    )
-  }, [filtering.updated_at, filtering.updated_at_gte])
+    if (!updatedFilterVal) return undefined
+    const days = updatedFilterVal === "7d" ? 7 : updatedFilterVal === "30d" ? 30 : 90
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [updatedFilterVal])
 
   // The backend reads a leading "-" as descending, matching the admin.
   const order = sorting
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
+
+  const isOpeningView =
+    limit === 20 &&
+    offset === 0 &&
+    !search &&
+    !status?.length &&
+    !order &&
+    !collectionId &&
+    !typeId &&
+    !tagId &&
+    !salesChannelId &&
+    !createdAtGte &&
+    !updatedAtGte
 
   const { data, isLoading } = useQuery({
     queryKey: [
@@ -321,6 +348,9 @@ export const ProductsTable = () => {
         updated_at_gte: updatedAtGte,
       }),
     placeholderData: (previous) => previous,
+    // The server-rendered page only matches the table's opening view: first
+    // page, default size, no search, filters or sort. Any other key fetches.
+    initialData: isOpeningView ? initialData ?? undefined : undefined,
   })
 
   const { mutateAsync: remove } = useMutation({
@@ -452,61 +482,48 @@ export const ProductsTable = () => {
 
   return (
     <>
-      <Container className="divide-y p-0">
-        <div className="flex items-center justify-between px-6 py-4">
-          <Heading level="h1">Products</Heading>
-          <div className="flex items-center justify-center gap-x-2">
+      <DataTable instance={table}>
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <Heading level="h2">Products</Heading>
+          <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search products..." />
+            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTable.SortingMenu tooltip="Sort" />
             <ProductExportButton />
             <ProductImportModal />
             <Button
               size="small"
-              variant="secondary"
-              onClick={() => setIsAddProductModalOpen(true)}
+              variant="primary"
               className="gap-x-1.5"
+              onClick={() => setCreating(true)}
             >
-              <Sparkles className="size-4 text-ui-fg-interactive" />
-              <span>Master Catalog</span>
-            </Button>
-            <Button size="small" variant="secondary" asChild>
-              <Link href="/products/new">Create</Link>
+              <Plus className="size-4" />
+              <span>Add Product</span>
             </Button>
           </div>
-        </div>
+        </DataTable.Toolbar>
+        <DataTable.FilterBar />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No products yet",
+              description: "Create your first product to get started.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No products match that search.",
+            },
+          }}
+        />
+        <DataTable.Pagination />
+        <DataTable.CommandBar
+          selectedLabel={(count) => count + " selected"}
+        />
+      </DataTable>
 
-        <DataTable instance={table}>
-          <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-            <div className="flex items-center gap-x-2">
-              <DataTableAddFilter table={table} />
-            </div>
-            <div className="flex items-center gap-x-2">
-              <DataTable.Search placeholder="Search" />
-              <DataTable.SortingMenu tooltip="Sort" />
-            </div>
-          </DataTable.Toolbar>
-          <DataTable.FilterBar />
-          <DataTable.Table
-            emptyState={{
-              empty: {
-                heading: "No records",
-                description: "No products found. Create a product or browse the Master Catalog.",
-              },
-              filtered: {
-                heading: "No matches",
-                description: "No products match that search.",
-              },
-            }}
-          />
-          <DataTable.Pagination />
-          <DataTable.CommandBar
-            selectedLabel={(count) => count + " selected"}
-          />
-        </DataTable>
-      </Container>
-
-      <AddProductModal
-        open={isAddProductModalOpen}
-        onOpenChange={setIsAddProductModalOpen}
-      />
+      {creating ? (
+        <ProductCreateFlow open onClose={() => setCreating(false)} />
+      ) : null}
     </>
   )
 }

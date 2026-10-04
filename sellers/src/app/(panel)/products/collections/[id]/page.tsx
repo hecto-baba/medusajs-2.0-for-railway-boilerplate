@@ -1,4 +1,4 @@
-import { CollectionDetail } from "@modules/collections"
+import { CollectionDetail } from "@modules/collections/components/detail/collection-detail"
 import { Metadata } from "next"
 
 export const metadata: Metadata = {

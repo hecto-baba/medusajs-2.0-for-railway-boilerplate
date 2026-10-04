@@ -1,6 +1,7 @@
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
 import { RENTAL_MODULE } from "../../modules/rental"
 import RentalModuleService from "../../modules/rental/service"
+import { assertNoOtherSaleMode, withSaleModeLock } from "../../lib/sale-mode"
 import { RentalUnit } from "../../utils/rental-unit"
 
 type UpdateRentalConfigurationInput = {
@@ -13,6 +14,7 @@ type UpdateRentalConfigurationInput = {
   security_deposit_amount?: number
   security_deposit_type?: "fixed" | "percentage"
   requires_time_selection?: boolean
+  fulfilment_modes?: "both" | "pickup" | "delivery"
   status?: "active" | "inactive"
 }
 
@@ -42,9 +44,20 @@ export const updateRentalConfigurationStep = createStep(
       patch.max_rental_units = input.max_rental_days
     }
 
-    const updatedRentalConfig = await rentalModuleService.updateRentalConfigurations(
-      patch as UpdateRentalConfigurationInput
-    )
+    const write = () =>
+      rentalModuleService.updateRentalConfigurations(
+        patch as UpdateRentalConfigurationInput
+      )
+
+    // Only a switch to "active" can create a conflict; edits to an already
+    // active rental must keep working. Check and write share one lock.
+    const updatedRentalConfig =
+      input.status === "active" && existingRentalConfig.status !== "active"
+        ? await withSaleModeLock(container, [existingRentalConfig.product_id], async () => {
+            await assertNoOtherSaleMode(container, existingRentalConfig.product_id, "rental")
+            return write()
+          })
+        : await write()
 
     return new StepResponse(updatedRentalConfig, existingRentalConfig)
   },
@@ -63,6 +76,7 @@ export const updateRentalConfigurationStep = createStep(
       security_deposit_amount: existingRentalConfig.security_deposit_amount,
       security_deposit_type: existingRentalConfig.security_deposit_type,
       requires_time_selection: existingRentalConfig.requires_time_selection,
+      fulfilment_modes: existingRentalConfig.fulfilment_modes,
       status: existingRentalConfig.status,
     })
   }

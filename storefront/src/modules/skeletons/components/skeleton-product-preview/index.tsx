@@ -1,12 +1,12 @@
-import { Container } from "@medusajs/ui"
-
 const SkeletonProductPreview = () => {
   return (
-    <div className="animate-pulse">
-      <Container className="aspect-[9/16] w-full bg-gray-100 bg-ui-bg-subtle" />
-      <div className="flex justify-between text-base-regular mt-2">
-        <div className="w-2/5 h-6 bg-gray-100"></div>
-        <div className="w-1/5 h-6 bg-gray-100"></div>
+    <div className="flex animate-pulse flex-col gap-2 rounded-large bg-card p-3 shadow-lift">
+      <div className="aspect-[1/0.86] w-full rounded-[12px] bg-canvas" />
+      <div className="h-4 w-4/5 rounded-soft bg-canvas" />
+      <div className="h-3 w-2/5 rounded-soft bg-canvas" />
+      <div className="mt-1 flex items-center justify-between">
+        <div className="h-5 w-1/3 rounded-soft bg-canvas" />
+        <div className="h-9 w-[76px] rounded-rounded bg-canvas" />
       </div>
     </div>
   )

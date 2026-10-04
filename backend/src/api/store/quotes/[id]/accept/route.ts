@@ -3,7 +3,9 @@ import { ContainerRegistrationKeys, Modules, OrderStatus } from "@medusajs/frame
 import { confirmOrderEditRequestWorkflow } from "@medusajs/medusa/core-flows"
 import { QUOTE_MODULE } from "../../../../../modules/quote"
 import { customerAcceptQuoteWorkflow } from "../../../../../workflows/customer-accept-quote"
+import { canCustomerAcceptQuote, quoteStatusMessage } from "../../../../../modules/quote/lib/transitions"
 import { canAccessQuote } from "../../../helpers/quote-access"
+import { ensureQuoteDeliveryAddress } from "../../../helpers/quote-delivery-address"
 
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const quoteModule = req.scope.resolve(QUOTE_MODULE) as any
@@ -30,6 +32,23 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
 
   if (!quote || !(await canAccessQuote(req, quote))) {
     return res.status(404).json({ message: "Quote not found" })
+  }
+
+  if (!canCustomerAcceptQuote(quote.status)) {
+    return res.status(409).json({ message: quoteStatusMessage(quote.status) })
+  }
+
+  // Goods that must be delivered need an address, and a quote is accepted without
+  // ever passing through checkout, so it is collected here.
+  const delivery = await ensureQuoteDeliveryAddress(
+    req,
+    quote.draft_order_id,
+    quote.status
+  )
+  if (!delivery.ok) {
+    return res
+      .status(400)
+      .json({ message: delivery.message, code: "delivery_address_required" })
   }
 
   // Resolve customer ID: from authenticated session, quote, or draft order/cart

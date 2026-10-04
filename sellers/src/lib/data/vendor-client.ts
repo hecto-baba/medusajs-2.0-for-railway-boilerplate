@@ -50,6 +50,11 @@ export type VendorVariant = {
     inventory_item_id: string
     required_quantity?: number
   }[]
+  // Populated by GET /vendors/products/:id/variants (eoi_configuration.*
+  // added to that route's field list) so eoi-section.tsx can read every
+  // variant's EOI config off this one list call instead of firing one
+  // request per variant.
+  eoi_configuration?: VendorEoiConfig | null
 }
 
 export type VendorProduct = {
@@ -399,6 +404,7 @@ export const uploadVendorImages = async (files: File[]) => {
 
 export type VendorRentalUnit = "hour" | "day" | "week" | "month" | "custom"
 export type VendorRentalDepositType = "fixed" | "percentage"
+export type VendorRentalFulfilmentModes = "both" | "pickup" | "delivery"
 
 export type VendorRentalConfig = {
   id: string
@@ -414,6 +420,8 @@ export type VendorRentalConfig = {
   security_deposit_amount: number
   security_deposit_type: VendorRentalDepositType
   requires_time_selection: boolean
+  // Absent on a configuration saved before this existed, which means "both".
+  fulfilment_modes?: VendorRentalFulfilmentModes
   status: "active" | "inactive"
 }
 
@@ -432,11 +440,50 @@ export const upsertVendorRentalConfig = (
     security_deposit_amount?: number
     security_deposit_type?: VendorRentalDepositType
     requires_time_selection?: boolean
+    fulfilment_modes?: VendorRentalFulfilmentModes
     status?: "active" | "inactive"
   }
 ) =>
   mutate<{ rental_config: VendorRentalConfig }>(
     "products/" + productId + "/rental-config",
+    "POST",
+    body
+  )
+
+/* -------------------------------------------------------------------- eoi */
+
+export type VendorEoiValueType = "fixed" | "percentage"
+
+export type VendorEoiConfig = {
+  id: string
+  variant_id: string
+  value_type: VendorEoiValueType
+  value_amount: number
+  status: "active" | "inactive"
+}
+
+// Variant-scoped (see docs/plan/EOI_VARIANT_LEVEL_CONFIG_PLAN.md): a fixed
+// amount can differ between a product's variants, so each call is keyed by
+// productId (for the vendor ownership check) AND variantId (for the config
+// itself) - mirrors the backend's nested
+// /vendors/products/:id/variants/:variant_id/eoi-config route.
+export const getVendorEoiConfig = (productId: string, variantId: string) =>
+  request<{ eoi_config: VendorEoiConfig | null }>(
+    "products/" + productId + "/variants/" + variantId + "/eoi-config",
+    {}
+  )
+
+export const upsertVendorEoiConfig = (
+  productId: string,
+  variantId: string,
+  body: {
+    value_type?: VendorEoiValueType
+    value_amount?: number
+    status?: "active" | "inactive"
+  }
+) =>
+  mutate<{ eoi_config: VendorEoiConfig }>(
+    "products/" + productId + "/variants/" + variantId + "/eoi-config",
     "POST",
     body
   )
@@ -2472,6 +2519,8 @@ export type VendorSalesChannel = {
   is_disabled: boolean
   products_count?: number
   is_vendor_owned?: boolean
+  /** The store's default channel (pre-selected on new products). */
+  is_default?: boolean
   products?: VendorProduct[]
   metadata?: Record<string, unknown> | null
   created_at: string
@@ -2870,6 +2919,12 @@ export const createVendorAvailabilityException = (body: {
     body
   )
 
+export const deleteVendorAvailabilityException = (id: string) =>
+  mutate<{ id: string; deleted: boolean }>(
+    `providers/me/exceptions/${id}`,
+    "DELETE"
+  )
+
 export const listVendorAppointments = () =>
   request<{ appointments: VendorAppointment[] }>(
     "providers/me/appointments",
@@ -2889,6 +2944,403 @@ export const createVendorAppointmentSlots = (body: {
     "POST",
     body
   )
+
+/* ------------------------------------------- appointments: resources (v2) */
+
+export type VendorResourceSettings = {
+  session_duration_minutes: number
+  slot_step_minutes: number | null
+  capacity: number
+  buffer_before_minutes: number
+  buffer_after_minutes: number
+  min_notice_minutes: number
+  max_advance_days: number
+  hold_minutes: number
+  cancellation_window_hours: number
+}
+
+export type VendorResourceReadiness = {
+  has_hours: boolean
+  has_services: boolean
+  live: boolean
+  missing: string[]
+}
+
+export type VendorResource = VendorResourceSettings & {
+  id: string
+  display_name: string | null
+  description: string | null
+  bio: string | null
+  image_url: string | null
+  kind: string
+  timezone: string
+  status: "active" | "inactive"
+  readiness?: VendorResourceReadiness
+}
+
+export type VendorResourceInput = Partial<VendorResourceSettings> & {
+  display_name?: string
+  description?: string | null
+  image_url?: string | null
+  kind?: string
+  timezone?: string
+  status?: "active" | "inactive"
+}
+
+export type VendorWeeklyHours = {
+  id: string
+  provider_id: string
+  day_of_week: number
+  start_time: string
+  end_time: string
+  effective_from: string
+  effective_until: string | null
+  status: "active" | "inactive"
+}
+
+export type VendorResourceException = {
+  id: string
+  provider_id: string
+  date: string
+  type: "blackout" | "extra_hours"
+  start_time: string | null
+  end_time: string | null
+  reason: string | null
+}
+
+export type VendorResourceService = {
+  id: string
+  product_id: string
+  duration_minutes: number | null
+  capacity: number | null
+  product: {
+    id: string
+    title: string
+    thumbnail?: string | null
+    variants?: { id: string; title: string | null }[]
+  } | null
+}
+
+export type VendorPreviewSlot = {
+  start: string
+  end: string
+  capacity: number
+  capacity_remaining: number
+  spots_taken: number
+}
+
+export type VendorPricingRule = {
+  id: string
+  vendor_id: string
+  resource_id: string | null
+  product_id: string | null
+  name: string
+  type: "percent_adjust" | "fixed_adjust" | "override_price"
+  value: number
+  currency_code: string | null
+  days_of_week: number[] | null
+  start_time: string | null
+  end_time: string | null
+  valid_from: string | null
+  valid_until: string | null
+  priority: number
+  is_active: boolean
+}
+
+export type VendorPricingRuleInput = Omit<
+  VendorPricingRule,
+  "id" | "vendor_id" | "priority" | "is_active"
+> & { priority?: number; is_active?: boolean }
+
+export type VendorBookingAttendee = {
+  id: string
+  status: "reserved" | "confirmed" | "cancelled"
+  buyer_name: string | null
+  buyer_email: string | null
+  buyer_phone: string | null
+  notes: string | null
+  order_id: string | null
+  cancelled_by: string | null
+  cancel_reason: string | null
+  rescheduled_from_start: string | null
+  rescheduled_by: string | null
+  reschedule_count: number
+}
+
+export type VendorBooking = {
+  id: string
+  start_time: string
+  end_time: string
+  status: string
+  max_capacity: number
+  resource: { id: string; display_name: string | null; timezone: string | null }
+  service: { product_id: string; title: string | null }
+  attendees: VendorBookingAttendee[]
+}
+
+export const listVendorResources = () =>
+  request<{ resources: VendorResource[]; count: number }>("resources", {})
+
+export const getVendorResource = (id: string) =>
+  request<{ resource: VendorResource }>(`resources/${id}`, {})
+
+export const createVendorResource = (
+  body: VendorResourceInput & { display_name: string; timezone: string }
+) => mutate<{ resource: VendorResource }>("resources", "POST", body)
+
+export const updateVendorResource = (id: string, body: VendorResourceInput) =>
+  mutate<{ resource: VendorResource }>(`resources/${id}`, "POST", body)
+
+export const deleteVendorResource = (id: string) =>
+  mutate<{ id: string; deleted: boolean }>(`resources/${id}`, "DELETE")
+
+export const copyVendorResourceSettings = (id: string, toResourceIds: string[]) =>
+  mutate<{ updated: string[] }>(`resources/${id}/copy-settings`, "POST", {
+    to_resource_ids: toResourceIds,
+  })
+
+export const listVendorResourceHours = (id: string) =>
+  request<{ hours: VendorWeeklyHours[] }>(`resources/${id}/hours`, {})
+
+export const createVendorResourceHours = (
+  id: string,
+  body: {
+    day_of_week: number
+    start_time: string
+    end_time: string
+    effective_from: string
+    effective_until?: string | null
+  }
+) => mutate<{ hours: VendorWeeklyHours }>(`resources/${id}/hours`, "POST", body)
+
+export const updateVendorResourceHours = (
+  id: string,
+  ruleId: string,
+  body: {
+    start_time?: string
+    end_time?: string
+    effective_from?: string
+    effective_until?: string | null
+    status?: "active" | "inactive"
+  }
+) => mutate<{ hours: VendorWeeklyHours }>(`resources/${id}/hours/${ruleId}`, "POST", body)
+
+export const deleteVendorResourceHours = (id: string, ruleId: string) =>
+  mutate<{ id: string; deleted: boolean }>(`resources/${id}/hours/${ruleId}`, "DELETE")
+
+export const listVendorResourceExceptions = (id: string) =>
+  request<{ availability_exceptions: VendorResourceException[] }>(
+    `resources/${id}/exceptions`,
+    {}
+  )
+
+export const createVendorResourceException = (
+  id: string,
+  body: {
+    date: string
+    type: "blackout" | "extra_hours"
+    start_time?: string | null
+    end_time?: string | null
+    reason?: string | null
+  }
+) =>
+  mutate<{ availability_exception: VendorResourceException }>(
+    `resources/${id}/exceptions`,
+    "POST",
+    body
+  )
+
+export const updateVendorResourceException = (
+  id: string,
+  exceptionId: string,
+  body: {
+    date: string
+    type: "blackout" | "extra_hours"
+    start_time?: string | null
+    end_time?: string | null
+    reason?: string | null
+  }
+) =>
+  mutate<{ availability_exception: VendorResourceException }>(
+    `resources/${id}/exceptions/${exceptionId}`,
+    "POST",
+    body
+  )
+
+export const deleteVendorResourceException = (id: string, exceptionId: string) =>
+  mutate<{ id: string; deleted: boolean }>(
+    `resources/${id}/exceptions/${exceptionId}`,
+    "DELETE"
+  )
+
+/* ------------------------------------- product-side appointment settings */
+
+export type VendorProductAppointmentResource = {
+  id: string
+  display_name: string | null
+  kind: string
+  status: "active" | "inactive"
+  timezone: string
+  /** The resource's own session length and group size (used when no override). */
+  default_duration_minutes: number
+  default_capacity: number
+  offered: boolean
+  /** null = use the resource's default. */
+  duration_minutes: number | null
+  capacity: number | null
+  /** Offered, active, with weekly hours: buyers can book it now. */
+  live: boolean
+  missing: string[]
+}
+
+export type VendorProductAppointmentConfig = {
+  product_id: string
+  offered_count: number
+  resources: VendorProductAppointmentResource[]
+}
+
+export const getVendorProductAppointmentConfig = (productId: string) =>
+  request<VendorProductAppointmentConfig>(`products/${productId}/appointment-config`, {})
+
+/** Sets the full list of resources that offer this product. */
+export const setVendorProductAppointmentConfig = (
+  productId: string,
+  resources: {
+    resource_id: string
+    duration_minutes?: number | null
+    capacity?: number | null
+  }[]
+) =>
+  mutate<VendorProductAppointmentConfig>(
+    `products/${productId}/appointment-config`,
+    "POST",
+    { resources }
+  )
+
+export const listVendorResourceServices = (id: string) =>
+  request<{ services: VendorResourceService[] }>(`resources/${id}/services`, {})
+
+export const setVendorResourceServices = (
+  id: string,
+  services: {
+    product_id: string
+    duration_minutes?: number | null
+    capacity?: number | null
+  }[]
+) =>
+  mutate<{ services: VendorResourceService[] }>(`resources/${id}/services`, "POST", {
+    services,
+  })
+
+export const getVendorSlotsPreview = (
+  id: string,
+  params: { product_id?: string; from: string; to: string }
+) =>
+  request<{ timezone: string; count: number; slots: VendorPreviewSlot[] }>(
+    `resources/${id}/slots-preview`,
+    params
+  )
+
+export const listVendorPricingRules = (resourceId?: string) =>
+  request<{ pricing_rules: VendorPricingRule[] }>("pricing-rules", {
+    resource_id: resourceId,
+  })
+
+export const createVendorPricingRule = (body: VendorPricingRuleInput) =>
+  mutate<{ pricing_rule: VendorPricingRule }>("pricing-rules", "POST", body)
+
+export const updateVendorPricingRule = (id: string, body: Partial<VendorPricingRuleInput>) =>
+  mutate<{ pricing_rule: VendorPricingRule }>(`pricing-rules/${id}`, "POST", body)
+
+export const deleteVendorPricingRule = (id: string) =>
+  mutate<{ id: string; deleted: boolean }>(`pricing-rules/${id}`, "DELETE")
+
+export const listVendorBookings = (params: {
+  resource_id?: string
+  status?: "upcoming" | "past" | "all"
+  from?: string
+  to?: string
+  limit: number
+  offset: number
+}) =>
+  request<{ appointments: VendorBooking[]; count: number; limit: number; offset: number }>(
+    "appointments",
+    params as Record<string, string | number | undefined>
+  )
+
+/**
+ * A booking the seller enters by hand (phone call, walk-in). Confirmed straight
+ * away with no order, so nothing is charged and no refund exists for it.
+ */
+export const createVendorBooking = (body: {
+  resource_id: string
+  product_id: string
+  start: string
+  name: string
+  email?: string
+  phone?: string
+  notes?: string
+}) =>
+  mutate<{ booking: { attendee_id: string; appointment_id: string } }>(
+    "appointments",
+    "POST",
+    body
+  )
+
+export type VendorBookingOverview = {
+  stats: {
+    active: { count: number; change: number }
+    upcoming: { count: number; change: number }
+    past: { count: number }
+    pending: { count: number; change: number }
+  }
+  recent: {
+    id: string
+    booking_ref: string
+    order_id: string | null
+    order_display_id: number | null
+    customer: string | null
+    start_time: string
+    timezone: string | null
+    service: string | null
+    resource: string | null
+    status: "confirmed" | "completed" | "cancelled"
+    amount: number | null
+    currency_code: string | null
+  }[]
+}
+
+export const getVendorBookingOverview = () =>
+  request<VendorBookingOverview>("appointments/overview", {})
+
+export const cancelVendorBooking = (attendeeId: string, reason: string, notify = true) =>
+  mutate<{ cancelled: unknown }>(`appointments/${attendeeId}/cancel`, "POST", { reason, notify })
+
+export type VendorRescheduleSlot = {
+  start: string
+  end: string
+  capacity: number
+  capacity_remaining: number
+}
+
+/** Times one booking could move to (same resource and service). */
+export const getVendorRescheduleSlots = (
+  attendeeId: string,
+  params: { from: string; to: string }
+) =>
+  request<{ timezone: string; count: number; slots: VendorRescheduleSlot[] }>(
+    `appointments/${attendeeId}/reschedule-slots`,
+    params
+  )
+
+export const rescheduleVendorBooking = (attendeeId: string, start: string, notify = true) =>
+  mutate<{ rescheduled: unknown }>(`appointments/${attendeeId}/reschedule`, "POST", {
+    start,
+    notify,
+  })
+
+export const completeVendorBooking = (appointmentId: string) =>
+  mutate<{ appointment: unknown }>(`appointments/${appointmentId}/complete`, "POST", {})
 
 /* ---------------------------------------------------------------- search */
 
@@ -3344,6 +3796,97 @@ export const listVendorPayouts = (params?: {
     count: number
     totals: Record<string, { owed: number; paid: number; void: number; refunded: number }>
   }>("payouts", params || {})
+
+/* ---------------------------------------------------------------- enquiry */
+
+export type VendorEnquiryFieldType =
+  | "text"
+  | "long_text"
+  | "email"
+  | "phone"
+  | "number"
+  | "dropdown"
+  | "radio"
+  | "checkbox"
+
+export type VendorEnquiryFieldDefinition = {
+  id: string
+  type: VendorEnquiryFieldType
+  label: string
+  required: boolean
+  order: number
+  options?: string[]
+}
+
+export type VendorEnquiryConfig = {
+  id: string
+  product_id: string
+  status: "active" | "inactive"
+  custom_fields: VendorEnquiryFieldDefinition[] | null
+}
+
+export type VendorEnquiryStatus = "pending" | "responded" | "closed"
+
+export type VendorEnquiry = {
+  id: string
+  product_id: string
+  product?: { title?: string | null } | null
+  customer_email: string
+  message: string
+  reply: string | null
+  status: VendorEnquiryStatus
+  responded_at: string | null
+  created_at: string
+  // Only on the per-product and single-enquiry reads, not on the queue list.
+  custom_field_answers?: Record<string, string | string[]> | null
+  custom_fields_snapshot?: VendorEnquiryFieldDefinition[] | null
+}
+
+export const getVendorEnquiryConfig = (productId: string) =>
+  request<{ enquiry_config: VendorEnquiryConfig | null }>(
+    "products/" + productId + "/enquiry-config",
+    {}
+  )
+
+export const upsertVendorEnquiryConfig = (
+  productId: string,
+  body: {
+    status?: "active" | "inactive"
+    custom_fields?: VendorEnquiryFieldDefinition[]
+  }
+) =>
+  mutate<{ enquiry_config: VendorEnquiryConfig }>(
+    "products/" + productId + "/enquiry-config",
+    "POST",
+    body
+  )
+
+export const listVendorProductEnquiries = (productId: string) =>
+  request<{ enquiries: VendorEnquiry[]; count: number }>(
+    "products/" + productId + "/enquiries",
+    {}
+  )
+
+export const listVendorEnquiries = (params: {
+  limit?: number
+  offset?: number
+  status?: VendorEnquiryStatus
+}) =>
+  request<ListResponse<{ enquiries: VendorEnquiry[] }>>(
+    "enquiries",
+    params as Record<string, string | number | undefined>
+  )
+
+export const getVendorEnquiry = (id: string) =>
+  request<{ enquiry: VendorEnquiry }>("enquiries/" + id, {})
+
+export const replyToVendorEnquiry = (id: string, reply: string) =>
+  mutate<{ enquiry: VendorEnquiry }>("enquiries/" + id, "POST", { reply })
+
+export const closeVendorEnquiry = (id: string) =>
+  mutate<{ enquiry: VendorEnquiry }>("enquiries/" + id + "/status", "POST", {
+    status: "closed",
+  })
 
 /* ---------------------------------------------------------------- digital products */
 

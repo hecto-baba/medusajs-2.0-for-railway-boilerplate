@@ -4,11 +4,18 @@ import {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { QUOTE_MODULE } from "../../../../modules/quote"
+import {
+  assertVendorMaySetQuoteStatus,
+  assertVendorOwnsQuote,
+  stripPlatformQuoteKeys,
+} from "../../shared/ownership-scope"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await assertVendorOwnsQuote(req, req.params.id)
+
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const orderModuleService = req.scope.resolve(Modules.ORDER) as any
 
@@ -101,6 +108,8 @@ export const POST = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  const owned = await assertVendorOwnsQuote(req, req.params.id)
+
   const quoteModule = req.scope.resolve(QUOTE_MODULE) as any
   const body = (req.body || {}) as any
 
@@ -108,7 +117,10 @@ export const POST = async (
     id: req.params.id,
   }
 
+  // A seller can send a price or decline; accepting is the buyer's decision, and a
+  // decided quote is final.
   if (body.status) {
+    assertVendorMaySetQuoteStatus(owned.status, body.status)
     updateData.status = body.status
   }
 
@@ -130,7 +142,8 @@ export const POST = async (
   }
 
   if (body.metadata) {
-    Object.assign(newMeta, body.metadata)
+    // Payment, fulfilment and ownership are the platform's to set, not a seller's.
+    Object.assign(newMeta, stripPlatformQuoteKeys(body.metadata))
   }
 
   updateData.metadata = newMeta

@@ -6,7 +6,6 @@ import { LOGIN_VIEW } from "@modules/account/templates/login-template"
 import Input from "@modules/common/components/input"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import { SubmitButton } from "@modules/checkout/components/submit-button"
-import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { login } from "@lib/data/customer"
 
 
@@ -19,11 +18,13 @@ const Login = ({ setCurrentView }: Props) => {
 
   return (
     <div
-      className="max-w-sm w-full flex flex-col items-center"
+      className="w-full flex flex-col items-center"
       data-testid="login-page"
     >
-      <h1 className="text-large-semi uppercase mb-6">Welcome back</h1>
-      <p className="text-center text-base-regular text-ui-fg-base mb-8">
+      <h1 className="font-display text-3xl font-extrabold tracking-tight mb-2">
+        Welcome back
+      </h1>
+      <p className="text-center text-base text-muted mb-8">
         Sign in to access an enhanced shopping experience.
       </p>
       <form className="w-full" action={formAction}>
@@ -53,16 +54,16 @@ const Login = ({ setCurrentView }: Props) => {
       </form>
       <button
         onClick={() => setCurrentView(LOGIN_VIEW.FORGOT_PASSWORD)}
-        className="underline text-small-regular mt-4"
+        className="text-sm font-bold text-brand hover:underline mt-4"
         data-testid="forgot-password-button"
       >
         Forgot your password?
       </button>
-      <span className="text-center text-ui-fg-base text-small-regular mt-6">
+      <span className="text-center text-muted text-sm mt-6">
         Not a member?{" "}
         <button
           onClick={() => setCurrentView(LOGIN_VIEW.REGISTER)}
-          className="underline"
+          className="font-bold text-brand hover:underline"
           data-testid="register-button"
         >
           Join us

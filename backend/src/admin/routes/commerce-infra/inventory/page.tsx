@@ -37,7 +37,7 @@ const CommerceInventoryPage = () => {
 
 export const config = defineRouteConfig({
   label: "Inventory",
-  rank: 3,
+  rank: 6,
 })
 
 export default CommerceInventoryPage

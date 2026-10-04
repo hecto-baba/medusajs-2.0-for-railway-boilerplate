@@ -176,16 +176,14 @@ export const S3_FORCE_PATH_STYLE = parseBoolean(process.env.S3_FORCE_PATH_STYLE,
 export const S3_ACL: string | false = process.env.S3_ACL || false;
 
 /**
- * (optional) Resend API Key and from Email - do not set if using SendGrid
+ * (optional) ZeptoMail API key and sender.
+ * ZEPTOMAIL_API_URL is only needed outside the default (.com) data centre,
+ * e.g. https://api.zeptomail.in/v1.1/email
  */
-export const RESEND_API_KEY = process.env.RESEND_API_KEY;
-export const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM;
-
-/**
- * (optionl) SendGrid API Key and from Email - do not set if using Resend
- */
-export const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-export const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || process.env.SENDGRID_FROM;
+export const ZEPTOMAIL_API_KEY = process.env.ZEPTOMAIL_API_KEY;
+export const ZEPTOMAIL_FROM_EMAIL = process.env.ZEPTOMAIL_FROM_EMAIL;
+export const ZEPTOMAIL_FROM_NAME = process.env.ZEPTOMAIL_FROM_NAME;
+export const ZEPTOMAIL_API_URL = process.env.ZEPTOMAIL_API_URL;
 
 /**
  * (optional) Stripe API key and webhook secret

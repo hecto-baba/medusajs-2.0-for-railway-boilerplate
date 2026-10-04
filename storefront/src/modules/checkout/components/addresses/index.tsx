@@ -43,11 +43,11 @@ const Addresses = ({
   const [message, formAction] = useActionState(setAddresses, null)
 
   return (
-    <div className="bg-white">
+    <div className="rounded-large bg-card p-5 shadow-lift small:p-6">
       <div className="flex flex-row items-center justify-between mb-6">
         <Heading
           level="h2"
-          className="flex flex-row text-3xl-regular gap-x-2 items-baseline"
+          className="flex flex-row font-display text-2xl font-extrabold tracking-tight gap-x-2 items-baseline"
         >
           Shipping Address
           {!isOpen && <CheckCircleSolid />}
@@ -56,7 +56,7 @@ const Addresses = ({
           <Text>
             <button
               onClick={handleEdit}
-              className="text-ui-fg-interactive hover:text-ui-fg-interactive-hover"
+              className="text-brand hover:underline"
               data-testid="edit-address-button"
             >
               Edit
@@ -78,12 +78,12 @@ const Addresses = ({
               <div>
                 <Heading
                   level="h2"
-                  className="text-3xl-regular gap-x-4 pb-6 pt-8"
+                  className="font-display text-2xl font-extrabold tracking-tight gap-x-4 pb-6 pt-8"
                 >
                   Billing address
                 </Heading>
 
-                <BillingAddress cart={cart} />
+                <BillingAddress cart={cart} customer={customer} />
               </div>
             )}
             <SubmitButton className="mt-6" data-testid="submit-address-button">

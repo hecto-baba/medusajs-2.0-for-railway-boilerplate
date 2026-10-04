@@ -1,4 +1,5 @@
-import { createWorkflow, WorkflowResponse } from "@medusajs/framework/workflows-sdk"
+import { createWorkflow, WorkflowResponse, transform } from "@medusajs/framework/workflows-sdk"
+import { emitEventStep } from "@medusajs/medusa/core-flows"
 import { updateRentalDepositStep } from "./steps/update-rental-deposit"
 
 type UpdateRentalDepositWorkflowInput = {
@@ -12,6 +13,12 @@ export const updateRentalDepositWorkflow = createWorkflow(
     const updatedRental = updateRentalDepositStep({
       rental_id,
       status,
+    })
+
+    // The renter is emailed from this event (deposit refunded / forfeited).
+    emitEventStep({
+      eventName: "rental.deposit_changed",
+      data: transform({ rental_id, status }, (data) => ({ id: data.rental_id, status: data.status })),
     })
 
     return new WorkflowResponse(updatedRental)

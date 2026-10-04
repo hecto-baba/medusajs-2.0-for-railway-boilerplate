@@ -4,6 +4,7 @@ import {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { APPROVAL_MODULE } from "../../../modules/approval"
+import { emitSafely } from "../../../lib/emit-safely"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
@@ -155,6 +156,13 @@ export const POST = async (
     status,
     type: "admin",
     created_by: customerId,
+  })
+
+  // The employee is emailed from this event; a failed emit never fails the decision.
+  await emitSafely(req.scope, "approval.decided", {
+    approval_id,
+    status,
+    approval_status_id: (approvalStatus as any)?.id,
   })
 
   return res.status(200).json({

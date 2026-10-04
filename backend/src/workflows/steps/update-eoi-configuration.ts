@@ -1,5 +1,10 @@
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
 import { EOI_MODULE } from "../../modules/expression-of-interest"
+import {
+  assertNoOtherSaleMode,
+  getProductIdOfVariant,
+  withSaleModeLock,
+} from "../../lib/sale-mode"
 import ExpressionOfInterestModuleService from "../../modules/expression-of-interest/service"
 
 type UpdateEoiConfigurationInput = {
@@ -19,7 +24,19 @@ export const updateEoiConfigurationStep = createStep(
       input.id
     )
 
-    const updatedEoiConfig = await eoiModuleService.updateEoiConfigurations(input)
+    // Only a switch to "active" can create a conflict. Check and write share
+    // a per-product lock so another mode cannot switch on between them.
+    const productId =
+      input.status === "active" && existingEoiConfig.status !== "active"
+        ? await getProductIdOfVariant(container, existingEoiConfig.variant_id)
+        : undefined
+
+    const updatedEoiConfig = productId
+      ? await withSaleModeLock(container, [productId], async () => {
+          await assertNoOtherSaleMode(container, productId, "eoi")
+          return eoiModuleService.updateEoiConfigurations(input)
+        })
+      : await eoiModuleService.updateEoiConfigurations(input)
 
     return new StepResponse(updatedEoiConfig, existingEoiConfig)
   },

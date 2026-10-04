@@ -1,9 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Button, Heading, Label, Textarea, toast } from "@medusajs/ui"
+import { Textarea, toast } from "@medusajs/ui"
 import { DocumentText } from "@medusajs/icons"
 import { requestQuote } from "@lib/data/quotes"
+import { convertToLocale } from "@lib/util/money"
+import Modal from "@modules/common/components/modal"
 import { useRouter } from "next/navigation"
 
 type RequestQuoteButtonProps = {
@@ -20,6 +22,9 @@ export const RequestQuoteButton = ({ cart, cartId }: RequestQuoteButtonProps) =>
   const resolvedCartId = cart?.id || cartId
   const items: any[] = cart?.items || []
   const total = Number(cart?.total || 0)
+  const currencyCode: string = cart?.currency_code || "usd"
+  const money = (amount: number) =>
+    convertToLocale({ amount, currency_code: currencyCode })
 
   const handleRequestQuote = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,106 +60,108 @@ export const RequestQuoteButton = ({ cart, cartId }: RequestQuoteButtonProps) =>
 
   return (
     <>
-      <Button
-        variant="secondary"
-        className="w-full h-10"
+      <button
+        type="button"
+        className="inline-flex h-11 w-full items-center justify-center rounded-large border-[1.5px] border-brand bg-card px-5 font-extrabold text-brand transition-colors hover:bg-brand-soft"
         onClick={() => setIsOpen(true)}
+        data-testid="request-quote-button"
       >
         Request a Quote
-      </Button>
+      </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 p-6 flex flex-col gap-y-5">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-x-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200">
-                  <DocumentText className="w-5 h-5" />
-                </div>
-                <div>
-                  <Heading level="h2" className="text-base font-semibold text-ui-fg-base">
-                    Request a Quote
-                  </Heading>
-                  <p className="text-xs text-ui-fg-subtle">
-                    Submit your cart to the merchant for custom wholesale pricing.
-                  </p>
-                </div>
+      <Modal isOpen={isOpen} close={() => setIsOpen(false)} size="medium">
+        <div className="flex w-full flex-col gap-y-5 overflow-y-auto">
+          <div className="flex items-start justify-between gap-x-3 border-b border-line pb-4">
+            <div className="flex items-center gap-x-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-rounded bg-brand-soft text-brand">
+                <DocumentText className="h-5 w-5" />
               </div>
+              <div>
+                <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">
+                  Request a Quote
+                </h2>
+                <p className="text-sm text-muted">
+                  Submit your cart to the merchant for custom wholesale pricing.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              aria-label="Close"
+              className="p-1 text-2xl leading-none text-muted transition-colors hover:text-ink"
+            >
+              &times;
+            </button>
+          </div>
+
+          <form onSubmit={handleRequestQuote} className="flex flex-col gap-y-4">
+            <div className="space-y-2 rounded-large border border-line bg-canvas p-4">
+              <span className="block text-xs font-extrabold uppercase tracking-wider text-muted">
+                Items in Quote ({items.length})
+              </span>
+              <div className="max-h-40 divide-y divide-line overflow-y-auto">
+                {items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between py-2 text-sm"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <p className="truncate font-bold text-ink">{item.title}</p>
+                      <p className="text-muted">Qty: {item.quantity}</p>
+                    </div>
+                    <span className="whitespace-nowrap font-bold text-ink">
+                      {money(
+                        item.total
+                          ? Number(item.total)
+                          : Number(item.unit_price || 0) *
+                              Number(item.quantity || 1)
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between border-t border-line pt-2 text-sm font-extrabold text-ink">
+                <span>Current Cart Total</span>
+                <span>
+                  {total > 0 ? money(total) : "Calculated at checkout"}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="quote-note" className="text-sm font-bold text-ink">
+                Message for Merchant (Optional)
+              </label>
+              <Textarea
+                id="quote-note"
+                rows={3}
+                placeholder="e.g. Requesting bulk discount for quarterly procurement, or custom pricing..."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="resize-none !rounded-rounded !border-line !bg-card !text-ink"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-x-2 border-t border-line pt-4">
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="text-ui-fg-muted hover:text-ui-fg-base text-2xl leading-none p-1"
+                className="inline-flex h-10 items-center justify-center rounded-large border-[1.5px] border-brand bg-card px-5 font-extrabold text-brand transition-colors hover:bg-brand-soft"
               >
-                &times;
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="inline-flex h-10 items-center justify-center rounded-large bg-brand px-5 font-extrabold text-brand-ink transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {loading ? "Submitting..." : "Submit Quote Request"}
               </button>
             </div>
-
-            <form onSubmit={handleRequestQuote} className="flex flex-col gap-y-4">
-              {/* Items Summary */}
-              <div className="border rounded-xl p-3 bg-gray-50/70 space-y-2">
-                <span className="text-xs font-semibold text-ui-fg-subtle uppercase tracking-wider block">
-                  Items in Quote ({items.length})
-                </span>
-                <div className="max-h-48 overflow-y-auto divide-y divide-gray-100">
-                  {items.map((item) => (
-                    <div key={item.id} className="py-2 flex items-center justify-between text-xs">
-                      <div className="min-w-0 pr-2">
-                        <p className="font-medium text-ui-fg-base truncate">{item.title}</p>
-                        <p className="text-ui-fg-subtle">Qty: {item.quantity}</p>
-                      </div>
-                      <span className="font-mono text-ui-fg-base whitespace-nowrap">
-                        {item.total ? `€${(Number(item.total) / 100).toFixed(2)}` : `€${(Number(item.unit_price || 0) * Number(item.quantity || 1)).toFixed(2)}`}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className="border-t pt-2 flex justify-between text-xs font-semibold text-ui-fg-base">
-                  <span>Current Cart Total</span>
-                  <span className="font-mono">
-                    {total > 0 ? `€${(total / 100).toFixed(2)}` : "Calculated at checkout"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Optional Customer Note / Message */}
-              <div className="space-y-1.5">
-                <Label htmlFor="quote-note" className="text-xs font-medium text-ui-fg-base">
-                  Message for Merchant (Optional)
-                </Label>
-                <Textarea
-                  id="quote-note"
-                  rows={3}
-                  placeholder="e.g. Requesting bulk discount for quarterly procurement, or custom pricing..."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className="text-xs resize-none"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-x-2 pt-2 border-t">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="small"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="small"
-                  isLoading={loading}
-                >
-                  Submit Quote Request
-                </Button>
-              </div>
-            </form>
-          </div>
+          </form>
         </div>
-      )}
+      </Modal>
     </>
   )
 }

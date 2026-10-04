@@ -182,9 +182,9 @@ export default function DeliveryTrackingPage() {
 
   if (loading) {
     return (
-      <div className="content-container py-16 flex flex-col items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-ui-border-base border-t-ui-fg-interactive mb-4" />
-        <p className="text-ui-fg-subtle text-sm">Loading delivery status...</p>
+      <div className="content-container flex flex-col items-center justify-center py-16">
+        <div className="mb-4 h-10 w-10 animate-spin rounded-circle border-4 border-line border-t-brand" />
+        <p className="text-sm text-muted">Loading delivery status...</p>
       </div>
     )
   }
@@ -192,13 +192,15 @@ export default function DeliveryTrackingPage() {
   if (!delivery) {
     return (
       <div className="content-container py-16 text-center">
-        <h1 className="text-2xl font-bold mb-2">Delivery Not Found</h1>
-        <p className="text-ui-fg-muted mb-6">
+        <h1 className="mb-2 font-display text-3xl font-extrabold tracking-tight text-ink">
+          Delivery Not Found
+        </h1>
+        <p className="mb-6 break-words text-muted">
           We could not find any active delivery with ID: {id}
         </p>
         <Link
           href={`/${countryCode}/restaurants`}
-          className="inline-block rounded-md bg-ui-bg-interactive px-4 py-2 text-sm text-white font-medium hover:opacity-90"
+          className="inline-flex h-11 items-center rounded-large bg-brand px-5 text-sm font-extrabold text-brand-ink hover:opacity-90"
         >
           Browse Restaurants
         </Link>
@@ -210,43 +212,39 @@ export default function DeliveryTrackingPage() {
   const isDeclined = delivery.delivery_status === "restaurant_declined"
 
   return (
-    <div className="content-container py-12 max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-ui-border-base pb-6 mb-8">
+    <div className="content-container max-w-3xl py-8">
+      <div className="mb-6 flex flex-col justify-between gap-3 small:flex-row small:items-center">
         <div>
           <div className="flex items-center gap-2">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-ui-fg-muted">
+            <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-circle bg-success" />
+            <span className="text-xs font-extrabold uppercase tracking-wider text-muted">
               Live Order Tracking
             </span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-1">
+          <h1 className="mt-1 break-words font-display text-3xl font-extrabold tracking-tight text-ink">
             Delivery #{delivery.id.slice(-8)}
           </h1>
-          <p className="text-ui-fg-subtle text-xs mt-1">
+          <p className="mt-1 text-xs text-muted">
             Last updated: {lastSync.toLocaleTimeString()}
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/${countryCode}/restaurants`}
-            className="text-xs font-medium text-ui-fg-interactive hover:underline"
-          >
-            ← Back to Restaurants
-          </Link>
-        </div>
+        <Link
+          href={`/${countryCode}/restaurants`}
+          className="self-start text-sm font-bold text-brand hover:underline small:self-auto"
+        >
+          ‹ Back to Restaurants
+        </Link>
       </div>
 
-      {/* ETA Banner */}
-      <div className="rounded-xl bg-ui-bg-subtle border border-ui-border-base p-6 mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="mb-5 flex flex-col items-start justify-between gap-4 rounded-large bg-card p-5 shadow-lift small:flex-row small:items-center">
         <div>
-          <span className="text-xs font-medium text-ui-fg-muted uppercase">
+          <span className="text-xs font-extrabold uppercase tracking-wider text-muted">
             Estimated Arrival
           </span>
-          <div className="text-2xl font-bold text-ui-fg-base mt-0.5">
+          <div className="mt-0.5 font-display text-2xl font-extrabold tracking-tight text-ink">
             {delivery.delivered_at ? (
-              <span className="text-green-600">Order Delivered</span>
+              <span className="text-success">Order Delivered</span>
             ) : delivery.eta ? (
               new Date(delivery.eta).toLocaleTimeString([], {
                 hour: "2-digit",
@@ -259,30 +257,31 @@ export default function DeliveryTrackingPage() {
         </div>
 
         <span
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
+          className={`rounded-circle px-3 py-1.5 text-xs font-bold ${
             delivery.delivery_status === "delivered"
-              ? "bg-green-100 text-green-800"
+              ? "bg-success-soft text-success"
               : isDeclined
-              ? "bg-red-100 text-red-800"
-              : "bg-blue-100 text-blue-800"
+              ? "bg-brand-soft text-brand"
+              : "bg-pop text-pop-ink"
           }`}
         >
           {delivery.delivery_status.replace(/_/g, " ").toUpperCase()}
         </span>
       </div>
 
-      {/* Visual Stepper */}
       {isDeclined ? (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-6 text-red-800 mb-8 text-center">
-          <p className="font-semibold text-base">Order Declined</p>
-          <p className="text-xs mt-1">
+        <div className="mb-5 rounded-large bg-brand-soft p-6 text-center text-brand">
+          <p className="text-base font-extrabold">Order Declined</p>
+          <p className="mt-1 text-xs">
             The restaurant was unable to fulfill this order. Please contact support or place another order.
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-ui-border-base bg-ui-bg-base p-6 mb-8">
-          <h2 className="text-base font-semibold mb-6">Delivery Status</h2>
-          <div className="relative flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
+        <div className="mb-5 rounded-large bg-card p-5 shadow-lift">
+          <h2 className="mb-6 font-display text-lg font-extrabold tracking-tight text-ink">
+            Delivery Status
+          </h2>
+          <div className="relative flex flex-col gap-6 small:flex-row small:items-start small:justify-between">
             {STEPS.map((step, idx) => {
               const isCompleted = currentStep > idx
               const isCurrent = currentStep === idx
@@ -290,32 +289,32 @@ export default function DeliveryTrackingPage() {
               return (
                 <div
                   key={step.key}
-                  className="flex md:flex-col items-center gap-4 md:gap-2 flex-1 relative z-10"
+                  className="relative z-10 flex flex-1 items-center gap-4 small:flex-col small:gap-2"
                 >
                   <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold transition-all ${
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-circle text-xs font-bold transition-all ${
                       isCompleted
-                        ? "bg-ui-bg-interactive text-white"
+                        ? "bg-brand text-brand-ink"
                         : isCurrent
-                        ? "border-2 border-ui-border-interactive bg-ui-bg-base text-ui-fg-interactive ring-4 ring-blue-100"
-                        : "border border-ui-border-base bg-ui-bg-subtle text-ui-fg-muted"
+                        ? "border-2 border-brand bg-card text-brand ring-4 ring-brand-soft"
+                        : "border border-line bg-canvas text-muted"
                     }`}
                   >
                     {isCompleted ? "✓" : idx + 1}
                   </div>
-                  <div className="md:text-center">
+                  <div className="min-w-0 small:text-center">
                     <p
-                      className={`text-xs font-semibold ${
+                      className={`text-xs font-bold ${
                         isCurrent
-                          ? "text-ui-fg-base"
+                          ? "text-ink"
                           : isCompleted
-                          ? "text-ui-fg-subtle"
-                          : "text-ui-fg-muted"
+                          ? "text-muted"
+                          : "text-muted opacity-70"
                       }`}
                     >
                       {step.title}
                     </p>
-                    <p className="text-[11px] text-ui-fg-muted hidden md:block mt-0.5">
+                    <p className="mt-0.5 hidden text-[11px] text-muted small:block">
                       {step.desc}
                     </p>
                   </div>
@@ -326,27 +325,22 @@ export default function DeliveryTrackingPage() {
         </div>
       )}
 
-      {/* Info Card: Restaurant & Delivery Details */}
-      <div className="rounded-xl border border-ui-border-base bg-ui-bg-base p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg">🍽️</span>
-          <h3 className="font-semibold text-sm">Restaurant Details</h3>
-        </div>
-        <p className="font-medium text-sm text-ui-fg-base">
+      <div className="rounded-large bg-card p-5 shadow-lift">
+        <h3 className="mb-3 font-display text-base font-extrabold tracking-tight text-ink">
+          Restaurant Details
+        </h3>
+        <p className="break-words text-sm font-bold text-ink">
           {delivery.restaurant?.name || "Restaurant Partner"}
         </p>
         {delivery.restaurant?.address && (
-          <p className="text-xs text-ui-fg-subtle mt-1">
+          <p className="mt-1 break-words text-xs text-muted">
             {delivery.restaurant.address}
           </p>
         )}
         {delivery.restaurant?.phone && (
-          <p className="text-xs text-ui-fg-muted mt-1">
-            📞 {delivery.restaurant.phone}
-          </p>
+          <p className="mt-1 text-xs text-muted">{delivery.restaurant.phone}</p>
         )}
       </div>
     </div>
   )
 }
-

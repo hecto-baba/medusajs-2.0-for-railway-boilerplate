@@ -122,4 +122,53 @@ export const removeCartId = async () => {
   cookiesStore.set("_medusa_cart_id", "", { maxAge: -1 })
 }
 
+/**
+ * Whether the shopper asked, on the address step, for the delivery address to
+ * be saved to their address book once the order is placed.
+ *
+ * Kept in a cookie rather than on the cart: it is the shopper's own choice, not
+ * order data, so it must not be copied into the order's metadata, and writing
+ * it to the cart would mean a read-modify-write of metadata that other cart
+ * updates also touch. The value is the id of the cart the choice was made for,
+ * so a choice left over from an abandoned cart can never apply to another one.
+ */
+const SAVE_ADDRESS_COOKIE = "_medusa_save_address"
 
+export const setSaveAddressChoice = async (cartId: string | null) => {
+  const cookiesStore = await cookies()
+  if (!cartId) {
+    cookiesStore.set(SAVE_ADDRESS_COOKIE, "", { maxAge: -1 })
+    return
+  }
+  cookiesStore.set(SAVE_ADDRESS_COOKIE, cartId, {
+    maxAge: 60 * 60 * 24,
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+  })
+}
+
+export const getSaveAddressChoice = async (): Promise<string | undefined> => {
+  const cookiesStore = await cookies()
+  return cookiesStore.get(SAVE_ADDRESS_COOKIE)?.value
+}
+
+
+
+/**
+ * Fetch directives for data that is identical for every visitor (regions,
+ * categories, collections).
+ *
+ * getCacheDirectives scopes entries per visitor so one shopper's
+ * revalidateTag cannot purge another's cart. That is wrong for shared catalog
+ * data: every new visitor (and every new cache-id cookie, daily) started with
+ * a cold cache and paid for the same backend calls again. These reads use one
+ * global tag and an hourly revalidate, and need no cookie, so they also work
+ * at build time.
+ */
+export const getSharedCacheDirectives = (
+  tag: string,
+  revalidate: number = 60 * 60
+): { next: { tags: string[]; revalidate: number } } => ({
+  next: { tags: [tag], revalidate },
+})

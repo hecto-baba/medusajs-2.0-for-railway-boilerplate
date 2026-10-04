@@ -6,14 +6,16 @@ import Payment from "@modules/checkout/components/payment"
 import Review from "@modules/checkout/components/review"
 import Shipping from "@modules/checkout/components/shipping"
 import TicketAddresses from "@modules/checkout/components/ticket-addresses"
-import { isTicketLineItem } from "types/ticket"
+import { isNoShippingCart } from "types/appointment"
 
 export default async function CheckoutForm({
   cart,
   customer,
+  step,
 }: {
   cart: HttpTypes.StoreCart | null
   customer: HttpTypes.StoreCustomer | null
+  step?: string
 }) {
   if (!cart) {
     return null
@@ -26,11 +28,33 @@ export default async function CheckoutForm({
   // Deliberately "every item is a ticket" rather than "any item is": a cart
   // mixing tickets with a physical product still has to be shipped, and must
   // keep the full checkout.
-  const items = cart.items ?? []
-  const isTicketsOnly =
-    items.length > 0 && items.every((item) => isTicketLineItem(item.metadata))
+  //
+  // Appointments are the same: they are created with requires_shipping false and
+  // are confirmed by email, so a cart of tickets and/or appointments collects a
+  // billing address only.
+  const isTicketsOnly = isNoShippingCart(cart.items)
 
-  const paymentMethods = await listCartPaymentMethods(cart.region?.id ?? "")
+  // Each lookup costs the backend a run of database queries (shipping options
+  // about 17), so a step fetches only what it can show. Payment methods are
+  // listed only while the payment step is open. Shipping options are needed
+  // while the delivery step is open, and afterwards to name the chosen method
+  // in its collapsed summary; on the address step nothing uses them yet.
+  // They are independent, so they are requested together.
+  const needsPaymentMethods = step === "payment"
+  const needsShippingGroups =
+    !isTicketsOnly &&
+    (step === "delivery" || (cart.shipping_methods?.length ?? 0) > 0)
+
+  const [paymentMethods, shippingGroups] = await Promise.all([
+    needsPaymentMethods
+      ? listCartPaymentMethods(cart.region?.id ?? "")
+      : Promise.resolve([] as any[]),
+    isTicketsOnly
+      ? Promise.resolve(null)
+      : needsShippingGroups
+        ? listCartShippingGroups(cart.id)
+        : Promise.resolve([]),
+  ])
 
   if (!paymentMethods) {
     return null
@@ -55,8 +79,6 @@ export default async function CheckoutForm({
       </div>
     )
   }
-
-  const shippingGroups = await listCartShippingGroups(cart.id)
 
   if (!shippingGroups) {
     return null

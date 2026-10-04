@@ -24,6 +24,37 @@ const sameDay = (a: unknown, b: unknown) => {
 addToCartWorkflow.hooks.validate(async ({ input }, { container }) => {
   const items = input.items || []
 
+  // Enquiry-only products cannot be bought. A hook accepts only ONE handler,
+  // so this check lives in the same handler as the ticket validation below
+  // rather than in a second addToCartWorkflow.hooks.validate (which would
+  // conflict). Every custom add-to-cart workflow (rental, EOI, appointment,
+  // tickets) runs addToCartWorkflow as a step, so this covers all of them.
+  const variantIds = items
+    .map((item) => item.variant_id)
+    .filter((id): id is string => !!id)
+
+  if (variantIds.length) {
+    const query = container.resolve("query")
+    // One query: each variant with its product's enquiry configuration. This
+    // runs on every add-to-cart in the store, so it must stay a single read.
+    const { data: variants } = await query.graph({
+      entity: "product_variant",
+      fields: ["id", "product.title", "product.enquiry_configuration.status"],
+      filters: { id: variantIds },
+    })
+
+    const blocked = (variants as any[]).find(
+      (v) => v?.product?.enquiry_configuration?.status === "active"
+    )
+
+    if (blocked) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        `"${blocked?.product?.title ?? "This product"}" is enquiry-only and cannot be added to the cart. Please send an enquiry instead.`
+      )
+    }
+  }
+
   const ticketItems = items.filter((item) => item.metadata?.seat_number)
 
   if (!ticketItems.length) {

@@ -1,4 +1,4 @@
-import { ShowDetail } from "@modules/shows"
+import { ShowDetail } from "@modules/shows/components/detail/show-detail"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Show Details" }

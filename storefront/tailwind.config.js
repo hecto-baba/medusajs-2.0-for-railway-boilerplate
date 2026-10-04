@@ -19,6 +19,28 @@ module.exports = {
         padding: "padding-top padding-right padding-bottom padding-left",
       },
       colors: {
+        // Storefront design tokens. Values are RGB triplets defined in
+        // src/styles/globals.css so opacity modifiers (bg-brand/10) work and
+        // dark mode only has to redefine the variables.
+        canvas: "rgb(var(--c-canvas) / <alpha-value>)",
+        card: "rgb(var(--c-card) / <alpha-value>)",
+        ink: "rgb(var(--c-ink) / <alpha-value>)",
+        muted: "rgb(var(--c-muted) / <alpha-value>)",
+        line: "rgb(var(--c-line) / <alpha-value>)",
+        brand: {
+          DEFAULT: "rgb(var(--c-brand) / <alpha-value>)",
+          ink: "rgb(var(--c-brand-ink) / <alpha-value>)",
+          soft: "rgb(var(--c-brand-soft) / <alpha-value>)",
+        },
+        pop: {
+          DEFAULT: "rgb(var(--c-pop) / <alpha-value>)",
+          ink: "rgb(var(--c-pop-ink) / <alpha-value>)",
+        },
+        success: {
+          DEFAULT: "rgb(var(--c-success) / <alpha-value>)",
+          ink: "rgb(var(--c-success-ink) / <alpha-value>)",
+          soft: "rgb(var(--c-success-soft) / <alpha-value>)",
+        },
         grey: {
           0: "#FFFFFF",
           5: "#F9FAFB",
@@ -44,6 +66,10 @@ module.exports = {
       maxWidth: {
         "8xl": "100rem",
       },
+      boxShadow: {
+        lift: "var(--shadow-lift)",
+        pop: "var(--shadow-pop)",
+      },
       screens: {
         "2xsmall": "320px",
         xsmall: "512px",
@@ -57,7 +83,16 @@ module.exports = {
         "3xl": "2rem",
       },
       fontFamily: {
+        display: [
+          "var(--font-display)",
+          "var(--font-body)",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "sans-serif",
+        ],
         sans: [
+          "var(--font-body)",
           "Inter",
           "-apple-system",
           "BlinkMacSystemFont",

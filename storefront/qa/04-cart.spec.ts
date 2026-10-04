@@ -5,19 +5,16 @@ import {
   parseMoney,
   selectFirstVariant,
   url,
+  openCartDrawer,
+  purchasableHandle,
 } from "./helpers"
 
 test.describe("Cart", () => {
   test("the cart dropdown shows what was added", async ({ page }) => {
     await addProductToCart(page, "t-shirt")
 
-    // Opened by hover rather than by the auto-open, which is racy: it fires
-    // only when totalItems differs from a useRef captured at mount, so a
-    // remount with the new count already present never triggers it.
-    await page.getByTestId("nav-cart-link").hover()
-
-    const dropdown = page.getByTestId("nav-cart-dropdown")
-    await expect(dropdown).toBeVisible()
+    // The cart is a drawer that opens when the header cart button is clicked.
+    const dropdown = await openCartDrawer(page)
     await expect(dropdown.getByTestId("cart-item")).toHaveCount(1)
     await expect(dropdown.getByTestId("cart-item-quantity")).toContainText("1")
     await expect(dropdown.getByTestId("cart-subtotal")).not.toBeEmpty()
@@ -46,7 +43,8 @@ test.describe("Cart", () => {
     const subtotal = page.getByTestId("cart-subtotal")
     const before = parseMoney(await subtotal.getAttribute("data-value"))
 
-    await page.getByTestId("product-select-button").selectOption("2")
+    // The cart line has a quantity stepper (the old dropdown is gone).
+    await page.getByRole("button", { name: "Increase quantity" }).click()
 
     // Same repaint defect as adding: the quantity reaches Medusa but the
     // totals can keep the old figures until the page is reloaded.
@@ -95,12 +93,9 @@ test.describe("Cart", () => {
 
   test("an item can be removed from the cart dropdown", async ({ page }) => {
     await addProductToCart(page, "t-shirt")
-    await page.getByTestId("nav-cart-link").hover()
-
     // DeleteButton declared only id/children/className, so the data-testid
     // both call sites passed was dropped and the control was unaddressable.
-    const dropdown = page.getByTestId("nav-cart-dropdown")
-    await expect(dropdown).toBeVisible()
+    const dropdown = await openCartDrawer(page)
     await dropdown.getByTestId("cart-item-remove-button").click()
 
     await expect(page.getByTestId("nav-cart-link")).toContainText("(0)")
@@ -158,7 +153,8 @@ test.describe("Cart", () => {
    * recurrence across the whole suite. This test is the direct assertion.
    */
   test("the cart count repaints without a reload", async ({ page }) => {
-    await page.goto(url("products/t-shirt"))
+    const handle = await purchasableHandle(page.request, "t-shirt").catch(() => "t-shirt")
+    await page.goto(url(`products/${handle}`))
     await expect(page.getByTestId("product-container")).toBeVisible()
 
     await selectFirstVariant(page)

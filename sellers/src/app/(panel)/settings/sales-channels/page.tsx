@@ -1,4 +1,4 @@
-import { SalesChannelsTable } from "@modules/settings"
+import { SalesChannelsTable } from "@modules/settings/components/sales-channels/sales-channels-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Sales Channels" }

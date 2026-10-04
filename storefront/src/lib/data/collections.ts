@@ -2,7 +2,7 @@ import { sdk } from "@lib/config"
 import { cache } from "react"
 import { getProductsList } from "./products"
 import { HttpTypes } from "@medusajs/types"
-import { getCacheDirectives } from "./cookies"
+import { getSharedCacheDirectives } from "./cookies"
 
 // See the note in regions.ts for why these are client.fetch calls rather than
 // the sdk.store.* helpers.
@@ -10,7 +10,7 @@ export const retrieveCollection = cache(async function (id: string) {
   return sdk.client
     .fetch<HttpTypes.StoreCollectionResponse>(`/store/collections/${id}`, {
       method: "GET",
-      ...(await getCacheDirectives("collections")),
+      ...getSharedCacheDirectives("collections"),
     })
     .then(({ collection }) => collection)
 })
@@ -23,7 +23,7 @@ export const getCollectionsList = cache(async function (
     .fetch<HttpTypes.StoreCollectionListResponse>("/store/collections", {
       method: "GET",
       query: { limit, offset: 0 },
-      ...(await getCacheDirectives("collections")),
+      ...getSharedCacheDirectives("collections"),
     })
     .then(({ collections }) => ({ collections, count: collections.length }))
 })
@@ -38,7 +38,7 @@ export const getCollectionByHandle = cache(async function (
     .fetch<HttpTypes.StoreCollectionListResponse>("/store/collections", {
       method: "GET",
       query: { handle },
-      ...(await getCacheDirectives("collections")),
+      ...getSharedCacheDirectives("collections"),
     })
     .then(({ collections }) => collections[0])
 })

@@ -23,11 +23,11 @@ import { validateTicketOrderStep, ValidateTicketOrderStepInput } from "./steps/v
 import { createTicketPurchasesStep, CreateTicketPurchasesStepInput } from "./steps/create-ticket-purchases"
 import { validateRentalStep, ValidateRentalInput } from "./steps/validate-rental"
 import { createRentalsForOrderStep, CreateRentalsForOrderInput } from "./steps/create-rentals-for-order"
-import { validateAppointmentAvailabilityStep } from "./steps/validate-appointment-availability"
+import { validateAppointmentHoldsStep } from "./steps/validate-appointment-holds"
 import {
-  createAppointmentAttendeesStep,
-  CreateAppointmentAttendeesStepInput,
-} from "./steps/create-appointment-attendees"
+  confirmAppointmentAttendeesStep,
+  ConfirmAppointmentAttendeesInput,
+} from "./steps/confirm-appointment-attendees"
 import { createEoiForOrderStep, CreateEoiForOrderInput } from "./steps/create-eoi-for-order"
 import createDigitalProductOrderStep from "./create-digital-product-order/steps/create-digital-product-order"
 
@@ -54,6 +54,12 @@ export const completeCartMarketplaceWorkflow = createWorkflow(
   "complete-cart-marketplace",
   (input: CompleteCartMarketplaceWorkflowInput) => {
     acquireLockStep({ key: input.cart_id, timeout: 2, ttl: 10 })
+
+    // Appointments are reserved when they go into the cart, so the only thing to
+    // check here is that each hold is still the buyer's - and it is checked
+    // BEFORE the order is created, so a lapsed reservation is reported while
+    // nothing has been finalised, never after.
+    validateAppointmentHoldsStep({ cart_id: input.cart_id })
 
     const order = completeCartWorkflow.runAsStep({ input: { id: input.cart_id } })
 
@@ -135,6 +141,13 @@ export const completeCartMarketplaceWorkflow = createWorkflow(
           }))
         )
       ).config({ name: "link-ticket-purchases-marketplace" })
+
+      // The ticket email goes out on this event rather than on order.placed, which
+      // fires from inside the core completion - before the purchases above exist.
+      emitEventStep({
+        eventName: "ticket.purchased",
+        data: { order_id: order.id },
+      }).config({ name: "emit-ticket-purchased-marketplace" })
     })
 
     // ---- rentals
@@ -189,17 +202,12 @@ export const completeCartMarketplaceWorkflow = createWorkflow(
       { attendeeLinks, appointmentItems },
       (data) => data.attendeeLinks.length === 0 && data.appointmentItems.length > 0
     ).then(() => {
-      validateAppointmentAvailabilityStep({
-        appointment_ids: transform({ appointmentItems }, (data) =>
-          data.appointmentItems.map((item: any) => item.metadata.appointment_id as string)
-        ),
-      })
-
-      const attendees = createAppointmentAttendeesStep({
+      // Confirms the places held at add-to-cart; nothing new is claimed here, so
+      // there is no post-payment availability check to fail.
+      const attendees = confirmAppointmentAttendeesStep({
         order_id: order.id,
-        customer_id: carts[0].customer_id,
         items: appointmentItems,
-      } as unknown as CreateAppointmentAttendeesStepInput)
+      } as unknown as ConfirmAppointmentAttendeesInput)
 
       createRemoteLinkStep(
         transform({ order, attendees }, (data) =>
@@ -209,6 +217,15 @@ export const completeCartMarketplaceWorkflow = createWorkflow(
           }))
         )
       ).config({ name: "link-appointment-attendees-marketplace" })
+
+      // Confirmation emails go out on this event rather than on order.placed,
+      // which fires from inside the core completion - before the places above
+      // are confirmed. This block runs once per order (guarded by the existing
+      // attendee-link check), so the event is emitted once.
+      emitEventStep({
+        eventName: "appointment.booked",
+        data: { order_id: order.id },
+      }).config({ name: "emit-appointment-booked-marketplace" })
     })
 
     // ---- expressions of interest

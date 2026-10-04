@@ -1,4 +1,4 @@
-import { ShippingOptionsCard } from "@modules/settings"
+import { ShippingOptionsCard } from "@modules/settings/components/locations/shipping-options-card"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Shipping Options" }

@@ -1,58 +1,47 @@
-import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
+
+import BillBreakdown, {
+  BillLine,
+} from "@modules/common/components/bill-breakdown"
 
 type OrderSummaryProps = {
   order: HttpTypes.StoreOrder
 }
 
 const OrderSummary = ({ order }: OrderSummaryProps) => {
-  const getAmount = (amount?: number | null) => {
-    if (!amount) {
-      return
-    }
+  const lines: BillLine[] = [
+    { label: "Subtotal", amount: order.subtotal ?? 0 },
+  ]
 
-    return convertToLocale({
-      amount,
-      currency_code: order.currency_code,
+  if (order.discount_total > 0) {
+    lines.push({
+      label: "Discount",
+      amount: -order.discount_total,
+      tone: "success",
     })
   }
 
+  if (order.gift_card_total > 0) {
+    lines.push({
+      label: "Gift card",
+      amount: -order.gift_card_total,
+      tone: "success",
+    })
+  }
+
+  lines.push({ label: "Shipping", amount: order.shipping_total ?? 0 })
+  lines.push({ label: "Taxes", amount: order.tax_total ?? 0 })
+
   return (
     <div>
-      <h2 className="text-base-semi">Order Summary</h2>
-      <div className="text-small-regular text-ui-fg-base my-2">
-        <div className="flex items-center justify-between text-base-regular text-ui-fg-base mb-2">
-          <span>Subtotal</span>
-          <span>{getAmount(order.subtotal)}</span>
-        </div>
-        <div className="flex flex-col gap-y-1">
-          {order.discount_total > 0 && (
-            <div className="flex items-center justify-between">
-              <span>Discount</span>
-              <span>- {getAmount(order.discount_total)}</span>
-            </div>
-          )}
-          {order.gift_card_total > 0 && (
-            <div className="flex items-center justify-between">
-              <span>Discount</span>
-              <span>- {getAmount(order.gift_card_total)}</span>
-            </div>
-          )}
-          <div className="flex items-center justify-between">
-            <span>Shipping</span>
-            <span>{getAmount(order.shipping_total)}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Taxes</span>
-            <span>{getAmount(order.tax_total)}</span>
-          </div>
-        </div>
-        <div className="h-px w-full border-b border-gray-200 border-dashed my-4" />
-        <div className="flex items-center justify-between text-base-regular text-ui-fg-base mb-2">
-          <span>Total</span>
-          <span>{getAmount(order.total)}</span>
-        </div>
-      </div>
+      <h2 className="px-1 pb-3 font-display text-xl font-extrabold tracking-tight">
+        Order Summary
+      </h2>
+      <BillBreakdown
+        lines={lines}
+        total={{ label: "Total", amount: order.total ?? 0 }}
+        currencyCode={order.currency_code}
+      />
     </div>
   )
 }

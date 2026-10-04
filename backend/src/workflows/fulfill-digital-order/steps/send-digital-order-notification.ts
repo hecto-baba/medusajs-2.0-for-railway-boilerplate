@@ -1,14 +1,12 @@
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
-import {
-  INotificationModuleService,
-  IFileModuleService,
-} from "@medusajs/framework/types"
+import { IFileModuleService } from "@medusajs/framework/types"
 import {
   MedusaError,
   ModuleRegistrationName,
   promiseAll,
 } from "@medusajs/framework/utils"
 import { DigitalProductOrder, MediaType } from "../../../modules/digital-product/types"
+import { sendNotice } from "../../../lib/email-notice"
 
 export type SendDigitalOrderNotificationStepInput = {
   digital_product_order: DigitalProductOrder
@@ -22,9 +20,6 @@ export const sendDigitalOrderNotificationStep = createStep(
     }: SendDigitalOrderNotificationStepInput,
     { container }
   ) => {
-    const notificationModuleService: INotificationModuleService = container.resolve(
-      ModuleRegistrationName.NOTIFICATION
-    )
     const fileModuleService: IFileModuleService = container.resolve(
       ModuleRegistrationName.FILE
     )
@@ -62,15 +57,25 @@ export const sendDigitalOrderNotificationStep = createStep(
       })
     )
 
-    const notification = await notificationModuleService.createNotifications({
+    // Sent once per digital order (idempotent), and a failed send is logged, not
+    // thrown: the buyer can still download from their account.
+    const result = await sendNotice(container, {
+      template: "digital-order-ready",
       to: digitalProductOrder.order.email,
-      template: "digital-order-template",
-      channel: "email",
-      data: {
-        products: notificationData,
+      subject: "Your digital purchase is ready",
+      resourceId: digitalProductOrder.id,
+      resourceType: "digital_product_order",
+      notice: {
+        heading: "Your download is ready",
+        paragraphs: [
+          "Thank you for your purchase. Your files are below. You can also download them any time from your account.",
+          ...notificationData.flatMap((product) =>
+            product.medias.map((url) => `${product.name}: ${url}`)
+          ),
+        ],
       },
     })
 
-    return new StepResponse(notification)
+    return new StepResponse(result)
   }
 )

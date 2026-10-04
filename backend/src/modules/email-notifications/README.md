@@ -10,17 +10,55 @@ pnpm email:dev
 
 This will start a react-email server at `http://localhost:3002` where you can preview the email templates.
 
-## What this template sends
+## What sends an email
 
-| Template | Sent by | When |
-| -------- | ------- | ---- |
-| `order-placed` | `src/subscribers/order-placed.ts` | A shopper completes an order. |
-| `invite-user` | `src/subscribers/invite-created.ts` | An administrator is invited, or the invite is resent. |
-| `reset-password` | `src/subscribers/password-reset.ts` | Someone asks to reset a password, whether a shopper or an administrator. |
+Every email is sent through `sendEmail` (`src/lib/send-email.ts`). It gives each email a unique
+idempotency key (enforced by a unique index in the notification table, so the same email is never sent
+twice), retries temporary ZeptoMail failures up to 3 times, and never throws: an order, payment or booking
+always succeeds even if its email cannot be sent. Failures are logged as `email_failed`.
 
-All three need a configured provider: `RESEND_API_KEY` **and** `RESEND_FROM_EMAIL`
-together (or the SendGrid pair). With only one of a pair set, the notification
-module is not registered at all and nothing sends, silently.
+Short status emails share one layout (`templates/notice.tsx`); the rest have their own template.
+
+| Template | Sent by | To | When |
+| -------- | ------- | -- | ---- |
+| `order-placed` | `subscribers/order-placed.ts` | Buyer | An order is placed (skipped for reservation-only orders) |
+| `eoi-confirmation` | `subscribers/order-placed.ts` | Buyer | An order contains reservation (EOI) lines; states deposit and uncharged balance |
+| `ticket-order-placed` | `subscribers/ticket-order-placed.ts` | Buyer | `ticket.purchased`, after the ticket records exist |
+| `appointment-booked` / `appointment-changed` | `subscribers/appointment-*.ts` | Buyer | Booking confirmed, cancelled, rescheduled |
+| `fulfillment-update` | `subscribers/buyer-*-email.ts` | Buyer | A seller ships or delivers part of an order |
+| `payment-received` | `subscribers/payment-captured-email.ts` | Buyer | A payment is captured more than 2 minutes after checkout (card payments are covered by the order confirmation) |
+| `payment-failed` | `subscribers/payment-failed-email.ts` | Shopper | Every failed Stripe payment attempt |
+| `refund-issued` | `subscribers/payment-refunded-email.ts` | Buyer | `payment.refunded`, one email per refund |
+| `order-cancelled` | `subscribers/order-canceled-email.ts` | Buyer | The buyer's own order is cancelled, by anyone, including automatic cancels. Seller child orders are silent |
+| `booking-failed` | `subscribers/booking-failed-email.ts` | Buyer | Paid, but the appointment time or ticket seat was lost |
+| `booking-failed-admin` | `subscribers/booking-failed-email.ts` | Platform operator | Same event; a refund must be issued by hand |
+| `quote-requested` | `jobs/send-quote-emails.ts` | Product vendor + buyer copy | A quote is requested |
+| `quote-sent` | `jobs/send-quote-emails.ts` | Buyer | The vendor sends their price |
+| `quote-accepted` | `jobs/send-quote-emails.ts` | Vendor + buyer | The buyer accepts |
+| `quote-rejected` | `jobs/send-quote-emails.ts` | The other party | Either side declines |
+| `quote-status-update` | `jobs/send-quote-emails.ts` | Buyer | Paid, dispatched, delivered |
+| `vendor-new-order` | `subscribers/link-vendor-order.ts` | Each vendor's admins | An order is placed; only that vendor's own items and totals |
+| `restaurant-new-delivery` | `subscribers/restaurant-new-delivery-email.ts` | Restaurant admins | `notify.restaurant` |
+| `enquiry-received` | `subscribers/enquiry-created-email.ts` | Product vendor (or platform operator) | A shopper asks about a product |
+| `enquiry-acknowledged` | `subscribers/enquiry-created-email.ts` | Enquirer | Same event |
+| `enquiry-responded` | `subscribers/enquiry-responded.ts` | Enquirer | The seller replies |
+| `approval-requested` | `subscribers/approval-email.ts` | Company managers | An employee submits a cart for approval |
+| `approval-decided` | `subscribers/approval-email.ts` | The employee | A manager approves or rejects |
+| `rental-activated` / `rental-returned` | `subscribers/rental-email.ts` | Renter | Rental starts, rental returned |
+| `rental-deposit-update` | `subscribers/rental-email.ts` | Renter | Deposit refunded, partly refunded or forfeited |
+| `digital-order-ready` | `workflows/fulfill-digital-order` | Buyer | A digital order is fulfilled |
+| `invite-user` | `subscribers/invite-created.ts` | Invited admin | Invite created or resent |
+| `reset-password` | `subscribers/password-reset.ts` | Whoever asked | A password reset is requested |
+
+Quote emails are driven by a job that runs every minute and reads each recently changed quote's current
+state, because quotes change in about fifteen places. A failed send is retried on the next run for 30 minutes.
+
+Settings: `ZEPTOMAIL_API_KEY` **and** `ZEPTOMAIL_FROM_EMAIL` (with only one set, the notification module
+is not registered and nothing sends), `ORDER_REPLY_TO_EMAIL` (reply-to; defaults to the sender), and
+`ADMIN_NOTIFICATION_EMAIL` (platform operator alerts such as failed bookings; without it those alerts
+are only logged).
+
+Not built: a reminder email the day before a rental is due back.
 
 ### A note on the reset-password link
 
@@ -174,26 +212,20 @@ await notificationModuleService.createNotifications({
 })
 ```
 
-## Additional Info & Documentation
+## Provider
 
-I based this module off of [@typed-dev/medusa-notification-resend](https://github.com/typed-development/medusa-notification-resend) but added
-the ability to use `react-email` templates and extended the functionality to include more Resend options. 
+Mail is sent through the [ZeptoMail API](https://www.zoho.com/zeptomail/help/api/email-sending.html)
+by `services/zeptomail.ts`. Templates are `react-email` components, rendered to HTML before sending.
 
-In the original module, you're limited to just `subject`, `from`, `to`, the body, and the attachments. You also could
-only send HTML, which means you have to render the email body using `@react-email/render` instead of using the
-`react` email option which renders it for you.
+| Variable | Purpose |
+| --- | --- |
+| `ZEPTOMAIL_API_KEY` | Send Mail token |
+| `ZEPTOMAIL_FROM_EMAIL` | Verified sender address |
+| `ZEPTOMAIL_FROM_NAME` | Sender display name (optional) |
+| `ZEPTOMAIL_API_URL` | Only for non-default data centres, e.g. `https://api.zeptomail.in/v1.1/email` |
 
-### Medusa
-
-* Guide: [How to Create a Notification Provider Module](https://docs.medusajs.com/resources/references/notification-provider-module)
-* Getting Started: [Events & Subscribers](https://docs.medusajs.com/learn/basics/events-and-subscribers) 
+Per-message options read from `emailOptions`: `subject`, `replyTo`, `cc`, `bcc`, `text`.
 
 ### React Email
 
 For more information on how to use `react-email`, refer to the official [documentation](https://react.email/)
-
-You can also use [these example templates](https://demo.react.email/preview/magic-links/aws-verify-email) as a reference.
-
-### Resend
-
-* Docs: [Node.js Quickstart](https://resend.com/docs/send-with-nodejs)

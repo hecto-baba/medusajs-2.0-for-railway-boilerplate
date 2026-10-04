@@ -100,15 +100,34 @@ export const addToCartWithRentalWorkflow = createWorkflow(
         // two open tabs - can never collide onto the same group id.
         const rentalGroupId = generateEntityId(undefined, "rentgrp")
 
+        // Picked up from the seller, nothing is delivered, so neither the rental
+        // nor its deposit needs a shipping address or method. The seller's
+        // setting decides when it allows only one way; when it allows both, the
+        // renter's choice counts, and only an exact "pickup" does - anything
+        // else keeps the safe default of shipping.
+        const modes = data.rentalData.fulfilment_modes ?? "both"
+        const rentalFulfilment =
+          modes === "pickup"
+            ? "pickup"
+            : modes === "delivery"
+              ? "delivery"
+              : data.input.metadata?.rental_fulfilment === "pickup"
+                ? "pickup"
+                : "delivery"
+        const isPickup = rentalFulfilment === "pickup"
+
         const items: Record<string, unknown>[] = [{
           ...baseItem,
           unit_price: data.rentalData.price,
+          ...(isPickup ? { requires_shipping: false } : {}),
           metadata: {
             ...(data.input.metadata || {}),
             rental_unit: data.rentalData.rental_unit,
             rental_units_count: data.rentalData.rental_units_count,
             rental_deposit_amount: data.rentalData.deposit_amount,
             rental_group_id: rentalGroupId,
+            // Settled above from the seller's setting, not the raw client value.
+            rental_fulfilment: rentalFulfilment,
           },
         }]
 
@@ -122,6 +141,7 @@ export const addToCartWithRentalWorkflow = createWorkflow(
             title: "Security Deposit",
             quantity: 1,
             unit_price: data.rentalData.deposit_amount,
+            ...(isPickup ? { requires_shipping: false } : {}),
             metadata: {
               is_rental_deposit: true,
               rental_group_id: rentalGroupId,

@@ -1,6 +1,7 @@
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
 import { RENTAL_MODULE } from "../../modules/rental"
 import RentalModuleService from "../../modules/rental/service"
+import { assertNoOtherSaleMode, withSaleModeLock } from "../../lib/sale-mode"
 import { RentalUnit } from "../../utils/rental-unit"
 
 type CreateRentalConfigurationInput = {
@@ -13,6 +14,7 @@ type CreateRentalConfigurationInput = {
   security_deposit_amount?: number
   security_deposit_type?: "fixed" | "percentage"
   requires_time_selection?: boolean
+  fulfilment_modes?: "both" | "pickup" | "delivery"
   status?: "active" | "inactive"
 }
 
@@ -37,18 +39,31 @@ export const createRentalConfigurationStep = createStep(
         ? input.max_rental_units
         : input.max_rental_days
 
-    const rentalConfig = await rentalModuleService.createRentalConfigurations({
-      product_id: input.product_id,
-      min_rental_days: input.min_rental_days,
-      max_rental_days: input.max_rental_days,
-      rental_unit: rentalUnit,
-      min_rental_units: minUnits,
-      max_rental_units: maxUnits,
-      security_deposit_amount: input.security_deposit_amount,
-      security_deposit_type: input.security_deposit_type,
-      requires_time_selection: input.requires_time_selection,
-      status: input.status,
-    })
+    const write = () =>
+      rentalModuleService.createRentalConfigurations({
+        product_id: input.product_id,
+        min_rental_days: input.min_rental_days,
+        max_rental_days: input.max_rental_days,
+        rental_unit: rentalUnit,
+        min_rental_units: minUnits,
+        max_rental_units: maxUnits,
+        security_deposit_amount: input.security_deposit_amount,
+        security_deposit_type: input.security_deposit_type,
+        requires_time_selection: input.requires_time_selection,
+        fulfilment_modes: input.fulfilment_modes,
+        status: input.status,
+      })
+
+    // One sale mode per product: refused while enquiries (or another mode) is
+    // active. Rental defaults to active when no status is sent. Check and
+    // write share one lock so another mode cannot switch on between them.
+    const rentalConfig =
+      input.status !== "inactive"
+        ? await withSaleModeLock(container, [input.product_id], async () => {
+            await assertNoOtherSaleMode(container, input.product_id, "rental")
+            return write()
+          })
+        : await write()
 
     return new StepResponse(rentalConfig, rentalConfig.id)
   },

@@ -8,6 +8,7 @@ import {
   deleteProductVariantsWorkflow,
   updateProductVariantsWorkflow,
 } from "@medusajs/medusa/core-flows"
+import { isOfferedAsService } from "../../../../../../lib/service-stock"
 import {
   assertOwnership,
   assertVariantBelongsToProduct,
@@ -74,6 +75,12 @@ export const POST = async (
   const { id, variant_id } = req.params
 
   const { additional_data, ...update } = req.validatedBody as Record<string, any>
+
+  // A variant of a bookable service has no stock to count, so a form that still
+  // sends "track stock" cannot switch it back on.
+  if (update.manage_inventory === true && (await isOfferedAsService(req.scope, id))) {
+    update.manage_inventory = false
+  }
 
   await updateProductVariantsWorkflow(req.scope).run({
     input: {

@@ -23,8 +23,13 @@ export function calculateEoiAmount({
   valueType,
   valueAmount,
 }: CalculateEoiAmountInput): CalculateEoiAmountResult {
-  const eoiChargedAmount =
+  const rawAmount =
     valueType === "percentage" ? unitPrice * (valueAmount / 100) : valueAmount
+
+  // An EOI is a deposit against the price, so it can never be negative or
+  // exceed the price itself (a fixed amount, or a percentage over 100,
+  // would otherwise charge more than the product costs).
+  const eoiChargedAmount = Math.min(Math.max(rawAmount, 0), unitPrice)
 
   return {
     eoi_charged_amount: eoiChargedAmount,

@@ -3,16 +3,22 @@ import { z } from "@medusajs/framework/zod"
 import { createEnquiryWorkflow } from "../../../workflows/create-enquiry"
 
 export const PostStoreEnquirySchema = z.object({
-  product_id: z.string(),
-  customer_email: z.string().email(),
-  message: z.string().min(1),
+  product_id: z.string().min(1).max(100),
+  customer_email: z.string().email().max(254),
+  message: z.string().min(1).max(2000),
   // Answers to the product's admin-configured custom fields, keyed by field
   // id. Validated against the product's active EnquiryConfiguration inside
   // createEnquiryWorkflow (not here) - this route has no way to know a
   // product's field schema without querying it, which the workflow already
   // does. See docs/plan/PRODUCT_ENQUIRY_MODULE_PLAN_ADMIN2.md, Phase D.2.
   custom_field_answers: z
-    .record(z.string(), z.union([z.string(), z.array(z.string())]))
+    .record(
+      z.string().max(100),
+      z.union([z.string().max(2000), z.array(z.string().max(500)).max(50)])
+    )
+    .refine((answers) => Object.keys(answers).length <= 50, {
+      message: "Too many custom field answers.",
+    })
     .optional(),
 })
 

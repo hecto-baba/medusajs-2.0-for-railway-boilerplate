@@ -3,6 +3,7 @@ import { MedusaError } from "@medusajs/framework/utils"
 import { TICKET_BOOKING_MODULE } from "../../modules/ticket-booking"
 import TicketBookingModuleService from "../../modules/ticket-booking/service"
 import { DATE_OPTION } from "../create-ticket-product"
+import { reportBookingFailure } from "../../lib/booking-failed"
 
 export type CreateTicketPurchasesStepInput = {
   order_id: string
@@ -86,7 +87,18 @@ export const createTicketPurchasesStep = createStep(
       return new StepResponse([], [])
     }
 
-    const purchases = await service.createTicketPurchases(toCreate)
+    let purchases
+    try {
+      purchases = await service.createTicketPurchases(toCreate)
+    } catch (error) {
+      // The unique seat index refused a seat another cart bought first.
+      await reportBookingFailure(container, {
+        order_id,
+        kind: "ticket",
+        detail: "One or more seats were sold to someone else before your payment completed.",
+      })
+      throw error
+    }
 
     return new StepResponse(
       purchases,

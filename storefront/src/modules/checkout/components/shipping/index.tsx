@@ -25,6 +25,10 @@ const groupTitle = (group: CartShippingGroup, count: number) =>
 const Shipping: React.FC<ShippingProps> = ({ cart, shippingGroups }) => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The option the shopper just picked, per seller group. Saving a delivery
+  // method is a slow backend call, so the choice is shown straight away and
+  // kept until the saved cart agrees (or the save fails and it is dropped).
+  const [pending, setPending] = useState<Record<string, string>>({})
 
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -54,28 +58,52 @@ const Shipping: React.FC<ShippingProps> = ({ cart, shippingGroups }) => {
     router.push(pathname + "?step=payment", { scroll: false })
   }
 
-  const set = async (id: string) => {
+  const set = async (groupKey: string, id: string) => {
+    setError(null)
+    setPending((current) => ({ ...current, [groupKey]: id }))
     setIsLoading(true)
     await setShippingMethod({ cartId: cart.id, shippingMethodId: id })
       .catch((err) => {
         setError(err.message)
+        setPending((current) => {
+          const next = { ...current }
+          delete next[groupKey]
+          return next
+        })
       })
       .finally(() => {
         setIsLoading(false)
       })
   }
 
+  // Once the saved cart shows the choice, the local copy is no longer needed.
+  useEffect(() => {
+    setPending((current) => {
+      const next = { ...current }
+      let changed = false
+      for (const group of groups) {
+        const saved = selectedOptionFor(group)
+        if (saved && next[group.shipping_profile_id] === saved.id) {
+          delete next[group.shipping_profile_id]
+          changed = true
+        }
+      }
+      return changed ? next : current
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart.shipping_methods])
+
   useEffect(() => {
     setError(null)
   }, [isOpen])
 
   return (
-    <div className="bg-white">
+    <div className="rounded-large bg-card p-5 shadow-lift small:p-6">
       <div className="flex flex-row items-center justify-between mb-6">
         <Heading
           level="h2"
           className={clx(
-            "flex flex-row text-3xl-regular gap-x-2 items-baseline",
+            "flex flex-row font-display text-2xl font-extrabold tracking-tight gap-x-2 items-baseline",
             {
               "opacity-50 pointer-events-none select-none":
                 !isOpen && cart.shipping_methods?.length === 0,
@@ -94,7 +122,7 @@ const Shipping: React.FC<ShippingProps> = ({ cart, shippingGroups }) => {
             <Text>
               <button
                 onClick={handleEdit}
-                className="text-ui-fg-interactive hover:text-ui-fg-interactive-hover"
+                className="text-brand hover:underline"
                 data-testid="edit-delivery-button"
               >
                 Edit
@@ -107,6 +135,7 @@ const Shipping: React.FC<ShippingProps> = ({ cart, shippingGroups }) => {
           <div className="pb-8">
             {groups.map((group) => {
               const selected = selectedOptionFor(group)
+              const chosenId = pending[group.shipping_profile_id] ?? selected?.id
               const title = groupTitle(group, groups.length)
 
               return (
@@ -125,7 +154,10 @@ const Shipping: React.FC<ShippingProps> = ({ cart, shippingGroups }) => {
                       No delivery options are available for these items.
                     </Text>
                   ) : (
-                    <RadioGroup value={selected?.id || ""} onChange={set}>
+                    <RadioGroup
+                      value={chosenId || ""}
+                      onChange={(id: string) => set(group.shipping_profile_id, id)}
+                    >
                       {group.shipping_options.map((option) => (
                         <RadioGroup.Option
                           key={option.id}
@@ -134,16 +166,25 @@ const Shipping: React.FC<ShippingProps> = ({ cart, shippingGroups }) => {
                           className={clx(
                             "flex items-center justify-between text-small-regular cursor-pointer py-4 border rounded-rounded px-8 mb-2 hover:shadow-borders-interactive-with-active",
                             {
-                              "border-ui-border-interactive":
-                                option.id === selected?.id,
+                              "border-brand bg-brand-soft":
+                                option.id === chosenId,
                             }
                           )}
                         >
                           <div className="flex items-center gap-x-4">
-                            <Radio checked={option.id === selected?.id} />
+                            <Radio checked={option.id === chosenId} />
                             <span className="text-base-regular">
                               {option.name}
                             </span>
+                            {isLoading && pending[group.shipping_profile_id] === option.id && (
+                              <span
+                                className="text-xs font-semibold text-muted"
+                                role="status"
+                                data-testid="delivery-saving"
+                              >
+                                Saving…
+                              </span>
+                            )}
                           </div>
                           <span className="justify-self-end text-ui-fg-base">
                             {convertToLocale({
@@ -173,7 +214,7 @@ const Shipping: React.FC<ShippingProps> = ({ cart, shippingGroups }) => {
             disabled={!everyGroupChosen}
             data-testid="submit-delivery-option-button"
           >
-            Continue to payment
+            {isLoading ? "Saving your choice…" : "Continue to payment"}
           </Button>
         </div>
       ) : (

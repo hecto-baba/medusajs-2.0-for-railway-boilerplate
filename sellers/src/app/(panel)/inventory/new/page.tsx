@@ -1,4 +1,4 @@
-import { InventoryCreateForm } from "@modules/inventory"
+import { InventoryCreateForm } from "@modules/inventory/components/forms/inventory-create-form"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "New Inventory Item" }

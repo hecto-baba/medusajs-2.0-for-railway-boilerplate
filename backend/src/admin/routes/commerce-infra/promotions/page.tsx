@@ -37,7 +37,7 @@ const CommercePromotionsPage = () => {
 
 export const config = defineRouteConfig({
   label: "Promotions",
-  rank: 5,
+  rank: 10,
 })
 
 export default CommercePromotionsPage

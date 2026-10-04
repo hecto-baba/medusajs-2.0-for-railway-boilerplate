@@ -1,6 +1,7 @@
 import { MedusaError } from "@medusajs/framework/utils"
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
 import { cancelOrderWorkflow } from "@medusajs/medusa/core-flows"
+import { reportBookingFailure } from "../../lib/booking-failed"
 
 export type ValidateTicketOrderStepInput = {
   items: {
@@ -44,7 +45,7 @@ const sameDay = (a: unknown, b: unknown) => {
  */
 export const validateTicketOrderStep = createStep(
   "validate-ticket-order",
-  async ({ items, order_id }: ValidateTicketOrderStepInput) => {
+  async ({ items, order_id }: ValidateTicketOrderStepInput, { container }) => {
     const seen = new Set<string>()
 
     for (const item of items) {
@@ -86,6 +87,11 @@ export const validateTicketOrderStep = createStep(
       )
 
       if (alreadySold) {
+        await reportBookingFailure(container, {
+          order_id,
+          kind: "ticket",
+          detail: `Seat ${item.metadata.seat_number} was sold to someone else before your payment completed.`,
+        })
         throw new MedusaError(
           MedusaError.Types.NOT_ALLOWED,
           `Seat ${item.metadata.seat_number} has already been purchased for this show date`

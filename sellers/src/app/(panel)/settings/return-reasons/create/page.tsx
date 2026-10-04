@@ -1,5 +1,6 @@
-import { RouteDrawer } from "@modules/common"
-import { ReturnReasonForm, ReturnReasonsTable } from "@modules/settings"
+import { RouteDrawer } from "@modules/common/components/route-drawer/route-drawer"
+import { ReturnReasonForm } from "@modules/settings/components/return-reason-form"
+import { ReturnReasonsTable } from "@modules/settings/components/return-reasons-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Create return reason" }

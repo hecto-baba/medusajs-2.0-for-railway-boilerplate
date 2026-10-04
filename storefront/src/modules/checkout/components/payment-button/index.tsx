@@ -10,7 +10,7 @@ import Spinner from "@modules/common/icons/spinner"
 import { placeOrder } from "@lib/data/cart"
 import { HttpTypes } from "@medusajs/types"
 import { isManual, isPaypal, isStripe } from "@lib/constants"
-import { isTicketLineItem } from "types/ticket"
+import { isNoShippingCart } from "types/appointment"
 import { B2BApprovalButton } from "../b2b-approval-button"
 
 type PaymentButtonProps = {
@@ -22,12 +22,9 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
   cart,
   "data-testid": dataTestId,
 }) => {
-  // Tickets require no shipping, so a ticket-only cart legitimately has no
-  // shipping method and must not be held back by that check.
-  const items = cart?.items ?? []
-  const isTicketsOnly =
-    items.length > 0 &&
-    items.every((item: any) => isTicketLineItem(item.metadata))
+  // Tickets and appointments require no shipping, so a cart of only those
+  // legitimately has no shipping method and must not be held back by that check.
+  const isTicketsOnly = isNoShippingCart(cart?.items as any)
 
   const notReady =
     !cart ||
@@ -105,6 +102,9 @@ const StripePaymentButton = ({
 
   const onPaymentCompleted = async () => {
     await placeOrder()
+      .then((res) => {
+        if (res && "error" in res) setErrorMessage(res.error ?? null)
+      })
       .catch((err) => {
         setErrorMessage(err.message)
       })
@@ -136,10 +136,12 @@ const StripePaymentButton = ({
         payment_method: {
           card: card,
           billing_details: {
+            // Joined defensively: a no-shipping order collects only a name and
+            // country, and a missing part must not become the text "undefined".
             name:
-              cart.billing_address?.first_name +
-              " " +
-              cart.billing_address?.last_name,
+              [cart.billing_address?.first_name, cart.billing_address?.last_name]
+                .filter(Boolean)
+                .join(" ") || undefined,
             address: {
               city: cart.billing_address?.city ?? undefined,
               country: cart.billing_address?.country_code ?? undefined,
@@ -191,6 +193,7 @@ const StripePaymentButton = ({
         disabled={disabled || notReady}
         onClick={handlePayment}
         size="large"
+        className="!rounded-large !border-0 !bg-brand !font-extrabold !text-brand-ink !shadow-none hover:!opacity-90 disabled:!bg-line disabled:!text-muted"
         isLoading={submitting}
         data-testid={dataTestId}
       >
@@ -221,6 +224,9 @@ const PayPalPaymentButton = ({
 
   const onPaymentCompleted = async () => {
     await placeOrder()
+      .then((res) => {
+        if (res && "error" in res) setErrorMessage(res.error ?? null)
+      })
       .catch((err) => {
         setErrorMessage(err.message)
       })
@@ -289,6 +295,9 @@ const ManualTestPaymentButton = ({
 
   const onPaymentCompleted = async () => {
     await placeOrder()
+      .then((res) => {
+        if (res && "error" in res) setErrorMessage(res.error ?? null)
+      })
       .catch((err) => {
         setErrorMessage(err.message)
       })
@@ -316,6 +325,7 @@ const ManualTestPaymentButton = ({
         isLoading={submitting}
         onClick={handlePayment}
         size="large"
+        className="!rounded-large !border-0 !bg-brand !font-extrabold !text-brand-ink !shadow-none hover:!opacity-90 disabled:!bg-line disabled:!text-muted"
         data-testid="submit-order-button"
       >
         Place order

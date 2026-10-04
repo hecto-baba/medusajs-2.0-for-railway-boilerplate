@@ -1,7 +1,8 @@
 import { requireVendorSession } from "@lib/data/vendor"
 import { Text } from "@medusajs/ui"
-import { RouteDrawer } from "@modules/common"
-import { EditStoreForm, StoreGeneralSection } from "@modules/settings"
+import { RouteDrawer } from "@modules/common/components/route-drawer/route-drawer"
+import { EditStoreForm } from "@modules/settings/components/edit-store-form"
+import { StoreGeneralSection } from "@modules/settings/components/store-general-section"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Edit store" }

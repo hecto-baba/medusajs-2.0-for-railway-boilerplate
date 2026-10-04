@@ -1,4 +1,4 @@
-import { PromotionDetail } from "@modules/promotions"
+import { PromotionDetail } from "@modules/promotions/components/promotion-detail"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Promotion" }

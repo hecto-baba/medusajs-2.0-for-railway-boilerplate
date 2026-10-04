@@ -8,8 +8,10 @@ import Items from "@modules/order/components/items"
 import OrderDetails from "@modules/order/components/order-details"
 import OrderSummary from "@modules/order/components/order-summary"
 import ShippingDetails from "@modules/order/components/shipping-details"
+import PaymentDetails from "@modules/order/components/payment-details"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import SellerOrders from "@modules/order/components/seller-orders"
+import TrackOrderLink from "@modules/order/components/track-order-link"
 import type { SellerOrder } from "@lib/data/orders"
 import { HttpTypes } from "@medusajs/types"
 
@@ -24,21 +26,28 @@ const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
 }) => {
   return (
     <div className="flex flex-col justify-center gap-y-4">
-      <div className="flex gap-2 justify-between items-center">
-        <h1 className="text-2xl-semi">Order details</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-large bg-card p-5 shadow-lift">
+        <h1 className="font-display text-2xl font-extrabold tracking-tight">
+          Order details
+        </h1>
         <LocalizedClientLink
           href="/account/orders"
-          className="flex gap-2 items-center text-ui-fg-subtle hover:text-ui-fg-base"
+          className="flex items-center gap-2 text-sm font-bold text-brand hover:underline"
           data-testid="back-to-overview-button"
         >
           <XMark /> Back to overview
         </LocalizedClientLink>
       </div>
       <div
-        className="flex flex-col gap-4 h-full bg-white w-full"
+        className="flex h-full w-full flex-col gap-4"
         data-testid="order-details-container"
       >
-        <OrderDetails order={order} showStatus />
+        <div className="rounded-large bg-card p-5 shadow-lift">
+          <OrderDetails order={order} showStatus />
+          <div className="mt-4 empty:hidden">
+            <TrackOrderLink order={order} />
+          </div>
+        </div>
         <Items items={order.items} />
         <SellerOrders sellerOrders={sellerOrders} />
         <ShippingDetails order={order} />

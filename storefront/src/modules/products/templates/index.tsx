@@ -1,5 +1,6 @@
 import React, { Suspense } from "react"
 
+import Breadcrumbs from "@modules/common/components/breadcrumbs"
 import ImageGallery from "@modules/products/components/image-gallery"
 import ProductActions from "@modules/products/components/product-actions"
 import ProductTabs from "@modules/products/components/product-tabs"
@@ -27,33 +28,40 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
 
   return (
     <>
-      <div
-        className="content-container flex flex-col small:flex-row small:items-start py-6 relative"
-        data-testid="product-container"
-      >
-        <div className="flex flex-col small:sticky small:top-48 small:py-0 small:max-w-[300px] w-full py-8 gap-y-6">
-          <ProductInfo product={product} />
-          <ProductTabs product={product} />
-        </div>
-        <div className="block w-full relative">
+      <div className="content-container py-6" data-testid="product-container">
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            product.collection
+              ? {
+                  label: product.collection.title,
+                  href: `/collections/${product.collection.handle}`,
+                }
+              : { label: "All products", href: "/store" },
+            { label: product.title },
+          ]}
+        />
+        <div className="grid items-start gap-8 small:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)] small:gap-10">
           <ImageGallery images={product?.images || []} />
-        </div>
-        <div className="flex flex-col small:sticky small:top-48 small:py-0 small:max-w-[300px] w-full py-8 gap-y-12">
-          <Suspense
-            fallback={
-              <ProductActions
-                disabled={true}
-                product={product}
-                region={region}
-              />
-            }
-          >
-            <ProductActionsWrapper id={product.id} region={region} />
-          </Suspense>
+          <div className="flex min-w-0 flex-col gap-y-6 small:sticky small:top-40">
+            <ProductInfo product={product} />
+            <Suspense
+              fallback={
+                <ProductActions
+                  disabled={true}
+                  product={product}
+                  region={region}
+                />
+              }
+            >
+              <ProductActionsWrapper product={product} region={region} />
+            </Suspense>
+            <ProductTabs product={product} />
+          </div>
         </div>
       </div>
       <div
-        className="content-container my-16 small:my-32"
+        className="content-container my-12 small:my-16"
         data-testid="related-products-container"
       >
         <Suspense fallback={<SkeletonRelatedProducts />}>

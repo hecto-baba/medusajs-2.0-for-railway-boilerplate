@@ -1,4 +1,4 @@
-import { LocationsTable } from "@modules/settings"
+import { LocationsTable } from "@modules/settings/components/locations/locations-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Locations & Shipping" }

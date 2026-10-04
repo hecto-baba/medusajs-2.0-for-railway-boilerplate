@@ -1,5 +1,6 @@
 "use server"
 
+import { unstable_cache } from "next/cache"
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
 import { HttpTypes } from "@medusajs/types"
@@ -17,23 +18,30 @@ import { getOrSetCart } from "./cart"
  * Never cached: a seat that was free a moment ago may have just been sold, and
  * showing a stale count invites a shopper to pick a seat they cannot have.
  */
+const cachedTicketAvailability = unstable_cache(
+  async (productId: string): Promise<TicketProductAvailability | null> =>
+    sdk.client
+      .fetch<TicketProductAvailability>(
+        `/store/ticket-products/${productId}/availability`,
+        { method: "GET" }
+      )
+      .catch(() => {
+        // A product that is not a show has no availability, which is not an
+        // error - the product page simply renders its normal actions instead.
+        // The null is cached too, so ordinary products stop probing a 404.
+        return null
+      }),
+  ["ticket-availability"],
+  { revalidate: 30, tags: ["ticket-availability"] }
+)
+
 export async function getTicketProductAvailability(
   productId: string
 ): Promise<TicketProductAvailability | null> {
-  return sdk.client
-    .fetch<TicketProductAvailability>(
-      `/store/ticket-products/${productId}/availability`,
-      {
-        method: "GET",
-        headers: { ...(await getAuthHeaders()) },
-        cache: "no-store",
-      }
-    )
-    .catch(() => {
-      // A product that is not a show has no availability, which is not an
-      // error - the product page simply renders its normal actions instead.
-      return null
-    })
+  // Cached for 30s and shared between visitors (no auth header: the show
+  // dates and seat counts are public). The seat map and the add-to-cart route
+  // stay uncached/authoritative, so a stale count cannot sell a taken seat.
+  return cachedTicketAvailability(productId)
 }
 
 /** The seat map for one show date. Also uncached, for the same reason. */

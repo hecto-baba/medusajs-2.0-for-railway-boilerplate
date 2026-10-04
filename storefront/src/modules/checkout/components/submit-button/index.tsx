@@ -20,7 +20,11 @@ export function SubmitButton({
   return (
     <Button
       size="large"
-      className={className}
+      className={
+        (variant || "primary") === "primary"
+          ? `!rounded-large !border-0 !bg-brand !font-extrabold !text-brand-ink !shadow-none hover:!opacity-90 disabled:!bg-line disabled:!text-muted ${className ?? ""}`
+          : className
+      }
       type="submit"
       isLoading={pending}
       variant={variant || "primary"}

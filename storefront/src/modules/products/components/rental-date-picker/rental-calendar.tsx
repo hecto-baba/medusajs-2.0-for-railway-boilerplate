@@ -8,36 +8,44 @@ type RentalCalendarProps = {
   onSelect: (date: Date | undefined) => void
   fromDate: Date
   bookedRanges: DateRange[]
+  /** Last day of the chosen rental period, highlighted with the start day. */
+  rangeEnd?: Date
   disabled?: boolean
 }
 
 /**
- * Thin wrapper around react-day-picker, themed to this store's palette via
- * its CSS custom properties rather than per-element classNames overrides -
- * the library exposes the whole look through --rdp-* variables, so a plain
- * style block on the wrapper is enough to match Medusa UI's near-black
- * accent instead of the library's default blue.
+ * Thin wrapper around react-day-picker, themed to the store tokens through its
+ * --rdp-* custom properties so light and dark follow the page. Booked days are
+ * struck through and cannot be picked; the chosen span is highlighted.
  */
 export default function RentalCalendar({
   selected,
   onSelect,
   fromDate,
   bookedRanges,
+  rangeEnd,
   disabled,
 }: RentalCalendarProps) {
+  const span =
+    selected && rangeEnd && rangeEnd > selected
+      ? [{ from: selected, to: rangeEnd }]
+      : []
+
   return (
     <div
-      className="rounded-md border border-ui-border-base bg-ui-bg-field p-2"
+      className="overflow-x-auto rounded-large border border-line bg-card p-3 text-ink"
       data-testid="rental-calendar"
       style={
         {
-          "--rdp-accent-color": "#18181b",
-          "--rdp-accent-background-color": "#f4f4f5",
-          "--rdp-today-color": "#18181b",
-          "--rdp-day-width": "38px",
-          "--rdp-day-height": "38px",
-          "--rdp-day_button-width": "36px",
-          "--rdp-day_button-height": "36px",
+          "--rdp-accent-color": "rgb(var(--c-brand))",
+          "--rdp-accent-background-color": "rgb(var(--c-brand-soft))",
+          "--rdp-today-color": "rgb(var(--c-brand))",
+          "--rdp-day-width": "40px",
+          "--rdp-day-height": "40px",
+          "--rdp-day_button-width": "38px",
+          "--rdp-day_button-height": "38px",
+          "--rdp-day_button-border-radius": "10px",
+          "--rdp-selected-border": "2px solid rgb(var(--c-brand))",
         } as React.CSSProperties
       }
     >
@@ -47,9 +55,10 @@ export default function RentalCalendar({
         onSelect={onSelect}
         startMonth={fromDate}
         disabled={disabled ? true : [{ before: fromDate }, ...bookedRanges]}
-        modifiers={{ booked: bookedRanges }}
+        modifiers={{ booked: bookedRanges, span }}
         modifiersClassNames={{
-          booked: "line-through text-ui-fg-disabled",
+          booked: "line-through opacity-50",
+          span: "[&>button]:bg-brand-soft [&>button]:text-ink",
         }}
       />
     </div>

@@ -4,6 +4,11 @@ import {
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { QUOTE_MODULE } from "../../../modules/quote"
+import {
+  assertVendorMaySetQuoteStatus,
+  assertVendorOwnsQuote,
+  quoteBelongsToVendor,
+} from "../shared/ownership-scope"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
@@ -63,12 +68,11 @@ export const GET = async (
     })
 
     // Filter quotes relevant to this vendor
-    const scopedQuotes = (allQuotes || []).filter((quote: any) => {
-      if (quote.metadata?.vendor_id === vendorId) return true
-      if (quote.cart?.items?.some((item: any) => vendorProductIds.includes(item.product_id))) return true
-      // If vendor owns products and quote has no items yet or matches
-      return true
-    })
+    // Only this seller's quotes. (This used to end in "return true", which listed
+    // every seller's quotes to every seller.)
+    const scopedQuotes = (allQuotes || []).filter((quote: any) =>
+      quoteBelongsToVendor(quote, vendorId, vendorProductIds)
+    )
 
     return res.json({
       quotes: scopedQuotes.slice(offset, offset + limit),
@@ -77,18 +81,9 @@ export const GET = async (
       offset,
     })
   } catch (error) {
-    const quoteModule = req.scope.resolve(QUOTE_MODULE) as any
-    const [quotes, count] = await quoteModule.listAndCountQuotes({}, {
-      take: limit,
-      skip: offset,
-    })
-
-    return res.json({
-      quotes: quotes || [],
-      count,
-      limit,
-      offset,
-    })
+    // Do NOT fall back to listing every quote: that would show this seller other
+    // sellers' quotes. Say the list is unavailable instead.
+    return res.status(500).json({ message: "Could not load quotes." })
   }
 }
 
@@ -104,9 +99,14 @@ export const POST = async (
     return res.status(400).json({ message: "quote_id is required" })
   }
 
+  // Only the seller's own quote, and only to send a price or decline. This used to
+  // update ANY quote and default to "accepted", i.e. accept it on the buyer's behalf.
+  const owned = await assertVendorOwnsQuote(req, quote_id)
+  assertVendorMaySetQuoteStatus(owned.status, status)
+
   const quote = await quoteModule.updateQuotes({
     id: quote_id,
-    status: status || "accepted",
+    status,
   })
 
   return res.status(200).json({ quote })

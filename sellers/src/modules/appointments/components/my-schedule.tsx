@@ -2,6 +2,7 @@
 
 import {
   createVendorProvider,
+  deleteVendorAvailabilityException,
   deleteVendorRecurringAvailability,
   getVendorProviderMe,
   listVendorAppointments,
@@ -37,6 +38,11 @@ const DAY_NAMES = [
   "Friday",
   "Saturday",
 ]
+
+// Effective-from / exception dates are calendar dates stored as UTC midnight;
+// formatting them in the browser's zone shows the previous day west of UTC.
+const formatCalendarDate = (value: string | Date) =>
+  new Date(value).toLocaleDateString(undefined, { timeZone: "UTC" })
 
 const STATUS_BADGE: Record<string, { label: string; color: any }> = {
   available: { label: "Available", color: "grey" },
@@ -152,6 +158,31 @@ export const MySchedule = () => {
     }
   }
 
+  const deleteExceptionMutation = useMutation({
+    mutationFn: (id: string) => deleteVendorAvailabilityException(id),
+    onSuccess: () => {
+      toast.success("Exception removed")
+      queryClient.invalidateQueries({ queryKey: ["vendor-availability-exceptions"] })
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Could not remove the exception")
+    },
+  })
+
+  const handleDeleteException = async (id: string) => {
+    const confirmed = await prompt({
+      title: "Remove this exception?",
+      description: "The day goes back to your normal weekly hours.",
+      confirmText: "Remove",
+      cancelText: "Cancel",
+      variant: "danger",
+    })
+
+    if (confirmed) {
+      deleteExceptionMutation.mutate(id)
+    }
+  }
+
   if (providerLoading) {
     return (
       <div className="bg-ui-bg-base shadow-elevation-card-rest overflow-hidden rounded-lg p-6">
@@ -232,13 +263,13 @@ export const MySchedule = () => {
                   </Table.Cell>
                   <Table.Cell>
                     <Text size="small" className="text-ui-fg-subtle">
-                      {new Date(rule.effective_from).toLocaleDateString()}
+                      {formatCalendarDate(rule.effective_from)}
                     </Text>
                   </Table.Cell>
                   <Table.Cell>
                     <Text size="small" className="text-ui-fg-subtle">
                       {rule.effective_until
-                        ? new Date(rule.effective_until).toLocaleDateString()
+                        ? formatCalendarDate(rule.effective_until)
                         : "—"}
                     </Text>
                   </Table.Cell>
@@ -246,6 +277,7 @@ export const MySchedule = () => {
                     <IconButton
                       size="small"
                       variant="transparent"
+                      aria-label="Remove recurring hours"
                       onClick={() => handleDelete(rule.id)}
                     >
                       <Trash />
@@ -286,6 +318,7 @@ export const MySchedule = () => {
                 <Table.HeaderCell>Type</Table.HeaderCell>
                 <Table.HeaderCell>Hours</Table.HeaderCell>
                 <Table.HeaderCell>Reason</Table.HeaderCell>
+                <Table.HeaderCell />
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -293,7 +326,7 @@ export const MySchedule = () => {
                 <Table.Row key={exception.id}>
                   <Table.Cell>
                     <Text size="small" weight="plus">
-                      {new Date(exception.date).toLocaleDateString()}
+                      {formatCalendarDate(exception.date)}
                     </Text>
                   </Table.Cell>
                   <Table.Cell>
@@ -315,6 +348,17 @@ export const MySchedule = () => {
                     <Text size="small" className="text-ui-fg-subtle">
                       {exception.reason || "—"}
                     </Text>
+                  </Table.Cell>
+                  <Table.Cell className="text-right">
+                    <IconButton
+                      size="small"
+                      variant="transparent"
+                      aria-label="Remove exception"
+                      disabled={deleteExceptionMutation.isPending}
+                      onClick={() => handleDeleteException(exception.id)}
+                    >
+                      <Trash />
+                    </IconButton>
                   </Table.Cell>
                 </Table.Row>
               ))}

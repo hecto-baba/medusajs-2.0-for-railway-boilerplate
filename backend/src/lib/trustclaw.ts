@@ -31,7 +31,13 @@ export interface TrustClawFetchOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE"
   params?: Record<string, string | number | boolean | undefined | null>
   body?: unknown
+  /** Overrides the default request budget (see DEFAULT_TIMEOUT_MS). */
+  timeoutMs?: number
 }
+
+// Generous on purpose: admin taxonomy sync pulls category trees of up to 1000
+// nodes. Callers on a page-load path pass a much shorter budget of their own.
+const DEFAULT_TIMEOUT_MS = 30_000
 
 async function trustclawFetch<T>(
   path: string,
@@ -40,11 +46,18 @@ async function trustclawFetch<T>(
   let method: "GET" | "POST" | "PATCH" | "DELETE" = "GET"
   let params: Record<string, string | number | boolean | undefined | null> = {}
   let body: unknown = undefined
+  let timeoutMs = DEFAULT_TIMEOUT_MS
 
-  if ("method" in options || "params" in options || "body" in options) {
+  if (
+    "method" in options ||
+    "params" in options ||
+    "body" in options ||
+    "timeoutMs" in options
+  ) {
     method = (options as TrustClawFetchOptions).method || "GET"
     params = (options as TrustClawFetchOptions).params || {}
     body = (options as TrustClawFetchOptions).body
+    timeoutMs = (options as TrustClawFetchOptions).timeoutMs ?? DEFAULT_TIMEOUT_MS
   } else {
     params = options as Record<string, string>
   }
@@ -68,7 +81,15 @@ async function trustclawFetch<T>(
     // Do not cache at the fetch layer — the proxy routes and job will
     // decide their own caching / revalidation strategy.
     cache: "no-store",
+    // Bounds a hung remote. A timed-out write may still have been applied
+    // remotely, so callers must not blindly retry one.
+    signal: AbortSignal.timeout(timeoutMs),
   })
+
+  // Any write may change an application's status, so drop cached statuses.
+  if (method !== "GET") {
+    statusCache.clear()
+  }
 
   if (!res.ok) {
     let errorDetail = res.statusText
@@ -216,6 +237,34 @@ let cachedVendorCategories: TrustClawVendorCategory[] | null = null
 let lastTaxonomyFetchTime = 0
 const TAXONOMY_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
+// Concurrent callers on a cold or expired cache share one refresh instead of
+// each issuing the same three remote requests.
+let taxonomyRefresh: Promise<void> | null = null
+
+function refreshTaxonomy(): Promise<void> {
+  if (taxonomyRefresh) return taxonomyRefresh
+
+  taxonomyRefresh = (async () => {
+    const [segs, vts, vcs] = await Promise.all([
+      fetchSegments().catch(() => []),
+      fetchVendorTypes({ status: "ALL" }).catch(() => []),
+      fetchVendorCategories({ status: "ALL", limit: "500" }).catch(() => []),
+    ])
+    if (segs.length) cachedSegments = segs
+    if (vts.length) cachedVendorTypes = vts
+    if (vcs.length) cachedVendorCategories = vcs
+    lastTaxonomyFetchTime = Date.now()
+  })()
+    .catch(() => {
+      // A failed refresh leaves the previous cache (if any) in place.
+    })
+    .finally(() => {
+      taxonomyRefresh = null
+    })
+
+  return taxonomyRefresh
+}
+
 export async function resolveTaxonomyDetails(params: {
   segmentId?: string | null
   vendorTypeId?: string | null
@@ -227,19 +276,16 @@ export async function resolveTaxonomyDetails(params: {
 }> {
   const now = Date.now()
   if (!cachedSegments || !cachedVendorTypes || !cachedVendorCategories || now - lastTaxonomyFetchTime > TAXONOMY_CACHE_TTL) {
-    try {
-      const [segs, vts, vcs] = await Promise.all([
-        fetchSegments().catch(() => []),
-        fetchVendorTypes({ status: "ALL" }).catch(() => []),
-        fetchVendorCategories({ status: "ALL", limit: "500" }).catch(() => []),
-      ])
-      if (segs.length) cachedSegments = segs
-      if (vts.length) cachedVendorTypes = vts
-      if (vcs.length) cachedVendorCategories = vcs
-      lastTaxonomyFetchTime = now
-    } catch {
-      // ignore
-    }
+    // Do not hold the response hostage to a slow remote: the refresh keeps
+    // running in the background and fills the cache for the next request.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    await Promise.race([
+      refreshTaxonomy(),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, 4000)
+      }),
+    ])
+    clearTimeout(timer)
   }
 
   let segment =
@@ -607,12 +653,49 @@ export interface TrustClawAnswersResponse {
 /**
  * Fetch the onboarding application status for a vendor.
  */
+const STATUS_CACHE_TTL = 30_000
+const statusCache = new Map<
+  string,
+  { at: number; value: Promise<TrustClawOnboardingStatus> }
+>()
+
+// Entries are only removed on failure or write, so without a bound the map
+// would grow with every vendor that ever loaded the panel.
+function pruneStatusCache(): void {
+  if (statusCache.size < 500) return
+  const cutoff = Date.now() - STATUS_CACHE_TTL
+  for (const [key, entry] of statusCache) {
+    if (entry.at < cutoff) statusCache.delete(key)
+  }
+  if (statusCache.size >= 500) statusCache.clear()
+}
+
 export function fetchOnboardingStatus(
   vendorId: string
 ): Promise<TrustClawOnboardingStatus> {
-  return trustclawFetch<TrustClawOnboardingStatus>("/api/v1/onboarding/status", {
-    vendorId,
+  // The panel asks for this on every page load; a short per-vendor cache keeps
+  // a cold remote from costing every navigation. Failures are not cached, and
+  // any write through trustclawFetch clears the cache so changes show at once.
+  const hit = statusCache.get(vendorId)
+  if (hit && Date.now() - hit.at < STATUS_CACHE_TTL) {
+    return hit.value
+  }
+
+  const value = trustclawFetch<TrustClawOnboardingStatus>(
+    "/api/v1/onboarding/status",
+    // Page-load path, and the caller falls back to local data on failure, so
+    // a slow remote should be abandoned quickly rather than awaited.
+    { params: { vendorId }, timeoutMs: 4000 }
+  )
+  pruneStatusCache()
+  statusCache.set(vendorId, { at: Date.now(), value })
+  value.catch(() => {
+    if (statusCache.get(vendorId)?.value === value) {
+      statusCache.delete(vendorId)
+    }
   })
+
+  return value
 }
 
 /**

@@ -1,11 +1,15 @@
 import { Metadata } from "next"
+import { Suspense } from "react"
 
-import FeaturedProducts from "@modules/home/components/featured-products"
-import Hero from "@modules/home/components/hero"
-import LatestProducts from "@modules/home/components/latest-products"
 import { getCollectionsWithProducts } from "@lib/data/collections"
 import { getRegion } from "@lib/data/regions"
 import { getStoreName } from "@lib/util/env"
+import CategoryTiles from "@modules/home/components/category-tiles"
+import FeaturedProducts from "@modules/home/components/featured-products"
+import Hero from "@modules/home/components/hero"
+import LatestProducts from "@modules/home/components/latest-products"
+import VerticalCards from "@modules/home/components/vertical-cards"
+import SkeletonProductGrid from "@modules/skeletons/templates/skeleton-product-grid"
 
 export const metadata: Metadata = {
   title: getStoreName(),
@@ -18,8 +22,10 @@ export default async function Home({
   params: Promise<{ countryCode: string }>
 }) {
   const { countryCode } = await params
-  const collections = await getCollectionsWithProducts(countryCode)
-  const region = await getRegion(countryCode)
+  const [collections, region] = await Promise.all([
+    getCollectionsWithProducts(countryCode),
+    getRegion(countryCode),
+  ])
 
   if (!collections || !region) {
     return null
@@ -32,28 +38,21 @@ export default async function Home({
   )
 
   return (
-    <>
-      {/* ===================================================================
-        * EXAMPLE SECTION START
-        *
-        * <Hero /> is the dashed placeholder block on your homepage. To delete
-        * it: remove the <Hero /> line just below, remove its import at the top
-        * of this file, then delete the folder
-        * src/modules/home/components/hero. Nothing else depends on it.
-        * =================================================================== */}
+    <div className="content-container pb-4 pt-5 small:pt-6">
       <Hero />
-      {/* ===================================================================
-        * EXAMPLE SECTION END
-        * =================================================================== */}
-      <div className="py-12">
-        {hasFeaturedProducts ? (
-          <ul className="flex flex-col gap-x-6">
-            <FeaturedProducts collections={collections} region={region} />
-          </ul>
-        ) : (
+      <Suspense fallback={null}>
+        <CategoryTiles />
+      </Suspense>
+      {hasFeaturedProducts ? (
+        <div className="flex flex-col" data-testid="featured-products">
+          <FeaturedProducts collections={collections} region={region} />
+        </div>
+      ) : (
+        <Suspense fallback={<SkeletonProductGrid />}>
           <LatestProducts countryCode={countryCode} region={region} />
-        )}
-      </div>
-    </>
+        </Suspense>
+      )}
+      <VerticalCards />
+    </div>
   )
 }

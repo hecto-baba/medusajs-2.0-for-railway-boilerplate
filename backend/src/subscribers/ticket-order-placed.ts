@@ -1,26 +1,22 @@
-import { Modules } from '@medusajs/framework/utils'
-import { INotificationModuleService } from '@medusajs/framework/types'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
 import { EmailTemplates } from '../modules/email-notifications/templates'
-import { RESEND_FROM_EMAIL } from '../lib/constants'
+import { sendEmail } from '../lib/send-email'
 import { TICKET_BOOKING_MODULE } from '../modules/ticket-booking'
 import TicketBookingModuleService from '../modules/ticket-booking/service'
 
 /**
  * Emails QR-coded tickets once an order containing them is placed.
  *
- * Deliberately a separate subscriber from order-placed.ts rather than an
- * addition to it: both listen to order.placed, and Medusa runs every
- * subscriber registered for an event. An order with no tickets exits here
- * immediately and only receives the standard confirmation.
+ * Listens to ticket.purchased, which the completion workflows emit AFTER the
+ * ticket purchases exist. It used to listen to order.placed, which fires from
+ * inside the core completion - before the purchases are created - so the
+ * handler could find no tickets and silently send nothing.
  */
 export default async function ticketOrderPlacedHandler({
   event: { data },
   container
-}: SubscriberArgs<{ id: string }>) {
+}: SubscriberArgs<{ order_id: string }>) {
   const query = container.resolve('query')
-  const notificationModuleService: INotificationModuleService =
-    container.resolve(Modules.NOTIFICATION)
   const ticketBookingModuleService: TicketBookingModuleService =
     container.resolve(TICKET_BOOKING_MODULE)
 
@@ -45,7 +41,7 @@ export default async function ticketOrderPlacedHandler({
       'ticket_purchases.ticket_product.venue.name',
       'ticket_purchases.ticket_product.venue.address'
     ],
-    filters: { id: data.id }
+    filters: { id: data.order_id }
   })
 
   const ticketPurchases = (order?.ticket_purchases || []).filter(Boolean) as any[]
@@ -68,17 +64,14 @@ export default async function ticketOrderPlacedHandler({
       .filter(Boolean)
       .join(' ')
 
-    await notificationModuleService.createNotifications({
-      to: order.email ?? '',
-      channel: 'email',
+    await sendEmail(container, {
       template: EmailTemplates.TICKET_ORDER_PLACED,
+      to: order.email ?? '',
+      subject: `Your tickets for ${firstPurchase?.ticket_product?.product?.title ?? 'your event'}`,
+      idempotencyKey: `ticket-order-placed:${order.id}`,
+      resourceId: order.id,
+      resourceType: 'order',
       data: {
-        emailOptions: {
-          replyTo: process.env.ORDER_REPLY_TO_EMAIL || RESEND_FROM_EMAIL,
-          subject: `Your tickets for ${
-            firstPurchase?.ticket_product?.product?.title ?? 'your event'
-          }`
-        },
         show: {
           name: firstPurchase?.ticket_product?.product?.title ?? 'Your event',
           date: firstPurchase?.show_date,
@@ -107,5 +100,5 @@ export default async function ticketOrderPlacedHandler({
 }
 
 export const config: SubscriberConfig = {
-  event: 'order.placed'
+  event: 'ticket.purchased'
 }

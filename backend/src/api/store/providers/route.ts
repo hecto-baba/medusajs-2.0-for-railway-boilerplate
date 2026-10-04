@@ -1,14 +1,14 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 
-export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const { data: providers } = await query.graph({
-    entity: "provider",
-    fields: ["id", "display_name", "bio", "timezone"],
-    filters: { status: "active" },
+/**
+ * Retired. This listed EVERY active provider - including those belonging to
+ * vendors that have not been approved - with no way to find what each one
+ * offers. Buyers now use GET /store/appointments/businesses, which only shows
+ * approved businesses with a live resource.
+ */
+export const GET = async (_req: MedusaRequest, res: MedusaResponse) => {
+  res.status(410).json({
+    type: "not_allowed",
+    message: "Use GET /store/appointments/businesses.",
   })
-
-  res.json({ providers })
 }

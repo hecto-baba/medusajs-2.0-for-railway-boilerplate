@@ -1,4 +1,4 @@
-import { RefundReasonsTable } from "@modules/settings"
+import { RefundReasonsTable } from "@modules/settings/components/refund-reasons-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Refund Reasons" }

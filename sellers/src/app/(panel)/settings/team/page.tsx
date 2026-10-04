@@ -1,4 +1,4 @@
-import { TeamTable } from "@modules/settings"
+import { TeamTable } from "@modules/settings/components/team/team-table"
 import { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Team" }

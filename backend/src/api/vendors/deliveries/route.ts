@@ -3,15 +3,12 @@ import {
   MedusaResponse,
 } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
-import { DELIVERY_MODULE } from "../../../modules/delivery"
-import DeliveryModuleService from "../../../modules/delivery/service"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const deliveryModule: DeliveryModuleService = req.scope.resolve(DELIVERY_MODULE)
 
   const limit = req.query.limit ? parseInt(req.query.limit as string) : 20
   const offset = req.query.offset ? parseInt(req.query.offset as string) : 0
@@ -103,14 +100,8 @@ export const GET = async (
       offset,
     })
   } catch (graphErr) {
-    // Fallback using delivery module
-    const filters: Record<string, any> = {}
-    if (status) filters.delivery_status = status
-    const [deliveries, count] = await deliveryModule.listAndCountDeliveries(filters, {
-      take: limit,
-      skip: offset,
-      relations: ["driver"],
-    })
-    return res.json({ deliveries, count, limit, offset })
+    // Do NOT fall back to listing every delivery: that would show this seller other
+    // sellers' deliveries. Say the list is unavailable instead.
+    return res.status(500).json({ message: "Could not load deliveries." })
   }
 }

@@ -23,7 +23,7 @@ import path from "path"
 const ROUTES_ROOT = path.join(process.cwd(), "src", "api", "vendors")
 
 const GUARD_CALL =
-  /\b(assert[A-Z][A-Za-z]*|getOwnedIds|getVendor[A-Za-z]*Ids)\s*\(/
+  /\b(assert[A-Z][A-Za-z]*|getOwnedIds|getVendor[A-Za-z]*Ids|listOwnedResourceIds)\s*\(/
 
 const REVIEWED_SAFE: Record<string, string> = {
   "currencies/[code]/route.ts":
@@ -38,6 +38,8 @@ const REVIEWED_SAFE: Record<string, string> = {
     "every handler refuses with 403: tax regions are platform-owned and read-only for sellers",
   "categories/[id]/route.ts":
     "shared taxonomy by design; its write handlers are 403 stubs",
+  "providers/me/exceptions/[id]/route.ts":
+    "legacy route: looks up the calling login's own provider by actor_id and deletes only an exception whose provider_id is that provider's (404 otherwise)",
 }
 
 const BACKLOG: string[] = [

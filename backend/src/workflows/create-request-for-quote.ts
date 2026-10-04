@@ -82,8 +82,11 @@ export const createRequestForQuoteWorkflow = createWorkflow(
           sales_channel_id: carts[0].sales_channel_id || undefined,
           email: customers[0].email || undefined,
           customer_id: customers[0].id || undefined,
-          billing_address: carts[0].billing_address,
-          shipping_address: carts[0].shipping_address,
+          // A quote is requested before any address is asked for: the delivery
+          // address is collected when the accepted quote becomes an order. So a
+          // cart with no address passes none on, rather than an explicit null.
+          billing_address: carts[0].billing_address ?? undefined,
+          shipping_address: carts[0].shipping_address ?? undefined,
           items: orderItems,
           region_id: carts[0].region_id || undefined,
           promo_codes: carts[0].promotions?.map((promo: any) => promo?.code),

@@ -1,5 +1,5 @@
 import { Metadata } from "next"
-import { notFound } from "next/navigation"
+import { redirect } from "next/navigation"
 
 import Wrapper from "@modules/checkout/components/payment-wrapper"
 import CheckoutForm from "@modules/checkout/templates/checkout-form"
@@ -12,10 +12,12 @@ export const metadata: Metadata = {
   title: "Checkout",
 }
 
-const fetchCart = async () => {
+const fetchCart = async (countryCode: string) => {
   const cart = await retrieveCart()
   if (!cart) {
-    return notFound()
+    // No cart cookie (or the cart no longer exists): send the shopper to the
+    // cart page instead of a 404.
+    return redirect(`/${countryCode}/cart`)
   }
 
   if (cart?.items?.length) {
@@ -26,14 +28,25 @@ const fetchCart = async () => {
   return cart
 }
 
-export default async function Checkout() {
-  const cart = await fetchCart()
-  const customer = await getCustomer()
+export default async function Checkout({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ countryCode: string }>
+  searchParams: Promise<{ step?: string }>
+}) {
+  const { countryCode } = await params
+  const { step } = await searchParams
+  // Independent calls, so they run together (each one waits on the database).
+  const [cart, customer] = await Promise.all([
+    fetchCart(countryCode),
+    getCustomer(),
+  ])
 
   return (
-    <div className="grid grid-cols-1 small:grid-cols-[1fr_416px] content-container gap-x-40 py-12">
+    <div className="grid grid-cols-1 gap-6 py-8 content-container small:grid-cols-[1fr_416px] small:gap-x-10 small:py-10">
       <Wrapper cart={cart}>
-        <CheckoutForm cart={cart} customer={customer} />
+        <CheckoutForm cart={cart} customer={customer} step={step} />
       </Wrapper>
       <CheckoutSummary cart={cart} />
     </div>

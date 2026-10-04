@@ -8,6 +8,7 @@ import {
   acquireLockStep,
   completeCartWorkflow,
   createRemoteLinkStep,
+  emitEventStep,
   releaseLockStep,
   useQueryGraphStep,
 } from "@medusajs/medusa/core-flows"
@@ -103,6 +104,11 @@ export const completeCartWithTicketsWorkflow = createWorkflow(
         )
 
         createRemoteLinkStep(linkData)
+
+        emitEventStep({
+          eventName: "ticket.purchased",
+          data: { order_id: order.id },
+        }).config({ name: "emit-ticket-purchased" })
       }
     )
 
