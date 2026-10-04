@@ -1,7 +1,7 @@
 import type { MedusaContainer } from "@medusajs/framework/types"
-import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
+import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { EmailTemplates } from "../modules/email-notifications/templates"
-import { ZEPTOMAIL_FROM_EMAIL } from "./constants"
+import { sendEmail } from "./send-email"
 
 /**
  * Tells the buyer when a seller ships or delivers part of their order
@@ -75,32 +75,28 @@ export const sendBuyerFulfillmentEmail = async (
     quantity: Number(item.quantity),
   }))
 
-  const notification: any = container.resolve(Modules.NOTIFICATION)
-  try {
-    await notification.createNotifications({
-      to: order.email,
-      channel: "email",
-      template: EmailTemplates.FULFILLMENT_UPDATE,
-      data: {
-        emailOptions: {
-          replyTo: process.env.ORDER_REPLY_TO_EMAIL || ZEPTOMAIL_FROM_EMAIL,
-          subject:
-            input.kind === "shipped"
-              ? `Part of your order #${orderDisplayId} has shipped`
-              : `Part of your order #${orderDisplayId} was delivered`,
-        },
-        kind: input.kind,
-        orderDisplayId,
-        sellerName,
-        customerName: order.shipping_address?.first_name || undefined,
-        items,
-        trackingNumber: label?.tracking_number || undefined,
-        trackingUrl: label?.tracking_url || undefined,
-      },
-    })
-    return { sent: true }
-  } catch (error) {
-    console.error("Error sending fulfilment email:", error)
-    return { sent: false, reason: "provider_error" }
-  }
+  // One email per shipment and per delivery; a redelivered event sends nothing twice.
+  const result = await sendEmail(container, {
+    template: EmailTemplates.FULFILLMENT_UPDATE,
+    to: order.email,
+    subject:
+      input.kind === "shipped"
+        ? `Part of your order #${orderDisplayId} has shipped`
+        : `Part of your order #${orderDisplayId} was delivered`,
+    idempotencyKey: `fulfillment-update:${input.fulfillment_id}:${input.kind}`,
+    resourceId: input.fulfillment_id,
+    resourceType: "fulfillment",
+    data: {
+      kind: input.kind,
+      orderDisplayId,
+      sellerName,
+      customerName: order.shipping_address?.first_name || undefined,
+      items,
+      trackingNumber: label?.tracking_number || undefined,
+      trackingUrl: label?.tracking_url || undefined,
+    },
+  })
+  if (result === "failed") return { sent: false, reason: "provider_error" }
+  if (result === "skipped") return { sent: false, reason: "already_sent" }
+  return { sent: true }
 }

@@ -90,8 +90,7 @@ published in this repository:
   warning at boot when a production deploy is still on the placeholder.
 - `MEDUSA_ADMIN_PASSWORD` is the login to your own dashboard.
 
-Email needs both halves of one provider: `ZEPTOMAIL_API_KEY` **and**
-`ZEPTOMAIL_FROM_EMAIL` (or the SendGrid pair). With only one set, the notification
+Email needs both `ZEPTOMAIL_API_KEY` **and** `ZEPTOMAIL_FROM_EMAIL`. With only one set, the notification
 module is not registered at all and no order confirmations or admin invites
 send, silently.
 

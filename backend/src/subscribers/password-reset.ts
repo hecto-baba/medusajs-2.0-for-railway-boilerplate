@@ -1,7 +1,7 @@
-import { INotificationModuleService } from '@medusajs/framework/types'
-import { Modules } from '@medusajs/framework/utils'
+import { createHash } from 'crypto'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/framework'
-import { BACKEND_URL, IS_DEV, ZEPTOMAIL_FROM_EMAIL, STOREFRONT_URL } from '../lib/constants'
+import { BACKEND_URL, IS_DEV, STOREFRONT_URL } from '../lib/constants'
+import { sendEmail } from '../lib/send-email'
 import { EmailTemplates } from '../modules/email-notifications/templates'
 
 /**
@@ -75,34 +75,24 @@ export default async function passwordResetHandler({
     console.info(`[dev] password reset link for ${email}: ${resetLink}`)
   }
 
-  const notificationModuleService: INotificationModuleService = container.resolve(
-    Modules.NOTIFICATION,
-  )
-
-  try {
-    await notificationModuleService.createNotifications({
-      to: email,
-      channel: 'email',
-      template: EmailTemplates.RESET_PASSWORD,
-      data: {
-        emailOptions: {
-          replyTo: process.env.ORDER_REPLY_TO_EMAIL || ZEPTOMAIL_FROM_EMAIL,
-          subject: `Reset your ${process.env.STORE_NAME || 'store'} password`,
-        },
-        resetLink,
-        email,
-        isAdmin,
-        expiresInMinutes: TOKEN_TTL_MINUTES,
-        preview: 'Set a new password',
-      },
-    })
-  } catch (error) {
-    // Same shape as the other subscribers: a failed send must not take down the
-    // workflow that emitted the event. The provider itself throws with the
-    // reason attached, so this line is where a misconfigured ZeptoMail key shows
-    // up in the deploy log.
-    console.error('Error sending password reset notification:', error)
-  }
+  // One email per reset request. The key is a hash of the token so the token
+  // itself never sits in the notification table's key column. sendEmail logs a
+  // failure (a misconfigured ZeptoMail key shows up in the deploy log) and never
+  // throws, so it cannot take down the workflow that emitted the event.
+  await sendEmail(container, {
+    template: EmailTemplates.RESET_PASSWORD,
+    to: email,
+    subject: `Reset your ${process.env.STORE_NAME || 'store'} password`,
+    idempotencyKey: `reset-password:${createHash('sha256').update(token).digest('hex').slice(0, 32)}`,
+    resourceType: 'auth_identity',
+    data: {
+      resetLink,
+      email,
+      isAdmin,
+      expiresInMinutes: TOKEN_TTL_MINUTES,
+      preview: 'Set a new password',
+    },
+  })
 }
 
 export const config: SubscriberConfig = {

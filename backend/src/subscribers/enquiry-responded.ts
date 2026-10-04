@@ -1,8 +1,6 @@
-import { Modules } from '@medusajs/framework/utils'
-import { INotificationModuleService } from '@medusajs/framework/types'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
 import { EmailTemplates } from '../modules/email-notifications/templates'
-import { ZEPTOMAIL_FROM_EMAIL } from '../lib/constants'
+import { sendEmail } from '../lib/send-email'
 
 /**
  * Emails the customer once an admin (or, later, a vendor) replies to their
@@ -11,12 +9,11 @@ import { ZEPTOMAIL_FROM_EMAIL } from '../lib/constants'
  * same way order-placed.ts and ticket-order-placed.ts both independently
  * listen to order.placed - not a change to this file.
  */
-export default async function enquiryRespondedHandler({
+async function enquiryRespondedHandler({
   event: { data },
   container
 }: SubscriberArgs<{ id: string }>) {
   const query = container.resolve('query')
-  const notificationModuleService: INotificationModuleService = container.resolve(Modules.NOTIFICATION)
 
   const {
     data: [enquiry]
@@ -50,15 +47,15 @@ export default async function enquiryRespondedHandler({
     })
     const storeName = (owner as any)?.vendor?.name ?? undefined
 
-    await notificationModuleService.createNotifications({
-      to: enquiry.customer_email,
-      channel: 'email',
+    // One reply per enquiry (the respond workflow refuses a second one).
+    await sendEmail(container, {
       template: EmailTemplates.ENQUIRY_RESPONDED,
+      to: enquiry.customer_email,
+      subject: `Re: your question about ${enquiry.product?.title ?? 'a product'}`,
+      idempotencyKey: `enquiry-responded:${enquiry.id}`,
+      resourceId: enquiry.id,
+      resourceType: 'enquiry',
       data: {
-        emailOptions: {
-          replyTo: process.env.ORDER_REPLY_TO_EMAIL || ZEPTOMAIL_FROM_EMAIL,
-          subject: `Re: your question about ${enquiry.product?.title ?? 'a product'}`
-        },
         productTitle: enquiry.product?.title ?? 'this product',
         message: enquiry.message,
         reply: enquiry.reply,
@@ -71,6 +68,19 @@ export default async function enquiryRespondedHandler({
     // never fail or roll back the admin's "respond" action, which has
     // already saved successfully at this point.
     console.error('Error sending enquiry response notification:', error)
+  }
+}
+
+/**
+ * Whatever goes wrong while preparing the email (a record deleted since the
+ * event, a failed lookup) must not surface as an unhandled error in the event
+ * bus: the order, invite or reply that triggered this has already succeeded.
+ */
+export default async function enquiryRespondedHandlerSafe(args: Parameters<typeof enquiryRespondedHandler>[0]) {
+  try {
+    await enquiryRespondedHandler(args)
+  } catch (error: any) {
+    console.error('Error sending enquiry response notification:', error?.message ?? error)
   }
 }
 

@@ -11,8 +11,6 @@ import {
   ZEPTOMAIL_FROM_EMAIL,
   ZEPTOMAIL_FROM_NAME,
   ZEPTOMAIL_API_URL,
-  SENDGRID_API_KEY,
-  SENDGRID_FROM_EMAIL,
   SHOULD_DISABLE_ADMIN,
   STORE_CORS,
   STRIPE_API_KEY,
@@ -169,22 +167,6 @@ const medusaConfig = {
               from: ZEPTOMAIL_FROM_EMAIL,
               from_name: ZEPTOMAIL_FROM_NAME,
               api_url: ZEPTOMAIL_API_URL,
-            },
-          },
-        ]
-      }
-    }] : SENDGRID_API_KEY && SENDGRID_FROM_EMAIL ? [{
-      key: Modules.NOTIFICATION,
-      resolve: '@medusajs/notification',
-      options: {
-        providers: [
-          {
-            resolve: '@medusajs/notification-sendgrid',
-            id: 'sendgrid',
-            options: {
-              channels: ['email'],
-              api_key: SENDGRID_API_KEY,
-              from: SENDGRID_FROM_EMAIL,
             },
           },
         ]

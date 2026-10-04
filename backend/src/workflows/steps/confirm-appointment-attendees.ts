@@ -6,6 +6,7 @@ import {
   isCapacityViolation,
   isExclusionViolation,
 } from "../../modules/appointment-booking/lib/db-errors"
+import { reportBookingFailure } from "../../lib/booking-failed"
 
 export type ConfirmAppointmentAttendeesInput = {
   order_id: string
@@ -79,6 +80,7 @@ export const confirmAppointmentAttendeesStep = createStep(
         )
       } catch (err: any) {
         if (isCapacityViolation(err)) {
+          await reportBookingFailure(container, { order_id, kind: "appointment", detail: "The appointment time could no longer be secured." })
           throw new MedusaError(
             MedusaError.Types.NOT_ALLOWED,
             "Your payment was received but the time could no longer be secured. The business has been notified and will contact you."
@@ -109,6 +111,7 @@ export const confirmAppointmentAttendeesStep = createStep(
           // someone else took that time in the meantime the overlap constraint
           // refuses it.
           if (isExclusionViolation(err)) {
+            await reportBookingFailure(container, { order_id, kind: "appointment", detail: "The appointment time could no longer be secured." })
             throw new MedusaError(
               MedusaError.Types.NOT_ALLOWED,
               "Your payment was received but the time could no longer be secured. The business has been notified and will contact you."
