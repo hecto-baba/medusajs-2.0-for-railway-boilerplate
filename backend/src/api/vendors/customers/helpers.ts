@@ -1,6 +1,6 @@
 import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
-import { getVendorId } from "../shared/vendor-scope"
+import { getVendorId, resolveVendorAdmin } from "../shared/vendor-scope"
 
 // Single source of truth lives in shared/vendor-scope.ts; re-exported so
 // existing imports from this file keep working.
@@ -17,18 +17,12 @@ export const getVendorCustomerIds = async (
 ): Promise<string[]> => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: [
-      "vendor.id",
-      "vendor.customers.id",
-      "vendor.orders.customer_id",
-      "vendor.orders.metadata",
-    ],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, [
+    "vendor.id",
+    "vendor.customers.id",
+    "vendor.orders.customer_id",
+    "vendor.orders.metadata",
+  ])
 
   if (!vendorAdmin?.vendor) {
     throw new MedusaError(
@@ -74,15 +68,10 @@ export const assertVendorOwnsCustomer = async (
 export const getVendorDirectCustomerIds = async (
   req: AuthenticatedMedusaRequest
 ): Promise<string[]> => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id", "vendor.customers.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, [
+    "vendor.id",
+    "vendor.customers.id",
+  ])
 
   return (
     ((vendorAdmin?.vendor as any)?.customers as { id?: string }[] | undefined) ?? []
@@ -211,15 +200,10 @@ export const refetchVendorCustomer = async (
 export const getVendorCustomerGroupIds = async (
   req: AuthenticatedMedusaRequest
 ): Promise<string[]> => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id", "vendor.customer_groups.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, [
+    "vendor.id",
+    "vendor.customer_groups.id",
+  ])
 
   if (!vendorAdmin?.vendor) {
     throw new MedusaError(

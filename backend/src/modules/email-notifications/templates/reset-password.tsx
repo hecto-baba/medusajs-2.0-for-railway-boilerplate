@@ -1,4 +1,5 @@
 import { Button, Link, Section, Text, Hr } from '@react-email/components'
+import * as React from 'react'
 import { Base } from './base'
 
 /**
@@ -51,7 +52,7 @@ export const isResetPasswordData = (data: any): data is ResetPasswordEmailProps 
 /**
  * The ResetPasswordEmail template component built with react-email
  */
-export const ResetPasswordEmail = ({
+export const ResetPasswordEmail: React.FC<ResetPasswordEmailProps> = ({
   resetLink,
   email,
   isAdmin = false,

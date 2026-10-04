@@ -2,6 +2,7 @@
 
 import { listVendorOrders, listVendorRegions, listVendorSalesChannels, type VendorOrder } from "@lib/data/vendor-client"
 import {
+  Container,
   createDataTableColumnHelper,
   createDataTableFilterHelper,
   DataTable,
@@ -16,6 +17,11 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useState, useMemo } from "react"
 import { OrderExportButton } from "./order-export-button"
+import {
+  NoRecords,
+  createMedusaDateFilter,
+  resolveMedusaDateFilter,
+} from "@modules/common"
 
 const columnHelper = createDataTableColumnHelper<VendorOrder>()
 const filterHelper = createDataTableFilterHelper<VendorOrder>()
@@ -154,7 +160,10 @@ const columns = [
 
 export const OrdersTable = () => {
   const [search, setSearch] = useState("")
-  const [sorting, setSorting] = useState<DataTableSortingState | null>(null)
+  const [sorting, setSorting] = useState<DataTableSortingState | null>({
+    id: "display_id",
+    desc: true,
+  })
   const [filtering, setFiltering] = useState<DataTableFilteringState>({})
   const [pagination, setPagination] = useState<DataTablePaginationState>({
     pageIndex: 0,
@@ -198,29 +207,8 @@ export const OrdersTable = () => {
     )
 
     list.push(
-      filterHelper.custom({
-        id: "created_at_gte",
-        label: "Created",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      })
-    )
-
-    list.push(
-      filterHelper.custom({
-        id: "updated_at_gte",
-        label: "Updated",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      })
+      createMedusaDateFilter(filterHelper, "created_at", "Created"),
+      createMedusaDateFilter(filterHelper, "updated_at", "Updated")
     )
 
     return list
@@ -235,20 +223,20 @@ export const OrdersTable = () => {
 
   const regionId = extractFilterValue(filtering.region_id)
   const salesChannelId = extractFilterValue(filtering.sales_channel_id)
-  const dateCreatedVal = extractFilterValue(filtering.created_at_gte)
-  const dateUpdatedVal = extractFilterValue(filtering.updated_at_gte)
 
   const createdAtGte = useMemo(() => {
-    if (!dateCreatedVal) return undefined
-    const days = dateCreatedVal === "7d" ? 7 : dateCreatedVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [dateCreatedVal])
+    return (
+      resolveMedusaDateFilter(filtering.created_at) ??
+      resolveMedusaDateFilter(filtering.created_at_gte)
+    )
+  }, [filtering.created_at, filtering.created_at_gte])
 
   const updatedAtGte = useMemo(() => {
-    if (!dateUpdatedVal) return undefined
-    const days = dateUpdatedVal === "7d" ? 7 : dateUpdatedVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [dateUpdatedVal])
+    return (
+      resolveMedusaDateFilter(filtering.updated_at) ??
+      resolveMedusaDateFilter(filtering.updated_at_gte)
+    )
+  }, [filtering.updated_at, filtering.updated_at_gte])
 
   const { data, isLoading } = useQuery({
     queryKey: [
@@ -309,14 +297,21 @@ export const OrdersTable = () => {
     },
   })
 
-  return (
-    <DataTable instance={table}>
-      <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-        <Heading level="h2">Orders</Heading>
-        <div className="flex items-center gap-x-2">
-          <DataTable.Search placeholder="Search orders..." />
-          <DataTable.FilterMenu tooltip="Filter" />
-          <DataTable.SortingMenu tooltip="Sort" />
+  const hasActiveQuery = Boolean(
+    search ||
+      regionId ||
+      salesChannelId ||
+      createdAtGte ||
+      updatedAtGte
+  )
+
+  const isNoRecords = !isLoading && (data?.count ?? 0) === 0 && !hasActiveQuery
+
+  if (isNoRecords) {
+    return (
+      <Container className="divide-y p-0">
+        <div className="flex items-center justify-between px-6 py-4">
+          <Heading level="h2">Orders</Heading>
           <OrderExportButton
             search={search}
             order={order}
@@ -327,22 +322,50 @@ export const OrdersTable = () => {
             currentOrders={data?.orders}
           />
         </div>
-      </DataTable.Toolbar>
-      <DataTable.FilterBar />
-      <DataTable.Table
-        emptyState={{
-          empty: {
-            heading: "No orders yet",
-            description: "Orders containing your products will appear here.",
-          },
-          filtered: {
-            heading: "No matches",
-            description: "No orders match the selected filters or search query.",
-          },
-        }}
-      />
-      <DataTable.Pagination />
-    </DataTable>
+        <NoRecords
+          title="No records"
+          message="Your orders will show up here."
+        />
+      </Container>
+    )
+  }
+
+  return (
+    <Container className="divide-y p-0">
+      <DataTable instance={table}>
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <Heading level="h2">Orders</Heading>
+          <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search orders..." />
+            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTable.SortingMenu tooltip="Sort" />
+            <OrderExportButton
+              search={search}
+              order={order}
+              regionId={regionId}
+              salesChannelId={salesChannelId}
+              createdAtGte={createdAtGte}
+              updatedAtGte={updatedAtGte}
+              currentOrders={data?.orders}
+            />
+          </div>
+        </DataTable.Toolbar>
+        <DataTable.FilterBar />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No records",
+              description: "Your orders will show up here.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No orders match the selected filters or search query.",
+            },
+          }}
+        />
+        <DataTable.Pagination />
+      </DataTable>
+    </Container>
   )
 }
 

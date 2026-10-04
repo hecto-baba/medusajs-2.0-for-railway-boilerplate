@@ -33,9 +33,15 @@ export const POST = async (
     buffer: Buffer
   }
 
-  const files = (req as unknown as { files?: UploadedFile[] }).files
+  const rawReq = req as unknown as { files?: UploadedFile[]; file?: UploadedFile }
+  const files =
+    rawReq.files && rawReq.files.length > 0
+      ? rawReq.files
+      : rawReq.file
+      ? [rawReq.file]
+      : []
 
-  if (!files?.length) {
+  if (!files.length) {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
       "No files were uploaded"

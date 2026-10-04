@@ -75,6 +75,10 @@
     "typescript": "^5.9.3"
   },
   "pnpm": {
+    "onlyBuiltDependencies": [
+      "@embedded-postgres/windows-x64",
+      "embedded-postgres"
+    ],
     "overrides": {
       "fast-xml-parser": "5.5.8",
       "protobufjs": "7.5.5"

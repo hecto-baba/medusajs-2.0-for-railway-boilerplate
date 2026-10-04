@@ -135,3 +135,33 @@ Leaving currency management read-only in the Seller Panel; rejected because sell
 **Core concept to remember:**
 In multi-tenant or multi-vendor platforms, vendor-specific store preferences (default currency, tax-inclusive flags, linked regions, channels, and locations) should gracefully fall back to platform defaults when unset, while allowing vendor overrides via structured metadata. In UI architecture, pairing table search and sort states with memoized filtering provides instantaneous feedback without redundant network waterfalls.
 
+### Multi-Tenant B2B, Restaurant & Digital Products Full Parity in Seller Panel — 2026-10-02
+
+**What was used:**
+1. **Remote Links & Multi-Tenant Data Scoping**:
+   - Registered `vendorRestaurantLink` (`vendor` <-> `restaurant`) and `vendorCompanyLink` (`vendor` <-> `company`) via `@medusajs/framework/utils` `defineLink` in `backend/src/links/`.
+   - Created secure, actor-isolated vendor API endpoints under `backend/src/api/vendors/`:
+     - **Digital Products**: `GET`/`POST` `/vendors/digital-products`, `GET`/`POST`/`DELETE` `/vendors/digital-products/:id`, and `DELETE` `/vendors/digital-products/:id/medias/:media_id`.
+     - **Restaurant & Delivery Operations**: `GET`/`POST` `/vendors/restaurants`, `GET`/`POST` `/vendors/restaurants/:id`, `POST` `/vendors/restaurants/:id/products`, `POST` `/vendors/restaurants/:id/admins`, `GET` `/vendors/deliveries`, `GET`/`POST` `/vendors/deliveries/:id` (managing timeline transitions `pending` -> `accepted` -> `preparing` -> `ready_for_pickup` -> `in_transit` -> `delivered`), and `GET` `/vendors/drivers`.
+     - **B2B Corporate Commerce**: `GET`/`POST` `/vendors/companies`, `GET`/`POST`/`DELETE` `/vendors/companies/:id`, `GET`/`POST` `/vendors/quotes`, `GET`/`POST` `/vendors/quotes/:id` (line-item price negotiation & shipping override), and `GET`/`POST` `/vendors/approvals` (spending limit decision recording).
+2. **Dynamic Multipurpose Permissions & Navigation**:
+   - Extended `feature-access.ts` with `hasB2B`, `hasRestaurants`, and `hasDigitalProducts` capabilities derived from vendor type (`multipurpose`, `b2b`, `restaurant`, `services`).
+   - Added collapsible B2B, Restaurant, and Digital Product navigation groups in `sidebar.tsx` with `@medusajs/icons` (`BuildingStorefront`, `ChefHat`, `DocumentText`).
+3. **Seller Panel Dedicated Views**:
+   - Built 10 complete page routes matching Medusa Admin parity:
+     - `/digital-products` (with file upload preview, media link attachments, and variant assignments).
+     - `/restaurants` (restaurant profile, operating hours, active/closed toggling, food menu, staff assignment).
+     - `/restaurants/deliveries` & `/restaurants/deliveries/:id` (live delivery board, status progression buttons, courier assignment, ETA updates).
+     - `/b2b` (B2B overview dashboard with live metrics and quick access).
+     - `/b2b/companies` & `/b2b/companies/:id` (corporate account directory, creation drawer, credit limit, currency, employee roster).
+     - `/b2b/quotes` & `/b2b/quotes/:id` (wholesale price negotiations, counter-proposals, line item discounts, shipping overrides).
+     - `/b2b/approvals` (spending limit review table with Approve/Reject modal decisions).
+
+**Why this over alternatives:**
+In Medusa Admin, B2B wholesale, restaurant dining/delivery, and digital downloads were only accessible to super-administrators. In a multi-tenant marketplace, sellers must directly manage their own corporate clients, kitchen preparation timelines, courier dispatch, and digital media assets. Hardcoding client-side filters on admin endpoints would cause severe data leakage across vendors; dedicated `/vendors/*` routes resolve `vendor_id` strictly from `req.auth_context.actor_id`, ensuring ironclad data isolation.
+
+**Alternatives considered:**
+Restricting sellers to retail-only products; rejected because modern multi-vendor platforms support diverse business models (e.g. ghost kitchens, SaaS/digital assets, and B2B wholesale distribution) under a single multipurpose seller profile. Using `<Table.Cell colSpan={...}>` in Medusa UI was rejected because `@medusajs/ui` does not define `colSpan` on `Table.Cell`; using native `<td colSpan={...}>` inside `<Table.Row>` maintains full HTML table compliance and eliminates TypeScript compilation errors.
+
+**Core concept to remember:**
+In Medusa 2.0 multi-tenant architectures, cross-module data isolation is enforced through Remote Links (`defineLink`) and `query.graph` actor-scoping. When designing UI tables with `@medusajs/ui`, empty/loading rows spanning across multiple columns must use native `<td colSpan={N}>` rather than `<Table.Cell>` to preserve strict component prop typing while rendering correctly.

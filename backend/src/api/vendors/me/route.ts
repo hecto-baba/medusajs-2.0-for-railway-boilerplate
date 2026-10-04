@@ -5,6 +5,7 @@ import type {
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import type MarketplaceModuleService from "../../../modules/marketplace/service"
+import { resolveVendorAdmin } from "../shared/vendor-scope"
 
 /**
  * Returns the calling vendor admin and the store they belong to.
@@ -17,25 +18,17 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: [
-      "id",
-      "email",
-      "first_name",
-      "last_name",
-      "vendor.id",
-      "vendor.name",
-      "vendor.handle",
-      "vendor.logo",
-      "vendor.metadata",
-    ],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, [
+    "id",
+    "email",
+    "first_name",
+    "last_name",
+    "vendor.id",
+    "vendor.name",
+    "vendor.handle",
+    "vendor.logo",
+    "vendor.metadata",
+  ])
 
   // A token that authenticates but resolves no admin means the record was
   // deleted while the session was still live.
@@ -69,13 +62,7 @@ export const PATCH = async (
     MARKETPLACE_MODULE
   )
 
-  const {
-    data: [existing],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["id", "vendor.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const existing = await resolveVendorAdmin(req, ["id", "vendor.id"])
 
   if (!existing) {
     throw new MedusaError(

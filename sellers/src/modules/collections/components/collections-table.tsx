@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo, useState } from "react"
 import {
   deleteVendorCollection,
   listVendorCollections,
@@ -7,6 +8,7 @@ import {
 } from "@lib/data/vendor-client"
 import {
   Button,
+  Container,
   createDataTableColumnHelper,
   createDataTableFilterHelper,
   DataTable,
@@ -29,8 +31,13 @@ import {
 } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo, useState } from "react"
-import { ActionMenu, PlaceholderCell } from "@modules/common"
+import {
+  ActionMenu,
+  DataTableAddFilter,
+  PlaceholderCell,
+  createMedusaDateFilter,
+  resolveMedusaDateFilter,
+} from "@modules/common"
 import { CollectionDrawer } from "./forms/collection-drawer"
 import { CollectionProductsModal } from "./forms/collection-products-modal"
 
@@ -64,33 +71,6 @@ const resolveDateFilter = (val: any): string | undefined => {
   }
   return undefined
 }
-
-const dateFilterOptions = [
-  {
-    label: "Today",
-    value: {
-      $gte: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
-    },
-  },
-  {
-    label: "Last 7 days",
-    value: {
-      $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-  {
-    label: "Last 30 days",
-    value: {
-      $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-  {
-    label: "Last 90 days",
-    value: {
-      $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-]
 
 export const CollectionsTable = () => {
   const router = useRouter()
@@ -175,26 +155,8 @@ export const CollectionsTable = () => {
 
   const filters = useMemo(
     () => [
-      filterHelper.custom({
-        id: "created_at",
-        label: "Created",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
-      filterHelper.custom({
-        id: "updated_at",
-        label: "Updated",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
+      createMedusaDateFilter(filterHelper, "created_at", "Created"),
+      createMedusaDateFilter(filterHelper, "updated_at", "Updated"),
     ],
     []
   )
@@ -373,31 +335,43 @@ export const CollectionsTable = () => {
   })
 
   return (
-    <div className="flex flex-col gap-y-3 p-8">
-      <div className="flex items-center justify-between">
+    <Container className="divide-y p-0">
+      <div className="flex items-center justify-between px-6 py-4">
         <div>
           <Heading level="h1">Collections</Heading>
           <Text size="small" className="text-ui-fg-subtle">
             Group products into collections for promotions, categories, and seasonal curation.
           </Text>
         </div>
-        <Button size="small" onClick={() => setIsCreateOpen(true)}>
-          <Plus />
-          Create Collection
+        <Button size="small" variant="secondary" onClick={() => setIsCreateOpen(true)}>
+          Create
         </Button>
       </div>
 
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between">
-          <DataTable.Search placeholder="Search collections..." />
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-x-2">
-            <DataTable.FilterMenu tooltip="Filter" />
+            <DataTableAddFilter table={table} />
+          </div>
+          <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search" />
             <DataTable.SortingMenu tooltip="Sort" />
           </div>
         </DataTable.Toolbar>
         <DataTable.FilterBar />
 
-        <DataTable.Table />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No collections yet",
+              description: "Create your first collection to group products.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No collections match the selected filters or search query.",
+            },
+          }}
+        />
 
         <DataTable.Pagination />
       </DataTable>
@@ -428,6 +402,6 @@ export const CollectionsTable = () => {
           )}
         />
       )}
-    </div>
+    </Container>
   )
 }

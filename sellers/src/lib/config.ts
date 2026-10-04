@@ -1,11 +1,10 @@
 import Medusa from "@medusajs/js-sdk"
 
 // Defaults to the standard Medusa port.
-let MEDUSA_BACKEND_URL = "http://localhost:9000"
-
-if (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL) {
-  MEDUSA_BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
-}
+let MEDUSA_BACKEND_URL =
+  process.env.MEDUSA_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL ||
+  "http://localhost:9000"
 
 /**
  * No publishableKey here, unlike the storefront's client.

@@ -1,5 +1,6 @@
 import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
+import { resolveVendorAdmin } from "../shared/vendor-scope"
 
 export const VENDOR_SHOW_FIELDS = [
   "id",
@@ -25,13 +26,10 @@ export const getVendorShowIds = async (
 ): Promise<string[]> => {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.id", "vendor.products.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, [
+    "vendor.id",
+    "vendor.products.id",
+  ])
 
   if (!vendorAdmin?.vendor) {
     throw new MedusaError(

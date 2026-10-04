@@ -15,10 +15,19 @@
     "rootDir": "./",
     "baseUrl": ".",
     "paths": {
+      "react": [
+        "./node_modules/@types/react"
+      ],
+      "react-dom": [
+        "./node_modules/@types/react-dom"
+      ],
       "*": [
         "./src/*"
       ]
     },
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
     "jsx": "react-jsx",
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,

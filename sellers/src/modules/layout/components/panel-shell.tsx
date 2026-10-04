@@ -20,7 +20,7 @@ import {
 import { Notifications } from "../notifications"
 import { SearchProvider } from "../search"
 import { useVendorOnboardingStatus } from "@modules/onboarding"
-import { ArrowRight, Clock, ExclamationCircle, Sparkles } from "@medusajs/icons"
+import { ArrowRight, Clock, ExclamationCircle, Sparkles, TriangleRightMini } from "@medusajs/icons"
 
 /**
  * Labels for the fixed segments of a path. Anything not listed - a product id,
@@ -29,8 +29,29 @@ import { ArrowRight, Clock, ExclamationCircle, Sparkles } from "@medusajs/icons"
 const SEGMENT_LABELS: Record<string, string> = {
   products: "Products",
   orders: "Orders",
-  dashboard: "Dashboard",
+  drafts: "Draft Orders",
+  "draft-orders": "Draft Orders",
+  collections: "Collections",
+  categories: "Categories",
+  options: "Product Options",
+  inventory: "Inventory",
+  reservations: "Reservations",
+  customers: "Customers",
+  groups: "Customer Groups",
+  "customer-groups": "Customer Groups",
+  pricing: "Price Lists",
+  "price-lists": "Price Lists",
+  promotions: "Promotions",
+  campaigns: "Campaigns",
+  earnings: "Earnings",
+  venues: "Venues",
+  shows: "Shows",
+  "my-schedule": "My Schedule",
+  dashboard: "Commerce Infrastructure",
+  "commerce-infra": "Commerce Infrastructure",
   settings: "Settings",
+  store: "Store",
+  locations: "Locations",
   profile: "Profile",
   "return-reasons": "Return Reasons",
   "refund-reasons": "Refund Reasons",
@@ -57,58 +78,225 @@ export const useBreadcrumbTitle = (title: string | null | undefined) => {
   }, [title, setTitle])
 }
 
+const getCanonicalCrumbs = (pathname: string, recordTitle: string | null): Crumb[] => {
+  // 1. Root and Dashboard
+  if (pathname === "/dashboard" || pathname === "/commerce-infra") {
+    return [{ label: "Commerce Infrastructure" }]
+  }
+
+  // 2. Draft Orders
+  if (pathname === "/orders/drafts") {
+    return [{ label: "Draft Orders" }]
+  }
+  if (pathname.startsWith("/orders/drafts/")) {
+    const rest = pathname.replace("/orders/drafts/", "")
+    return [
+      { label: "Draft Orders", href: "/orders/drafts" },
+      { label: rest === "new" ? "Create" : (recordTitle ?? rest) },
+    ]
+  }
+
+  // 3. Earnings
+  if (pathname === "/orders/earnings") {
+    return [{ label: "Earnings" }]
+  }
+
+  // 4. Orders
+  if (pathname === "/orders") {
+    return [{ label: "Orders" }]
+  }
+  if (pathname.startsWith("/orders/")) {
+    const rest = pathname.replace("/orders/", "")
+    return [
+      { label: "Orders", href: "/orders" },
+      { label: recordTitle ?? rest },
+    ]
+  }
+
+  // 5. Collections
+  if (pathname === "/products/collections") {
+    return [{ label: "Collections" }]
+  }
+  if (pathname.startsWith("/products/collections/")) {
+    const rest = pathname.replace("/products/collections/", "")
+    return [
+      { label: "Collections", href: "/products/collections" },
+      { label: rest === "new" ? "Create" : (recordTitle ?? rest) },
+    ]
+  }
+
+  // 6. Categories
+  if (pathname === "/products/categories") {
+    return [{ label: "Categories" }]
+  }
+  if (pathname.startsWith("/products/categories/")) {
+    const rest = pathname.replace("/products/categories/", "")
+    return [
+      { label: "Categories", href: "/products/categories" },
+      { label: rest === "new" ? "Create" : (recordTitle ?? rest) },
+    ]
+  }
+
+  // 7. Product Options
+  if (pathname === "/products/options") {
+    return [{ label: "Product Options" }]
+  }
+  if (pathname.startsWith("/products/options/")) {
+    const rest = pathname.replace("/products/options/", "")
+    return [
+      { label: "Product Options", href: "/products/options" },
+      { label: rest === "new" ? "Create" : (recordTitle ?? rest) },
+    ]
+  }
+
+  // 8. Products
+  if (pathname === "/products") {
+    return [{ label: "Products" }]
+  }
+  if (pathname.startsWith("/products/")) {
+    const rest = pathname.replace("/products/", "")
+    return [
+      { label: "Products", href: "/products" },
+      { label: rest === "new" ? "Create" : (recordTitle ?? rest) },
+    ]
+  }
+
+  // 9. Reservations
+  if (pathname === "/inventory/reservations" || pathname === "/reservations") {
+    return [{ label: "Reservations" }]
+  }
+  if (pathname.startsWith("/inventory/reservations/")) {
+    const rest = pathname.replace("/inventory/reservations/", "")
+    return [
+      { label: "Reservations", href: "/inventory/reservations" },
+      { label: rest === "new" ? "Create" : (recordTitle ?? rest) },
+    ]
+  }
+
+  // 10. Inventory
+  if (pathname === "/inventory") {
+    return [{ label: "Inventory" }]
+  }
+  if (pathname.startsWith("/inventory/")) {
+    const rest = pathname.replace("/inventory/", "")
+    return [
+      { label: "Inventory", href: "/inventory" },
+      { label: rest === "new" ? "Create" : (recordTitle ?? rest) },
+    ]
+  }
+
+  // 11. Customer Groups
+  if (pathname === "/customers/groups") {
+    return [{ label: "Customer Groups" }]
+  }
+  if (pathname.startsWith("/customers/groups/")) {
+    const rest = pathname.replace("/customers/groups/", "")
+    return [
+      { label: "Customer Groups", href: "/customers/groups" },
+      { label: rest === "new" ? "Create" : (recordTitle ?? rest) },
+    ]
+  }
+
+  // 12. Customers
+  if (pathname === "/customers") {
+    return [{ label: "Customers" }]
+  }
+  if (pathname.startsWith("/customers/")) {
+    const rest = pathname.replace("/customers/", "")
+    return [
+      { label: "Customers", href: "/customers" },
+      { label: recordTitle ?? rest },
+    ]
+  }
+
+  // 13. Campaigns
+  if (pathname === "/promotions/campaigns" || pathname === "/campaigns") {
+    return [{ label: "Campaigns" }]
+  }
+  if (pathname.startsWith("/promotions/campaigns/")) {
+    const rest = pathname.replace("/promotions/campaigns/", "")
+    return [
+      { label: "Campaigns", href: "/promotions/campaigns" },
+      { label: rest === "new" ? "Create" : (recordTitle ?? rest) },
+    ]
+  }
+
+  // 14. Promotions
+  if (pathname === "/promotions") {
+    return [{ label: "Promotions" }]
+  }
+  if (pathname.startsWith("/promotions/")) {
+    const rest = pathname.replace("/promotions/", "")
+    return [
+      { label: "Promotions", href: "/promotions" },
+      { label: rest === "new" ? "Create" : (recordTitle ?? rest) },
+    ]
+  }
+
+  // 15. Price Lists
+  if (pathname === "/pricing") {
+    return [{ label: "Price Lists" }]
+  }
+  if (pathname.startsWith("/pricing/")) {
+    const rest = pathname.replace("/pricing/", "")
+    return [
+      { label: "Price Lists", href: "/pricing" },
+      { label: rest === "new" ? "Create" : (recordTitle ?? rest) },
+    ]
+  }
+
+  // 16. Fallback
+  const segments = pathname.split("/").filter(Boolean)
+  return segments.map((segment, index) => {
+    const href = "/" + segments.slice(0, index + 1).join("/")
+    const known = SEGMENT_LABELS[segment]
+    return {
+      label: known ?? (recordTitle ?? segment),
+      href: index < segments.length - 1 ? href : undefined,
+    }
+  })
+}
+
 const Breadcrumbs = ({ recordTitle }: { recordTitle: string | null }) => {
   const pathname = usePathname()
-  const segments = pathname.split("/").filter(Boolean)
+  const crumbs = getCanonicalCrumbs(pathname, recordTitle)
 
-  if (!segments.length) {
+  if (!crumbs.length) {
     return null
   }
 
-  const crumbs: Crumb[] = segments.map((segment, index) => {
-    const href = "/" + segments.slice(0, index + 1).join("/")
-    const known = SEGMENT_LABELS[segment]
-
-    if (known) {
-      return { label: known, href }
-    }
-
-    return {
-      label: recordTitle ?? segment.slice(0, 12) + "…",
-      href,
-    }
-  })
-
   return (
-    <nav className="flex items-center gap-x-2 overflow-hidden">
+    <ol className="text-ui-fg-muted txt-compact-small-plus flex select-none items-center">
       {crumbs.map((crumb, index) => {
         const isLast = index === crumbs.length - 1
+        const isSingle = crumbs.length === 1
 
         return (
-          <div key={crumb.href ?? index} className="flex items-center gap-x-2">
-            {index > 0 ? (
-              <span className="text-ui-fg-muted" aria-hidden>
-                ›
-              </span>
-            ) : null}
-            {isLast || !crumb.href ? (
-              <Text size="small" className="text-ui-fg-base truncate">
+          <li key={crumb.href ?? index} className="flex items-center">
+            {!isLast && crumb.href ? (
+              <Link
+                className="transition-fg hover:text-ui-fg-subtle"
+                href={crumb.href}
+              >
                 {crumb.label}
-              </Text>
-            ) : (
-              <Link href={crumb.href}>
-                <Text
-                  size="small"
-                  className="text-ui-fg-subtle hover:text-ui-fg-base truncate"
-                >
-                  {crumb.label}
-                </Text>
               </Link>
+            ) : (
+              <div>
+                {!isSingle && <span className="block lg:hidden">...</span>}
+                <span className={!isSingle ? "hidden lg:block" : ""}>
+                  {crumb.label}
+                </span>
+              </div>
             )}
-          </div>
+            {!isLast && (
+              <span className="mx-2">
+                <TriangleRightMini className="rtl:rotate-180" aria-hidden />
+              </span>
+            )}
+          </li>
         )
       })}
-    </nav>
+    </ol>
   )
 }
 
@@ -197,14 +385,14 @@ export const PanelShell = ({
             )}
             <div className="flex flex-1 flex-col overflow-hidden">
               <header className="border-ui-border-base bg-ui-bg-subtle flex h-12 shrink-0 items-center justify-between border-b px-4">
-                <div className="flex items-center gap-x-3 overflow-hidden">
+                <div className="flex items-center gap-x-1.5 overflow-hidden">
                   <IconButton
                     size="small"
                     variant="transparent"
                     onClick={toggle}
                     aria-label={collapsed ? "Show sidebar" : "Hide sidebar"}
                   >
-                    <SidebarLeft />
+                    <SidebarLeft className="text-ui-fg-muted rtl:rotate-180" />
                   </IconButton>
                   <Breadcrumbs recordTitle={recordTitle} />
                 </div>

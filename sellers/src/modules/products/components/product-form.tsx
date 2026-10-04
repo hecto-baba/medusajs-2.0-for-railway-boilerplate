@@ -26,6 +26,7 @@ import {
   IconButton,
   Input,
   Label,
+  ProgressTabs,
   Select,
   Switch,
   Table,
@@ -158,12 +159,16 @@ type FormVariant = {
   price: string
   manage_inventory: boolean
   inventory_quantity: string
+  allow_backorder?: boolean
+  inventory_kit?: boolean
+  price_eur?: string
 }
 
 export const ProductForm = ({ product }: ProductFormProps) => {
   const router = useRouter()
   const queryClient = useQueryClient()
   const isEdit = Boolean(product)
+  const [activeStep, setActiveStep] = useState<"details" | "organize" | "variants">("details")
 
   // 1. General Info
   const [title, setTitle] = useState(product?.title ?? "")
@@ -441,12 +446,18 @@ export const ProductForm = ({ product }: ProductFormProps) => {
           sku: v.sku.trim() || undefined,
           barcode: v.barcode.trim() || undefined,
           manage_inventory: v.manage_inventory,
-          inventory_quantity: v.manage_inventory
-            ? parseInt(v.inventory_quantity, 10) || 0
-            : undefined,
+          metadata: {
+            inventory_quantity: v.manage_inventory
+              ? parseInt(v.inventory_quantity, 10) || 0
+              : undefined,
+          },
           prices: [
             {
               currency_code: "usd",
+              amount: parseFloat(v.price) || 0,
+            },
+            {
+              currency_code: "eur",
               amount: parseFloat(v.price) || 0,
             },
           ],
@@ -454,6 +465,29 @@ export const ProductForm = ({ product }: ProductFormProps) => {
         }))
       } else {
         payloadOptions = [{ title: "Default", values: ["Default"] }]
+        const singlePrices = Object.entries(prices)
+          .filter(([, value]) => value && value.trim() !== "")
+          .map(([currency_code, value]) => ({
+            currency_code,
+            amount: Number(value),
+          }))
+        if (
+          singlePrices.length > 0 &&
+          !singlePrices.some((e) => e.currency_code === "eur") &&
+          singlePrices.some((e) => e.currency_code === "usd")
+        ) {
+          const usdAmount = singlePrices.find((e) => e.currency_code === "usd")!.amount
+          singlePrices.push({ currency_code: "eur", amount: usdAmount })
+        }
+        if (
+          singlePrices.length > 0 &&
+          !singlePrices.some((e) => e.currency_code === "usd") &&
+          singlePrices.some((e) => e.currency_code === "eur")
+        ) {
+          const eurAmount = singlePrices.find((e) => e.currency_code === "eur")!.amount
+          singlePrices.push({ currency_code: "usd", amount: eurAmount })
+        }
+
         payloadVariants = [
           {
             title: "Default",
@@ -461,15 +495,12 @@ export const ProductForm = ({ product }: ProductFormProps) => {
             sku: singleSku.trim() || undefined,
             barcode: singleBarcode.trim() || undefined,
             manage_inventory: singleManageInventory,
-            inventory_quantity: singleManageInventory
-              ? parseInt(singleQuantity, 10) || 0
-              : undefined,
-            prices: Object.entries(prices)
-              .filter(([, value]) => value.trim() !== "")
-              .map(([currency_code, value]) => ({
-                currency_code,
-                amount: Number(value),
-              })),
+            metadata: {
+              inventory_quantity: singleManageInventory
+                ? parseInt(singleQuantity, 10) || 0
+                : undefined,
+            },
+            prices: singlePrices,
           },
         ]
       }
@@ -482,7 +513,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
           : {}),
         options: payloadOptions,
         variants: payloadVariants,
-        // Attach staged media — images field is replace-semantics on the API
+        // Attach staged media â€” images field is replace-semantics on the API
         ...(mediaImages.length > 0
           ? {
               images: mediaImages,
@@ -556,6 +587,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
   const removeTag = (tag: string) => {
     setSelectedTags(selectedTags.filter((t) => t !== tag))
   }
+
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-y-6">
@@ -704,7 +736,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
         )}
       </Card>
 
-      {/* Media card — shown for both create and edit; for create, images are staged */}
+      {/* Media card â€” shown for both create and edit; for create, images are staged */}
       <Card
         title="Media"
         description="Upload product images. The first image will be used as the thumbnail."
@@ -713,7 +745,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
             <input
               ref={mediaInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.svg,.avif"
               multiple
               className="hidden"
               onChange={async (e) => {
@@ -814,7 +846,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
           >
             <Photo className="size-8 opacity-40" />
             <Text size="small">
-              Click to upload images — first image becomes the thumbnail
+              Click to upload images â€” first image becomes the thumbnail
             </Text>
           </button>
         )}
@@ -925,7 +957,7 @@ export const ProductForm = ({ product }: ProductFormProps) => {
                     onClick={() => removeTag(tag)}
                     className="hover:text-ui-fg-error"
                   >
-                    ×
+                    Ã—
                   </button>
                 </Badge>
               ))}

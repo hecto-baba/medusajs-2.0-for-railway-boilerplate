@@ -7,5 +7,9 @@ export const metadata: Metadata = {
 }
 
 export default function CollectionsPage() {
-  return <CollectionsTable />
+  return (
+    <div className="p-6">
+      <CollectionsTable />
+    </div>
+  )
 }

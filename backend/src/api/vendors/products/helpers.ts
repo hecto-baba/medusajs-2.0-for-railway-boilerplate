@@ -2,11 +2,11 @@ import type { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError, Modules } from "@medusajs/framework/utils"
 import { createInventoryItemsWorkflow } from "@medusajs/medusa/core-flows"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
-import { getVendorId } from "../shared/vendor-scope"
+import { getVendorId, resolveVendorAdmin } from "../shared/vendor-scope"
 
 // Single source of truth lives in shared/vendor-scope.ts; re-exported so
 // existing imports from this file keep working.
-export { getVendorId }
+export { getVendorId, resolveVendorAdmin }
 
 /**
  * Confirms the product behind a URL id belongs to the calling vendor.
@@ -28,18 +28,10 @@ export const assertOwnership = async (
   req: AuthenticatedMedusaRequest,
   productId: string
 ): Promise<void> => {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    fields: ["vendor.products.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, ["vendor.products.id"])
 
   const owns = vendorAdmin?.vendor?.products?.some(
-    (product) => product?.id === productId
+    (product: any) => product?.id === productId
   )
 
   if (!owns) {

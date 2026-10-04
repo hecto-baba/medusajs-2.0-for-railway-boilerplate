@@ -6,6 +6,8 @@ import {
   type VendorPromotion,
 } from "@lib/data/vendor-client"
 import {
+  Button,
+  Container,
   createDataTableColumnHelper,
   createDataTableCommandHelper,
   createDataTableFilterHelper,
@@ -24,7 +26,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { PlaceholderCell } from "@modules/common"
+import { DataTableAddFilter, PlaceholderCell } from "@modules/common"
 
 const columnHelper = createDataTableColumnHelper<VendorPromotion>()
 const filterHelper = createDataTableFilterHelper<VendorPromotion>()
@@ -63,24 +65,66 @@ const formatValue = (promotion: VendorPromotion) => {
 }
 
 const filters = [
-  filterHelper.custom({
-    id: "created_at",
+  filterHelper.accessor("created_at", {
+    type: "date",
     label: "Created",
-    type: "select",
     options: [
-      { label: "Last 7 days", value: "7d" },
-      { label: "Last 30 days", value: "30d" },
-      { label: "Last 90 days", value: "90d" },
+      {
+        label: "Today",
+        value: {
+          $gte: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+          $lte: new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+        },
+      },
+      {
+        label: "Last 7 days",
+        value: {
+          $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      {
+        label: "Last 30 days",
+        value: {
+          $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      {
+        label: "Last 90 days",
+        value: {
+          $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
     ],
   }),
-  filterHelper.custom({
-    id: "updated_at",
+  filterHelper.accessor("updated_at", {
+    type: "date",
     label: "Updated",
-    type: "select",
     options: [
-      { label: "Last 7 days", value: "7d" },
-      { label: "Last 30 days", value: "30d" },
-      { label: "Last 90 days", value: "90d" },
+      {
+        label: "Today",
+        value: {
+          $gte: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+          $lte: new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+        },
+      },
+      {
+        label: "Last 7 days",
+        value: {
+          $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      {
+        label: "Last 30 days",
+        value: {
+          $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      {
+        label: "Last 90 days",
+        value: {
+          $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      },
     ],
   }),
 ]
@@ -370,36 +414,40 @@ export const PromotionsTable = () => {
   })
 
   return (
-    <DataTable instance={table}>
-      <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-        <Heading level="h2">Promotions</Heading>
-        <div className="flex items-center gap-x-2">
-          <DataTable.Search placeholder="Search promotions..." />
-          <DataTable.FilterMenu tooltip="Filter" />
-          <DataTable.SortingMenu tooltip="Sort" />
-          <Link
-            href="/promotions/new"
-            className="bg-ui-button-inverted text-ui-contrast-fg-primary shadow-buttons-inverted txt-compact-small-plus rounded-md px-3 py-1.5"
-          >
-            Create
-          </Link>
-        </div>
-      </DataTable.Toolbar>
-      <DataTable.FilterBar />
-      <DataTable.Table
-        emptyState={{
-          empty: {
-            heading: "No promotions yet",
-            description: "Create your first promotion to offer a discount.",
-          },
-          filtered: {
-            heading: "No matches",
-            description: "No promotions match that search.",
-          },
-        }}
-      />
-      <DataTable.Pagination />
-      <DataTable.CommandBar selectedLabel={(count) => count + " selected"} />
-    </DataTable>
+    <Container className="divide-y p-0">
+      <div className="flex items-center justify-between px-6 py-4">
+        <Heading level="h1">Promotions</Heading>
+        <Button size="small" variant="secondary" asChild>
+          <Link href="/promotions/new">Create</Link>
+        </Button>
+      </div>
+
+      <DataTable instance={table}>
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-x-2">
+            <DataTableAddFilter table={table} />
+          </div>
+          <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search" />
+            <DataTable.SortingMenu tooltip="Sort" />
+          </div>
+        </DataTable.Toolbar>
+        <DataTable.FilterBar />
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No promotions yet",
+              description: "Create your first promotion to offer a discount.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No promotions match that search.",
+            },
+          }}
+        />
+        <DataTable.Pagination />
+        <DataTable.CommandBar selectedLabel={(count) => count + " selected"} />
+      </DataTable>
+    </Container>
   )
 }

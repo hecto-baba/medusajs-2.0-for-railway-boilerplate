@@ -27,6 +27,7 @@ import { useState } from "react"
 import { Section } from "@modules/products/components/detail/section"
 import { RecurringAvailabilityCreateModal } from "./forms/recurring-availability-create-modal"
 import { ExceptionCreateModal } from "./forms/exception-create-modal"
+import { AppointmentCreateModal } from "./forms/appointment-create-modal"
 
 const DAY_NAMES = [
   "Sunday",
@@ -105,6 +106,7 @@ export const MySchedule = () => {
 
   const [recurringModalOpen, setRecurringModalOpen] = useState(false)
   const [exceptionModalOpen, setExceptionModalOpen] = useState(false)
+  const [appointmentModalOpen, setAppointmentModalOpen] = useState(false)
 
   const { data: providerData, isLoading: providerLoading } = useQuery({
     queryKey: ["vendor-provider-me"],
@@ -365,7 +367,18 @@ export const MySchedule = () => {
         )}
       </Section>
 
-      <Section title="Appointments">
+      <Section
+        title="Appointments"
+        actions={
+          <Button
+            size="small"
+            variant="secondary"
+            onClick={() => setAppointmentModalOpen(true)}
+          >
+            Add appointment
+          </Button>
+        }
+      >
         {appointmentsLoading ? (
           <div className="px-6 py-8">
             <Text size="small" className="text-ui-fg-subtle">
@@ -435,6 +448,10 @@ export const MySchedule = () => {
       <ExceptionCreateModal
         open={exceptionModalOpen}
         onOpenChange={setExceptionModalOpen}
+      />
+      <AppointmentCreateModal
+        open={appointmentModalOpen}
+        onOpenChange={setAppointmentModalOpen}
       />
     </div>
   )

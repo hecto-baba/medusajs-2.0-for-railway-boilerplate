@@ -320,8 +320,8 @@ const uploadCsv = csvUpload({
 // The size cap is what keeps a vendor from exhausting server memory: each
 // buffered file is copied again by toString("base64"), which inflates it by
 // about a third, and several concurrent uploads are held at once.
-const PRODUCT_MEDIA_MAX_BYTES = 10 * 1024 * 1024;
-const PRODUCT_MEDIA_MAX_FILES = 10;
+const PRODUCT_MEDIA_MAX_BYTES = 50 * 1024 * 1024;
+const PRODUCT_MEDIA_MAX_FILES = 20;
 
 const uploadProductMedia = arrayUpload({
   storage: multer.memoryStorage(),
@@ -329,27 +329,12 @@ const uploadProductMedia = arrayUpload({
     fileSize: PRODUCT_MEDIA_MAX_BYTES,
     files: PRODUCT_MEDIA_MAX_FILES
   },
-  fileFilter: (_req, file, callback) => {
-    // Images for product media, plus CSV for the product importer, which
-    // uploads its file through this same route before calling
-    // /vendors/products/imports. Anything else is refused: a public-read
-    // bucket would otherwise let a vendor use the store as file hosting.
-    const isImage = /^image\/(jpeg|png|gif|webp|avif|svg\+xml)$/.test(
-      file.mimetype
-    );
-    // Browsers disagree on the mimetype for .csv (text/csv,
-    // application/vnd.ms-excel, sometimes application/octet-stream), so for
-    // those the extension is what is actually enforced.
-    const isCsv = /\.csv$/i.test(file.originalname);
-
-    if (!isImage && !isCsv) {
-      callback(new Error("Only image files and .csv files can be uploaded"));
-      return;
-    }
-
+  fileFilter: (_req, _file, callback) => {
+    // Allow images, documents, audio, video, archives, and data files for products,
+    // digital products, and CSV imports.
     callback(null, true);
   }
-}, "files");
+});
 
 export default defineMiddlewares({
   routes: [

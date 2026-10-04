@@ -21,8 +21,8 @@ import multer from "multer"
  * about why their file was refused - a wrong file type reads as a server
  * fault rather than as something they can correct.
  */
-export const arrayUpload = (options: Options, field: string) => {
-  const handler = multer(options).array(field)
+export const arrayUpload = (options: Options, field?: string) => {
+  const handler = field ? multer(options).array(field) : multer(options).any()
 
   return (
     req: MedusaRequest,
@@ -47,7 +47,7 @@ export const arrayUpload = (options: Options, field: string) => {
             limit
               ? `That file is too large. The limit is ${Math.round(
                   Number(limit) / (1024 * 1024)
-                )}MB per image.`
+                )}MB per file.`
               : "That file is too large."
           )
         )
@@ -61,7 +61,7 @@ export const arrayUpload = (options: Options, field: string) => {
           new MedusaError(
             MedusaError.Types.INVALID_DATA,
             limit
-              ? `Only ${limit} images can be uploaded at a time.`
+              ? `Only ${limit} files can be uploaded at a time.`
               : "Too many files were uploaded at once."
           )
         )

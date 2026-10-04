@@ -6,6 +6,8 @@ import {
   type VendorCampaign,
 } from "@lib/data/vendor-client"
 import {
+  Button,
+  Container,
   createDataTableColumnHelper,
   createDataTableCommandHelper,
   DataTable,
@@ -285,34 +287,36 @@ export const CampaignsTable = () => {
   })
 
   return (
-    <DataTable instance={table}>
-      <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-        <Heading level="h2">Campaigns</Heading>
-        <div className="flex items-center gap-x-2">
-          <DataTable.Search placeholder="Search campaigns..." />
-          <DataTable.SortingMenu tooltip="Sort" />
-          <Link
-            href="/promotions/campaigns/new"
-            className="bg-ui-button-inverted text-ui-contrast-fg-primary shadow-buttons-inverted txt-compact-small-plus rounded-md px-3 py-1.5"
-          >
-            Create
-          </Link>
-        </div>
-      </DataTable.Toolbar>
-      <DataTable.Table
-        emptyState={{
-          empty: {
-            heading: "No campaigns yet",
-            description: "Create your first campaign to group and budget your promotions.",
-          },
-          filtered: {
-            heading: "No matches",
-            description: "No campaigns match that search.",
-          },
-        }}
-      />
-      <DataTable.Pagination />
-      <DataTable.CommandBar selectedLabel={(count) => `${count} selected`} />
-    </DataTable>
+    <Container className="divide-y p-0">
+      <div className="flex items-center justify-between px-6 py-4">
+        <Heading level="h1">Campaigns</Heading>
+        <Button size="small" variant="secondary" asChild>
+          <Link href="/promotions/campaigns/new">Create</Link>
+        </Button>
+      </div>
+
+      <DataTable instance={table}>
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-x-2">
+            <DataTable.Search placeholder="Search" />
+            <DataTable.SortingMenu tooltip="Sort" />
+          </div>
+        </DataTable.Toolbar>
+        <DataTable.Table
+          emptyState={{
+            empty: {
+              heading: "No campaigns yet",
+              description: "Create your first campaign to group and budget your promotions.",
+            },
+            filtered: {
+              heading: "No matches",
+              description: "No campaigns match that search.",
+            },
+          }}
+        />
+        <DataTable.Pagination />
+        <DataTable.CommandBar selectedLabel={(count) => `${count} selected`} />
+      </DataTable>
+    </Container>
   )
 }

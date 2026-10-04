@@ -11,6 +11,9 @@ export type FeatureKey =
   | "shows"
   | "rentals"
   | "settings"
+  | "b2b"
+  | "restaurants"
+  | "digitalProducts"
 
 export interface VendorCapabilities {
   hasOrders: boolean
@@ -23,6 +26,9 @@ export interface VendorCapabilities {
   hasShows: boolean
   hasRentals: boolean
   hasSettings: boolean
+  hasB2B: boolean
+  hasRestaurants: boolean
+  hasDigitalProducts: boolean
 }
 
 /**
@@ -31,12 +37,14 @@ export interface VendorCapabilities {
  * Rules:
  * - Venues & Shows are only visible if vendorType is "BOOKING" / "TICKETING" or segment is "EVENTS" / "ENTERTAINMENT" / "VENUE".
  * - Rentals are enabled if vendorType is "RENTAL".
- * - Physical inventory / products / orders are standard for "ORDER", "RETAIL", "GROCERY", etc.
+ * - B2B (Companies, Quotes, Approvals) is enabled for B2B/Wholesale vendors or multipurpose commerce vendors.
+ * - Restaurants (Menu, Live Kitchen Deliveries) is enabled for Food/Beverage/Restaurant vendors or multipurpose commerce vendors.
+ * - Digital Products is enabled for Digital vendors or multipurpose commerce vendors.
  */
 export function getVendorCapabilities(
   onboarding?: VendorOnboardingData | null
 ): VendorCapabilities {
-  // If no onboarding data exists or in unrestricted fallback, provide core commerce capabilities
+  // If no onboarding data exists or in unrestricted fallback, provide core commerce capabilities including multi-tenant multipurpose features
   if (!onboarding) {
     return {
       hasOrders: true,
@@ -49,6 +57,9 @@ export function getVendorCapabilities(
       hasShows: true,
       hasRentals: true,
       hasSettings: true,
+      hasB2B: true,
+      hasRestaurants: true,
+      hasDigitalProducts: true,
     }
   }
 
@@ -119,6 +130,47 @@ export function getVendorCapabilities(
     !isRental &&
     !vendorTypeCode.includes("ORDER")
 
+  // Restaurant & Food Delivery Detection
+  const isRestaurant =
+    segmentCode.includes("FOOD") ||
+    segmentCode.includes("RESTAURANT") ||
+    segmentCode.includes("BEVERAGE") ||
+    segmentCode.includes("DINING") ||
+    segmentCode.includes("CAFE") ||
+    segmentCode.includes("BAKERY") ||
+    segmentCode.includes("KITCHEN") ||
+    segmentId.includes("food") ||
+    segmentId.includes("restaurant") ||
+    vendorCategoryCode.includes("FOOD") ||
+    vendorCategoryCode.includes("RESTAURANT") ||
+    vendorTypeCode.includes("RESTAURANT") ||
+    vendorTypeCode.includes("DELIVERY") ||
+    !isTicketingOrEvents // multipurpose commerce vendors have restaurant capability
+
+  // B2B Wholesale / Corporate Detection
+  const isB2B =
+    segmentCode.includes("B2B") ||
+    segmentCode.includes("WHOLESALE") ||
+    segmentCode.includes("MANUFACTURING") ||
+    segmentCode.includes("DISTRIBUTOR") ||
+    segmentCode.includes("CONSTRUCTION") ||
+    segmentCode.includes("AUTOMOBILES") ||
+    vendorTypeCode.includes("B2B") ||
+    vendorTypeCode.includes("WHOLESALE") ||
+    !isTicketingOrEvents // multipurpose commerce vendors have B2B capability
+
+  // Digital Products Detection
+  const isDigital =
+    segmentCode.includes("DIGITAL") ||
+    segmentCode.includes("SOFTWARE") ||
+    segmentCode.includes("MEDIA") ||
+    segmentCode.includes("COURSE") ||
+    segmentCode.includes("EBOOK") ||
+    segmentCode.includes("DOWNLOAD") ||
+    vendorTypeCode.includes("DIGITAL") ||
+    vendorCategoryCode.includes("DIGITAL") ||
+    !isTicketingOrEvents // multipurpose commerce vendors have digital products capability
+
   return {
     hasOrders: true,
     hasProducts: !isTicketingOrEvents,
@@ -130,6 +182,9 @@ export function getVendorCapabilities(
     hasShows: isTicketingOrEvents,
     hasRentals: isRental,
     hasSettings: true,
+    hasB2B: isB2B,
+    hasRestaurants: isRestaurant,
+    hasDigitalProducts: isDigital,
   }
 }
 
@@ -156,6 +211,15 @@ export function isRouteAllowed(
     return false
   }
   if (pathname.startsWith("/enquiries") && !capabilities.hasProducts) {
+    return false
+  }
+  if (pathname.startsWith("/b2b") && !capabilities.hasB2B) {
+    return false
+  }
+  if (pathname.startsWith("/restaurants") && !capabilities.hasRestaurants) {
+    return false
+  }
+  if (pathname.startsWith("/digital-products") && !capabilities.hasDigitalProducts) {
     return false
   }
   return true

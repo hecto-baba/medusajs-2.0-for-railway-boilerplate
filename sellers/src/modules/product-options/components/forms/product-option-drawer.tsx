@@ -219,7 +219,7 @@ export const ProductOptionDrawer = ({
               </Label>
               <div className="flex items-center gap-x-2">
                 <Input
-                  placeholder="e.g. Small (press Enter to add)"
+                  placeholder="e.g. Small"
                   value={newValue}
                   onChange={(e) => setNewValue(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -234,6 +234,9 @@ export const ProductOptionDrawer = ({
                   Add
                 </Button>
               </div>
+              <Text size="xsmall" className="text-ui-fg-subtle">
+                Type an option value and press Enter or click Add.
+              </Text>
 
               {values.length > 0 ? (
                 <div className="flex flex-wrap gap-2 pt-2">

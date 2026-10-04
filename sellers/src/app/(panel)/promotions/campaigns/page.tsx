@@ -9,9 +9,7 @@ export const metadata: Metadata = {
 export default function CampaignsPage() {
   return (
     <div className="p-6">
-      <div className="bg-ui-bg-base shadow-elevation-card-rest rounded-lg overflow-hidden">
-        <CampaignsTable />
-      </div>
+      <CampaignsTable />
     </div>
   )
 }

@@ -21,7 +21,7 @@ import {
   usePrompt,
 } from "@medusajs/ui"
 import { PencilSquare, Trash } from "@medusajs/icons"
-import { ActionMenu, DateCell } from "@modules/common"
+import { ActionMenu, DataTableAddFilter, DateCell, createMedusaDateFilter, resolveMedusaDateFilter } from "@modules/common"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -67,42 +67,24 @@ export const CustomerGroupsTable = () => {
     ? (sorting.desc ? "-" : "") + sorting.id
     : undefined
 
-  const dateFilterVal = extractFilterVal(filtering.created_at_gte)
   const createdAtGte = useMemo(() => {
-    if (!dateFilterVal) return undefined
-    const days = dateFilterVal === "7d" ? 7 : dateFilterVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [dateFilterVal])
+    return (
+      resolveMedusaDateFilter(filtering.created_at) ??
+      resolveMedusaDateFilter(filtering.created_at_gte)
+    )
+  }, [filtering.created_at, filtering.created_at_gte])
 
-  const updatedFilterVal = extractFilterVal(filtering.updated_at_gte)
   const updatedAtGte = useMemo(() => {
-    if (!updatedFilterVal) return undefined
-    const days = updatedFilterVal === "7d" ? 7 : updatedFilterVal === "30d" ? 30 : 90
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  }, [updatedFilterVal])
+    return (
+      resolveMedusaDateFilter(filtering.updated_at) ??
+      resolveMedusaDateFilter(filtering.updated_at_gte)
+    )
+  }, [filtering.updated_at, filtering.updated_at_gte])
 
   const filters = useMemo(
     () => [
-      filterHelper.custom({
-        id: "created_at_gte",
-        label: "Created",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
-      filterHelper.custom({
-        id: "updated_at_gte",
-        label: "Updated",
-        type: "select",
-        options: [
-          { label: "Last 7 days", value: "7d" },
-          { label: "Last 30 days", value: "30d" },
-          { label: "Last 90 days", value: "90d" },
-        ],
-      }),
+      createMedusaDateFilter(filterHelper, "created_at", "Created"),
+      createMedusaDateFilter(filterHelper, "updated_at", "Updated"),
     ],
     []
   )
@@ -276,10 +258,12 @@ export const CustomerGroupsTable = () => {
 
       {/* Data Table */}
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between">
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-x-2">
+            <DataTableAddFilter table={table} />
+          </div>
           <div className="flex items-center gap-x-2">
             <DataTable.Search placeholder="Search" />
-            <DataTable.FilterMenu tooltip="Filter" />
             <DataTable.SortingMenu tooltip="Sort" />
           </div>
         </DataTable.Toolbar>

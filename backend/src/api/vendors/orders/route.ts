@@ -6,6 +6,7 @@ import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { getOrdersListWorkflow } from "@medusajs/medusa/core-flows"
 import { decorateSplitChildren, scopeOrderToVendor } from "./helpers"
+import { resolveVendorAdmin } from "../shared/vendor-scope"
 
 export const GetVendorOrdersSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -48,14 +49,11 @@ export const GET = async (
     updated_at_gte,
   } = req.validatedQuery as unknown as z.infer<typeof GetVendorOrdersSchema>
 
-  const {
-    data: [vendorAdmin],
-  } = await query.graph({
-    entity: "vendor_admin",
-    // Ids only: the order rows themselves are loaded below, a page at a time.
-    fields: ["vendor.id", "vendor.products.id", "vendor.orders.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
+  const vendorAdmin = await resolveVendorAdmin(req, [
+    "vendor.id",
+    "vendor.products.id",
+    "vendor.orders.id",
+  ])
 
   if (!vendorAdmin?.vendor) {
     res.status(404).json({ message: "Vendor profile not found." })
