@@ -5,6 +5,7 @@ import OrderDetails from "@modules/order/components/order-details"
 import ShippingDetails from "@modules/order/components/shipping-details"
 import PaymentDetails from "@modules/order/components/payment-details"
 import SellerOrders from "@modules/order/components/seller-orders"
+import TrackOrderLink from "@modules/order/components/track-order-link"
 import type { SellerOrder } from "@lib/data/orders"
 import { HttpTypes } from "@medusajs/types"
 
@@ -47,6 +48,9 @@ export default function OrderCompletedTemplate({
               Thank you. Your order was placed successfully.
             </p>
             <OrderDetails order={order} centered />
+            <div className="mt-4 empty:hidden">
+              <TrackOrderLink order={order} />
+            </div>
           </div>
           <h2 className="px-1 pt-2 font-display text-2xl font-extrabold tracking-tight">
             Summary

@@ -11,6 +11,7 @@ import ShippingDetails from "@modules/order/components/shipping-details"
 import PaymentDetails from "@modules/order/components/payment-details"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import SellerOrders from "@modules/order/components/seller-orders"
+import TrackOrderLink from "@modules/order/components/track-order-link"
 import type { SellerOrder } from "@lib/data/orders"
 import { HttpTypes } from "@medusajs/types"
 
@@ -43,6 +44,9 @@ const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
       >
         <div className="rounded-large bg-card p-5 shadow-lift">
           <OrderDetails order={order} showStatus />
+          <div className="mt-4 empty:hidden">
+            <TrackOrderLink order={order} />
+          </div>
         </div>
         <Items items={order.items} />
         <SellerOrders sellerOrders={sellerOrders} />

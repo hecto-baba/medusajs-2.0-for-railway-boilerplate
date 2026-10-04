@@ -243,6 +243,29 @@ export async function deleteLineItem(lineId: string) {
       await revalidateCacheTag("carts")
     })
     .catch(medusaError)
+
+  // Taking out the last dish must also take off the restaurant tag, or the next
+  // thing put in this cart (a booking, a rental) would inherit it. The cart is
+  // read again after the delete rather than worked out from an earlier copy:
+  // two dishes removed together would each see the other still there.
+  // The item is already gone, so a failure here is logged, not shown.
+  try {
+    const cart = await retrieveCart()
+    if (
+      cart?.metadata?.restaurant_id &&
+      !(cart.items ?? []).some((item) => item.metadata?.restaurant_id)
+    ) {
+      await sdk.store.cart.update(
+        cartId,
+        { metadata: { ...cart.metadata, restaurant_id: null, restaurant_name: null } },
+        {},
+        await getAuthHeaders()
+      )
+      await revalidateCacheTag("carts")
+    }
+  } catch (err) {
+    console.error("Failed to clear the restaurant tag from the cart:", err)
+  }
 }
 
 export async function clearCart() {
@@ -677,24 +700,25 @@ export async function placeOrder() {
     )?.toLowerCase()
 
     // Step 13: Order Delivery Creation on Checkout
-    const restaurantId =
-      (cart?.metadata?.restaurant_id as string) ||
-      (cart?.items ?? []).find((item: any) => item.metadata?.restaurant_id)?.metadata?.restaurant_id
+    // Only the dishes in the cart say whether this is a food order. The cart's
+    // own restaurant_id is a leftover once the dishes are removed, and used to
+    // turn a booking or rental into a delivery.
+    const restaurantId = (cart?.items ?? []).find((item: any) => item.metadata?.restaurant_id)
+      ?.metadata?.restaurant_id as string | undefined
 
-    let deliveryId: string | null = null
     if (restaurantId) {
       try {
-        const deliveryRes: any = await sdk.client.fetch(`/store/deliveries`, {
+        await sdk.client.fetch(`/store/deliveries`, {
           method: "POST",
           body: {
             cart_id: cartId,
             restaurant_id: restaurantId,
+            order_id: cartRes.order.id,
           },
           headers: { ...(await getAuthHeaders()) },
         })
-        if (deliveryRes?.delivery?.id) {
-          deliveryId = deliveryRes.delivery.id
-        }
+        // The order pages read the delivery id from the order.
+        await revalidateCacheTag("orders")
       } catch (err) {
         console.error("Failed to create order delivery workflow:", err)
       }
@@ -702,11 +726,9 @@ export async function placeOrder() {
 
     await removeCartId()
 
-    if (deliveryId) {
-      redirect(`/${countryCode}/deliveries/${deliveryId}`)
-    } else {
-      redirect(`/${countryCode}/order/confirmed/${cartRes?.order.id}`)
-    }
+    // Every order lands on its confirmation; a food order gets a "Track your
+    // order" link there.
+    redirect(`/${countryCode}/order/confirmed/${cartRes.order.id}`)
   }
 
   return { cart: cartRes?.cart }
