@@ -7,6 +7,7 @@ import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
 import { APPOINTMENT_BOOKING_MODULE } from "../../modules/appointment-booking"
 import AppointmentBookingModuleService from "../../modules/appointment-booking/service"
 import { applyPricingRules } from "../../modules/appointment-booking/lib/pricing"
+import { disableStockTracking } from "../../lib/service-stock"
 
 export type PrepareAppointmentBookingInput = {
   cart_id: string
@@ -125,6 +126,12 @@ export const prepareAppointmentBookingStep = createStep(
         "This resource does not offer that service."
       )
     }
+
+    // A service has no stock to count. Safety net for a product that was set up
+    // (or edited in the Medusa admin) with stock tracking on: without this, Medusa
+    // would refuse the add-to-cart for having no stock location. A no-op once
+    // every variant is already untracked.
+    await disableStockTracking(container, [variant.product_id])
 
     const basePrice = (variant as any).calculated_price?.calculated_amount
     if (typeof basePrice !== "number") {

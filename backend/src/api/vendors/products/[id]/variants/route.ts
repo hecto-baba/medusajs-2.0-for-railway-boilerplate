@@ -8,6 +8,7 @@ import type {
 } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { createProductVariantsWorkflow } from "@medusajs/medusa/core-flows"
+import { isOfferedAsService } from "../../../../../lib/service-stock"
 import {
   assertOwnership,
   ensureVariantInventoryItem,
@@ -79,6 +80,11 @@ export const POST = async (
   await assertOwnership(req, id)
 
   const { additional_data, ...rest } = req.validatedBody as Record<string, any>
+
+  // A variant of a bookable service has no stock to count, whatever the form sent.
+  if (await isOfferedAsService(req.scope, id)) {
+    rest.manage_inventory = false
+  }
 
   const { result } = await createProductVariantsWorkflow(req.scope).run({
     input: {
