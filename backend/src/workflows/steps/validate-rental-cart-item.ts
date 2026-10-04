@@ -43,6 +43,7 @@ export const validateRentalCartItemStep = createStep(
         rental_units_count: 0,
         price: 0,
         deposit_amount: 0,
+        fulfilment_modes: "both" as "both" | "pickup" | "delivery",
       })
     }
 
@@ -142,6 +143,11 @@ export const validateRentalCartItemStep = createStep(
       rental_units_count: unitsCount,
       price: subtotal,
       deposit_amount: depositAmount,
+      // How the seller lets this product reach the renter, so the add-to-cart
+      // workflow can settle pickup versus delivery from the server's own
+      // configuration instead of trusting the client's choice alone.
+      fulfilment_modes: ((rental_configuration as any).fulfilment_modes ??
+        "both") as "both" | "pickup" | "delivery",
     })
   }
 )

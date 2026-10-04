@@ -133,20 +133,33 @@ export const isAppointmentLineItem = (
 ): boolean => !!metadata?.attendee_id && !!metadata?.start_time
 
 /**
- * True when every line in the cart is a ticket or an appointment. Such a cart has
- * nothing to ship - its lines are created with requires_shipping false - so it
- * never gets a shipping method, and every checkout step that would otherwise
- * insist on one (address, payment, review, place order) must skip that check.
+ * True when no line in the cart needs shipping, so the cart never gets a
+ * shipping method and every checkout step that would otherwise insist on one
+ * (address, payment, review, place order) must skip that check. Such a cart
+ * collects contact details only, not a delivery address.
+ *
+ * A line needs no shipping when Medusa says so (`requires_shipping === false`,
+ * which the ticket, appointment, EOI, digital and pickup-rental workflows set
+ * when the line is added), or - for lines added before those flags existed -
+ * when its metadata marks it as a ticket or an appointment.
+ *
  * Deliberately "every item", not "any item": a cart that mixes in a physical
  * product still has to be shipped.
  */
 export const isNoShippingCart = (
-  items: { metadata?: Record<string, unknown> | null }[] | null | undefined
+  items:
+    | {
+        requires_shipping?: boolean | null
+        metadata?: Record<string, unknown> | null
+      }[]
+    | null
+    | undefined
 ): boolean =>
   !!items &&
   items.length > 0 &&
   items.every(
     (item) =>
+      item.requires_shipping === false ||
       isAppointmentLineItem(item.metadata) ||
       (!!item.metadata?.seat_number && !!item.metadata?.show_date)
   )

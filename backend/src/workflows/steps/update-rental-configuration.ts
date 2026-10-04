@@ -14,6 +14,7 @@ type UpdateRentalConfigurationInput = {
   security_deposit_amount?: number
   security_deposit_type?: "fixed" | "percentage"
   requires_time_selection?: boolean
+  fulfilment_modes?: "both" | "pickup" | "delivery"
   status?: "active" | "inactive"
 }
 
@@ -75,6 +76,7 @@ export const updateRentalConfigurationStep = createStep(
       security_deposit_amount: existingRentalConfig.security_deposit_amount,
       security_deposit_type: existingRentalConfig.security_deposit_type,
       requires_time_selection: existingRentalConfig.requires_time_selection,
+      fulfilment_modes: existingRentalConfig.fulfilment_modes,
       status: existingRentalConfig.status,
     })
   }

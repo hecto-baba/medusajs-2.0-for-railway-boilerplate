@@ -1,5 +1,6 @@
 export type RentalUnit = "hour" | "day" | "week" | "month" | "custom"
 export type RentalDepositType = "fixed" | "percentage"
+export type RentalFulfilmentModes = "both" | "pickup" | "delivery"
 
 export type RentalConfiguration = {
   id: string
@@ -15,6 +16,9 @@ export type RentalConfiguration = {
   security_deposit_amount: number
   security_deposit_type: RentalDepositType
   requires_time_selection: boolean
+  // How the seller lets the rental reach the renter. Optional because a
+  // configuration saved before this existed has none, which means "both".
+  fulfilment_modes?: RentalFulfilmentModes
   status: "active" | "inactive"
 }
 

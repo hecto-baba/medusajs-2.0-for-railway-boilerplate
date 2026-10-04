@@ -5,6 +5,7 @@ import { Container } from "@medusajs/ui"
 import Checkbox from "@modules/common/components/checkbox"
 import Input from "@modules/common/components/input"
 import { mapKeys } from "lodash"
+import { useParams } from "next/navigation"
 import React, { useEffect, useMemo, useState } from "react"
 import AddressSelect from "../address-select"
 import CountrySelect from "../country-select"
@@ -32,6 +33,30 @@ const addressToFormData = (
   email: email || "",
 })
 
+/**
+ * What to start the form with: the address already on this cart if it has a
+ * real one, otherwise the customer's saved default, so a returning customer
+ * does not retype what the store already knows. A cart address with no street
+ * is not a real one - a cart that began as a no-shipping order only carries a
+ * name and a country.
+ */
+const initialShippingAddress = (
+  cart: HttpTypes.StoreCart | null,
+  customer: HttpTypes.StoreCustomer | null
+): HttpTypes.StoreCartAddress | null | undefined => {
+  if (cart?.shipping_address?.address_1) {
+    return cart.shipping_address
+  }
+
+  const countries = cart?.region?.countries?.map((c) => c.iso_2)
+  const inRegion = (customer?.addresses ?? []).filter(
+    (a) => a.country_code && (countries ?? []).includes(a.country_code)
+  )
+  const saved = inRegion.find((a) => a.is_default_shipping) ?? inRegion[0]
+
+  return (saved as unknown as HttpTypes.StoreCartAddress) ?? cart?.shipping_address
+}
+
 const ShippingAddress = ({
   customer,
   cart,
@@ -43,9 +68,22 @@ const ShippingAddress = ({
   checked: boolean
   onChange: () => void
 }) => {
-  const [formData, setFormData] = useState<Record<string, string>>(() =>
-    addressToFormData(cart?.shipping_address, cart?.email || customer?.email)
-  )
+  const params = useParams<{ countryCode?: string }>()
+
+  const [formData, setFormData] = useState<Record<string, string>>(() => {
+    const initial = addressToFormData(
+      initialShippingAddress(cart, customer),
+      cart?.email || customer?.email
+    )
+    // Nothing else picks a country, so the select would sit on its placeholder
+    // until the shopper chose one. Start on the store they are already in.
+    if (!initial["shipping_address.country_code"] && params?.countryCode) {
+      initial["shipping_address.country_code"] = params.countryCode
+    }
+    return initial
+  })
+
+  const [saveAddress, setSaveAddress] = useState(true)
 
   const countriesInRegion = useMemo(
     () => cart?.region?.countries?.map((c) => c.iso_2),
@@ -87,8 +125,9 @@ const ShippingAddress = ({
   }
 
   useEffect(() => {
-    // Ensure cart is not null and has a shipping_address before setting form data
-    if (cart && cart.shipping_address) {
+    // Only a real address on the cart overrides the form. One without a street
+    // would blank out the saved address the form was started with.
+    if (cart && cart.shipping_address?.address_1) {
       setFormAddress(cart?.shipping_address, cart?.email)
     }
 
@@ -222,6 +261,17 @@ const ShippingAddress = ({
           data-testid="billing-address-checkbox"
         />
       </div>
+      {customer && (
+        <div className="mb-4">
+          <Checkbox
+            label="Save this address for next time"
+            name="save_address"
+            checked={saveAddress}
+            onChange={() => setSaveAddress((v) => !v)}
+            data-testid="save-address-checkbox"
+          />
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4 mb-4">
         <Input
           label="Email"

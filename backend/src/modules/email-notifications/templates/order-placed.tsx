@@ -97,7 +97,9 @@ export const OrderPlacedTemplate: React.FC<OrderPlacedTemplateProps> & {
 
         <Hr style={{ margin: '20px 0' }} />
 
-        {shippingAddress && (
+        {/* An order with nothing to ship (tickets, digital, EOI) carries no street
+            address, so there is nothing to print and no empty block to leave. */}
+        {shippingAddress?.address_1 && (
           <>
             <Text style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 10px' }}>
               Shipping Address

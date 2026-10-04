@@ -60,6 +60,13 @@ const LineItemRentalDates = ({
         Rental: {start} - {end}
         {quantityLabel ? ` (${quantityLabel})` : ""}
       </Text>
+      {typeof metadata?.rental_fulfilment === "string" && (
+        <Text className="inline-block txt-small text-muted w-full overflow-hidden text-ellipsis">
+          {metadata.rental_fulfilment === "pickup"
+            ? "Pick up from the seller"
+            : "Delivered to you"}
+        </Text>
+      )}
       {(pickupTime || returnTime) && (
         <Text className="inline-block txt-small text-muted w-full overflow-hidden text-ellipsis">
           Pickup {pickupTime ?? "—"} / Return {returnTime ?? "—"}

@@ -18,6 +18,7 @@ import { PostCartItemsRentalsBody } from "./store/carts/[id]/line-items/rentals/
 import { PostCartItemsTicketsBody } from "./store/carts/[id]/line-items/tickets/route";
 import { PostCartItemsAppointmentsBody } from "./store/carts/[id]/line-items/appointments/route";
 import { PostCartItemsEoiBody } from "./store/carts/[id]/line-items/eoi/route";
+import { PostCartItemsDigitalBody } from "./store/carts/[id]/line-items/digital/route";
 import { GetAvailableSlotsSchema } from "./store/providers/[id]/available-slots/route";
 import { PostStoreEnquirySchema } from "./store/enquiries/route";
 import { enquiryRateLimit } from "./store/enquiries/rate-limit";
@@ -503,6 +504,13 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(PostCartItemsEoiBody)
+      ]
+    },
+    {
+      matcher: "/store/carts/:id/line-items/digital",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostCartItemsDigitalBody)
       ]
     },
     {

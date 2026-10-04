@@ -25,6 +25,7 @@ export const PostRentalConfigBodySchema = z.object({
   security_deposit_amount: z.number().optional(),
   security_deposit_type: z.enum(["fixed", "percentage"]).optional(),
   requires_time_selection: z.boolean().optional(),
+  fulfilment_modes: z.enum(["both", "pickup", "delivery"]).optional(),
   status: z.enum(["active", "inactive"]).optional(),
 })
 
@@ -45,6 +46,7 @@ export const POST = async (
       security_deposit_amount: req.validatedBody.security_deposit_amount,
       security_deposit_type: req.validatedBody.security_deposit_type,
       requires_time_selection: req.validatedBody.requires_time_selection,
+      fulfilment_modes: req.validatedBody.fulfilment_modes,
       status: req.validatedBody.status
     },
   })

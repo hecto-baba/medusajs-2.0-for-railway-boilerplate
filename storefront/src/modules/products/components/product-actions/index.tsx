@@ -1,6 +1,6 @@
 "use client"
 
-import { Button } from "@medusajs/ui"
+import { Button, Text } from "@medusajs/ui"
 import dynamic from "next/dynamic"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
@@ -73,6 +73,11 @@ export default function ProductActions({
   const [rentalSelection, setRentalSelection] = useState<RentalSelection | null>(
     null
   )
+  // How a rental reaches the renter. Pickup needs no address at checkout, so
+  // it is the default; choosing delivery brings back the full address form.
+  const [rentalFulfilment, setRentalFulfilment] = useState<
+    "pickup" | "delivery"
+  >("pickup")
   const [rentalPrice, setRentalPrice] = useState<number | null>(null)
   const [rentalDeposit, setRentalDeposit] = useState<number | null>(null)
   const countryCode = useParams().countryCode as string
@@ -196,6 +201,13 @@ export default function ProductActions({
 
   const isRental = !!rentalConfiguration
 
+  // The seller may allow only one way. Then there is nothing to choose, and the
+  // server enforces the same setting, so the form follows it rather than the
+  // renter's radio buttons.
+  const rentalFulfilmentModes = rentalConfiguration?.fulfilment_modes ?? "both"
+  const effectiveRentalFulfilment: "pickup" | "delivery" =
+    rentalFulfilmentModes === "both" ? rentalFulfilment : rentalFulfilmentModes
+
   // Availability is per variant, so a dates-and-price pair chosen for one
   // variant must not survive a switch to another. Clearing only on a real
   // change - rather than on every run including the first - keeps this from
@@ -273,6 +285,7 @@ export default function ProductActions({
           rentalUnitsCount: rentalSelection.rental_units_count,
           pickupTime: rentalSelection.pickup_time,
           returnTime: rentalSelection.return_time,
+          fulfilment: effectiveRentalFulfilment,
         }))
       } else if (isEoi) {
         await track(
@@ -286,6 +299,8 @@ export default function ProductActions({
             variantId: selectedVariant.id,
             quantity: amount,
             countryCode,
+            isDigital: !!(selectedVariant as VariantWithDigitalProduct)
+              .digital_product,
           }),
           amount
         )
@@ -359,6 +374,56 @@ export default function ProductActions({
               onPriceChange={setRentalPrice}
               onDepositChange={setRentalDeposit}
             />
+            {rentalFulfilmentModes !== "both" && (
+              <Text className="txt-medium text-ui-fg-subtle" data-testid="rental-fulfilment-fixed">
+                {rentalFulfilmentModes === "pickup"
+                  ? "Pick up from the seller - no delivery address needed."
+                  : "Delivered to you - we will ask for your address at checkout."}
+              </Text>
+            )}
+            {rentalFulfilmentModes === "both" && (
+            <fieldset
+              className="flex flex-col gap-y-2"
+              disabled={!!disabled || isAdding}
+              data-testid="rental-fulfilment"
+            >
+              <legend className="txt-medium-plus text-ui-fg-base mb-1">
+                How do you want to get it?
+              </legend>
+              <label className="flex items-start gap-x-2 txt-medium">
+                <input
+                  type="radio"
+                  name="rental_fulfilment"
+                  value="pickup"
+                  checked={rentalFulfilment === "pickup"}
+                  onChange={() => setRentalFulfilment("pickup")}
+                  className="mt-1"
+                />
+                <span>
+                  Pick up from the seller
+                  <span className="block txt-small text-ui-fg-subtle">
+                    No delivery address needed
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-x-2 txt-medium">
+                <input
+                  type="radio"
+                  name="rental_fulfilment"
+                  value="delivery"
+                  checked={rentalFulfilment === "delivery"}
+                  onChange={() => setRentalFulfilment("delivery")}
+                  className="mt-1"
+                />
+                <span>
+                  Deliver to me
+                  <span className="block txt-small text-ui-fg-subtle">
+                    We will ask for your address at checkout
+                  </span>
+                </span>
+              </label>
+            </fieldset>
+            )}
             {rentalPrice !== null && rentalSelection && (
               <div className="flex flex-col gap-y-1">
                 <div className="flex items-baseline justify-between">

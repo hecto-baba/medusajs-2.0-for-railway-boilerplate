@@ -115,6 +115,9 @@ export const addToCartWithEoiWorkflow = createWorkflow(
         return [{
           ...baseItem,
           unit_price: data.eoiData.eoi_charged_amount,
+          // An EOI is only a deposit to register interest; nothing is
+          // delivered, so the cart must not demand a shipping address or method.
+          requires_shipping: false,
           metadata: {
             ...clientMetadata,
             is_eoi: true,

@@ -175,6 +175,26 @@
           "enumItems": [],
           "mappedType": "boolean"
         },
+        "fulfilment_modes": {
+          "name": "fulfilment_modes",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "'both'",
+          "comment": null,
+          "enumItems": [
+            "both",
+            "pickup",
+            "delivery"
+          ],
+          "mappedType": "enum"
+        },
         "status": {
           "name": "status",
           "type": "text",
