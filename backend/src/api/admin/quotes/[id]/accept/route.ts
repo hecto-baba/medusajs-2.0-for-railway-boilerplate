@@ -1,6 +1,7 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, Modules, OrderStatus } from "@medusajs/framework/utils"
 import { QUOTE_MODULE } from "../../../../../modules/quote"
+import { canAdminAcceptQuote, quoteStatusMessage } from "../../../../../modules/quote/lib/transitions"
 
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const quoteModule = req.scope.resolve(QUOTE_MODULE) as any
@@ -25,6 +26,10 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
 
   if (!quote) {
     return res.status(404).json({ message: "Quote not found" })
+  }
+
+  if (!canAdminAcceptQuote(quote.status)) {
+    return res.status(409).json({ message: quoteStatusMessage(quote.status) })
   }
 
   // Update order status if draft order exists

@@ -40,10 +40,12 @@ export const GET = async (
 
   // 2. Query company details
   try {
-    const filters: Record<string, any> = {}
-    if (companyIds.length > 0) {
-      filters.id = companyIds
+    // A seller with no companies sees none. (An empty id list used to mean "no filter",
+    // which listed every seller's companies.)
+    if (companyIds.length === 0) {
+      return res.json({ companies: [], count: 0, limit, offset })
     }
+    const filters: Record<string, any> = { id: companyIds }
 
     const { data: companies, metadata } = await query.graph({
       entity: "company",
@@ -76,8 +78,11 @@ export const GET = async (
     })
   } catch (error) {
     const companyModule = req.scope.resolve(COMPANY_MODULE) as any
+    if (!companyIds.length) {
+      return res.json({ companies: [], count: 0, limit, offset })
+    }
     const [companies, count] = await companyModule.listAndCountCompanies(
-      companyIds.length ? { id: companyIds } : {},
+      { id: companyIds },
       { take: limit, skip: offset }
     )
 
