@@ -37,32 +37,32 @@ export const CommerceInfraOverview = ({
   // Live vendor-scoped counts
   const { data: ordersData } = useQuery({
     queryKey: ["commerce-infra", "vendor-orders-count"],
-    queryFn: () => listVendorOrders({ limit: 0, offset: 0 }).catch(() => null),
+    queryFn: () => listVendorOrders({ limit: 1, offset: 0 }).catch(() => null),
   })
 
   const { data: productsData } = useQuery({
     queryKey: ["commerce-infra", "vendor-products-count"],
-    queryFn: () => listVendorProducts({ limit: 0, offset: 0 }).catch(() => null),
+    queryFn: () => listVendorProducts({ limit: 1, offset: 0 }).catch(() => null),
   })
 
   const { data: inventoryData } = useQuery({
     queryKey: ["commerce-infra", "vendor-inventory-count"],
-    queryFn: () => listVendorInventoryItems({ limit: 0, offset: 0 }).catch(() => null),
+    queryFn: () => listVendorInventoryItems({ limit: 1, offset: 0 }).catch(() => null),
   })
 
   const { data: customersData } = useQuery({
     queryKey: ["commerce-infra", "vendor-customers-count"],
-    queryFn: () => listVendorCustomers({ limit: 0, offset: 0 }).catch(() => null),
+    queryFn: () => listVendorCustomers({ limit: 1, offset: 0 }).catch(() => null),
   })
 
   const { data: promotionsData } = useQuery({
     queryKey: ["commerce-infra", "vendor-promotions-count"],
-    queryFn: () => listVendorPromotions({ limit: 0, offset: 0 }).catch(() => null),
+    queryFn: () => listVendorPromotions({ limit: 1, offset: 0 }).catch(() => null),
   })
 
   const { data: priceListsData } = useQuery({
     queryKey: ["commerce-infra", "vendor-price-lists-count"],
-    queryFn: () => listVendorPriceLists({ limit: 0, offset: 0 }).catch(() => null),
+    queryFn: () => listVendorPriceLists({ limit: 1, offset: 0 }).catch(() => null),
   })
 
   const modules = [
