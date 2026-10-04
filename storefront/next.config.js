@@ -41,6 +41,9 @@ const remotePattern = (value) => {
  * @type {import('next').NextConfig}
  */
 const nextConfig = {
+  // Lets a second copy of the app run beside the first one (for profiling or a
+  // production build) without sharing its build folder. Unset means ".next".
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   outputFileTracingRoot: path.resolve(__dirname, ".."),
   reactStrictMode: true,
   eslint: {
@@ -57,9 +60,20 @@ const nextConfig = {
     // one page at a time trades build speed for a build that actually
     // finishes.
     cpus: 1,
+    // Import only the components actually used from these barrel packages.
+    // Pulling `clx` or `Text` from "@medusajs/ui" otherwise drags the whole
+    // library (date pickers, react-aria, ~195 KB) into every page's bundle.
+    optimizePackageImports: ["@medusajs/ui", "@medusajs/icons"],
   },
   images: {
-    unoptimized: true,
+    // Serve resized WebP instead of the original files. Product media was
+    // being sent as-is (900 KB-1.4 MB PNGs), which dominated LCP. WebP rather
+    // than AVIF: AVIF encoding is slow on the first request of each image.
+    formats: ["image/webp"],
+    deviceSizes: [360, 640, 828, 1080, 1200, 1920],
+    imageSizes: [72, 128, 256, 384],
+    // Product media is effectively immutable (uploads get unique names).
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     // Thumbnails request quality 50. Next 16 requires every quality used to be
     // declared here, and warns about it from 15 onwards.
     qualities: [50, 75, 100],
@@ -85,6 +99,10 @@ const nextConfig = {
         protocol: "https",
         hostname: "medusa-server-testing.s3.amazonaws.com",
       },
+      // Catalog media seeded from these hosts
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "*.supabase.co" },
+      { protocol: "https", hostname: "encrypted-tbn0.gstatic.com" },
       { // Note: can be removed after deleting demo products
         protocol: "https",
         hostname: "medusa-server-testing.s3.us-east-1.amazonaws.com",

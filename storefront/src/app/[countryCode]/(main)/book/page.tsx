@@ -1,4 +1,6 @@
 import { listBusinesses } from "@lib/data/appointments"
+import RemoteImage from "@modules/appointments/components/remote-image"
+import Chip from "@modules/common/components/chip"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { Metadata } from "next"
 
@@ -27,51 +29,63 @@ export default async function BookPage({
   const href = (p: number) => `/book?${new URLSearchParams({ ...(q ? { q } : {}), page: String(p) })}`
 
   return (
-    <div className="content-container py-12" data-testid="book-businesses-page">
-      <h1 className="text-3xl-regular mb-2">Book an appointment</h1>
-      <p className="text-ui-fg-subtle mb-6">
-        Choose a business, pick a time that suits you, and book online.
-      </p>
+    <div className="bg-canvas">
+    <div className="content-container py-8 small:py-12" data-testid="book-businesses-page">
+      <div className="mb-6 rounded-large bg-card p-5 shadow-lift small:p-8">
+        <h1 className="font-display text-3xl font-extrabold tracking-tight text-ink small:text-4xl">
+          Book an appointment
+        </h1>
+        <p className="mt-2 text-muted">
+          Choose a business, pick a time that suits you, and book online.
+        </p>
 
-      <form method="get" className="mb-8 flex gap-2">
+      <form method="get" className="mt-5 flex gap-2">
         <input
           name="q"
           defaultValue={q ?? ""}
           placeholder="Search businesses"
           aria-label="Search businesses"
-          className="border-ui-border-base w-full max-w-md rounded-md border px-3 py-2"
+          className="w-full max-w-md rounded-rounded border border-line bg-canvas px-3 py-2.5 text-ink placeholder:text-muted"
         />
-        <button type="submit" className="bg-ui-button-neutral rounded-md border px-4 py-2">
+        <button
+          type="submit"
+          className="rounded-rounded bg-brand px-5 py-2.5 font-extrabold text-brand-ink hover:opacity-90"
+        >
           Search
         </button>
       </form>
+      </div>
 
       {businesses.length ? (
-        <ul className="grid grid-cols-1 gap-6 small:grid-cols-2 medium:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-4 xsmall:grid-cols-2 medium:grid-cols-3">
           {businesses.map((business) => (
             <li key={business.id}>
               <LocalizedClientLink
                 href={`/book/${business.handle}`}
-                className="border-ui-border-base hover:shadow-elevation-card-hover flex h-full flex-col gap-3 rounded-lg border p-5 transition-shadow"
+                className="flex h-full flex-col gap-4 rounded-large bg-card p-5 shadow-lift transition-shadow hover:shadow-pop"
                 data-testid="business-card"
               >
                 {business.logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <RemoteImage
                     src={business.logo}
-                    alt=""
-                    className="h-16 w-16 rounded-md object-cover"
+                    width={56}
+                    height={56}
+                    className="h-14 w-14 rounded-[12px] object-cover"
                   />
                 ) : (
-                  <div className="bg-ui-bg-subtle flex h-16 w-16 items-center justify-center rounded-md text-2xl">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[12px] bg-brand-soft font-display text-2xl font-extrabold text-brand">
                     {business.name.slice(0, 1).toUpperCase()}
                   </div>
                 )}
-                <div>
-                  <div className="txt-large-plus">{business.name}</div>
-                  <div className="text-ui-fg-subtle txt-small">
-                    {business.resource_count}{" "}
-                    {business.resource_count === 1 ? "person or place" : "people and places"} to book
+                <div className="flex flex-1 flex-col gap-2">
+                  <div className="break-words font-display text-lg font-extrabold text-ink">
+                    {business.name}
+                  </div>
+                  <div>
+                    <Chip tone="muted">
+                      {business.resource_count}{" "}
+                      {business.resource_count === 1 ? "person or place" : "people and places"} to book
+                    </Chip>
                   </div>
                 </div>
               </LocalizedClientLink>
@@ -79,7 +93,7 @@ export default async function BookPage({
           ))}
         </ul>
       ) : (
-        <div className="text-ui-fg-subtle py-16 text-center">
+        <div className="rounded-large bg-card py-16 text-center text-muted shadow-lift">
           {q
             ? `No businesses match "${q}".`
             : "No businesses are taking bookings yet. Please check back soon."}
@@ -89,20 +103,21 @@ export default async function BookPage({
       {pages > 1 ? (
         <div className="mt-10 flex items-center justify-center gap-4">
           {pageNumber > 1 ? (
-            <LocalizedClientLink href={href(pageNumber - 1)} className="underline">
+            <LocalizedClientLink href={href(pageNumber - 1)} className="font-bold text-brand hover:underline">
               Previous
             </LocalizedClientLink>
           ) : null}
-          <span className="text-ui-fg-subtle txt-small">
+          <span className="text-sm text-muted">
             Page {pageNumber} of {pages}
           </span>
           {pageNumber < pages ? (
-            <LocalizedClientLink href={href(pageNumber + 1)} className="underline">
+            <LocalizedClientLink href={href(pageNumber + 1)} className="font-bold text-brand hover:underline">
               Next
             </LocalizedClientLink>
           ) : null}
         </div>
       ) : null}
+    </div>
     </div>
   )
 }

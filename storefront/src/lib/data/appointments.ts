@@ -1,5 +1,6 @@
 "use server"
 
+import { unstable_cache } from "next/cache"
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
 import {
@@ -55,7 +56,13 @@ export async function getBusiness(
       `/store/appointments/businesses/${encodeURIComponent(handle)}`,
       {
         method: "GET",
-        query: { region_id: region?.id },
+        // The business route prices each service, and it fails without a
+        // currency ("calculatePrices requires currency_code"), so send the
+        // region's currency along with the region.
+        query: {
+          region_id: region?.id,
+          currency_code: region?.currency_code,
+        },
         cache: "no-store",
       }
     )
@@ -67,21 +74,33 @@ export async function getBusiness(
  * Null means an ordinary product (or the lookup failed), so the product page keeps
  * its normal flow rather than breaking.
  */
+const cachedAppointmentOffer = unstable_cache(
+  async (
+    productId: string,
+    regionId?: string
+  ): Promise<AppointmentProductOffer | null> =>
+    sdk.client
+      .fetch<AppointmentProductOffer>(
+        `/store/appointments/products/${encodeURIComponent(productId)}`,
+        {
+          method: "GET",
+          query: { region_id: regionId },
+        }
+      )
+      .then((offer) => (offer?.is_appointment ? offer : null))
+      .catch(() => null),
+  ["appointment-offer"],
+  { revalidate: 60, tags: ["appointment-offer"] }
+)
+
 export async function getProductAppointmentOffer(
   productId: string,
   regionId?: string
 ): Promise<AppointmentProductOffer | null> {
-  return sdk.client
-    .fetch<AppointmentProductOffer>(
-      `/store/appointments/products/${encodeURIComponent(productId)}`,
-      {
-        method: "GET",
-        query: { region_id: regionId },
-        cache: "no-store",
-      }
-    )
-    .then((offer) => (offer?.is_appointment ? offer : null))
-    .catch(() => null)
+  // The offer (who can be booked, starting price) is the same for every
+  // visitor, and an ordinary product's "not an appointment" answer is cached
+  // too. Actual slots (getAppointmentSlots) stay uncached.
+  return cachedAppointmentOffer(productId, regionId)
 }
 
 export async function getAppointmentSlots(params: {
@@ -105,6 +124,8 @@ export async function getAppointmentSlots(params: {
           from: params.from,
           to: params.to,
           region_id: region?.id,
+          // Slots are priced, and pricing fails without a currency.
+          currency_code: region?.currency_code,
         },
         cache: "no-store",
       }

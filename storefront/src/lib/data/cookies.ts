@@ -123,3 +123,21 @@ export const removeCartId = async () => {
 }
 
 
+
+/**
+ * Fetch directives for data that is identical for every visitor (regions,
+ * categories, collections).
+ *
+ * getCacheDirectives scopes entries per visitor so one shopper's
+ * revalidateTag cannot purge another's cart. That is wrong for shared catalog
+ * data: every new visitor (and every new cache-id cookie, daily) started with
+ * a cold cache and paid for the same backend calls again. These reads use one
+ * global tag and an hourly revalidate, and need no cookie, so they also work
+ * at build time.
+ */
+export const getSharedCacheDirectives = (
+  tag: string,
+  revalidate: number = 60 * 60
+): { next: { tags: string[]; revalidate: number } } => ({
+  next: { tags: [tag], revalidate },
+})

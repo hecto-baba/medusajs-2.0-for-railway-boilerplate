@@ -1,6 +1,7 @@
 "use client"
 
 import { addAppointmentToCart, getAppointmentSlots } from "@lib/data/appointments"
+import RemoteImage from "../remote-image"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { AppointmentProductOffer, AppointmentSlot } from "types/appointment"
@@ -51,10 +52,9 @@ type Candidate = { slot: AppointmentSlot; resourceId: string }
 
 const Avatar = ({ name, image }: { name: string; image: string | null }) =>
   image ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={image} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+    <RemoteImage src={image} width={36} height={36} className="h-9 w-9 shrink-0 rounded-full object-cover" />
   ) : (
-    <span className="bg-ui-bg-interactive flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-extrabold text-brand">
       {name.charAt(0).toUpperCase()}
     </span>
   )
@@ -231,19 +231,19 @@ const BookingPanel = ({ offer }: { offer: AppointmentProductOffer }) => {
 
   return (
     <div
-      className="border-ui-border-base flex flex-col gap-y-4 rounded-xl border p-5 shadow-elevation-card-rest"
+      className="flex flex-col gap-y-4 rounded-large bg-card p-5 shadow-lift"
       data-testid="booking-panel"
     >
       <div className="flex items-baseline justify-between">
-        <span className="text-2xl font-semibold">
+        <span className="font-display text-2xl font-extrabold text-ink">
           {money(choice?.slot.price ?? service.from_price, currency)}
         </span>
-        <span className="text-ui-fg-subtle txt-small">{durationText}</span>
+        <span className="text-sm text-muted">{durationText}</span>
       </div>
 
       {service.variants.length > 1 ? (
         <div className="flex flex-col gap-1">
-          <label className="txt-compact-small-plus" htmlFor="appt-variant">
+          <label className="text-sm font-bold text-ink" htmlFor="appt-variant">
             Option
           </label>
           <select
@@ -253,7 +253,7 @@ const BookingPanel = ({ offer }: { offer: AppointmentProductOffer }) => {
               setVariantId(e.target.value)
               setChoice(null)
             }}
-            className="border-ui-border-base rounded-md border px-3 py-2"
+            className="w-full rounded-rounded border border-line bg-card px-3 py-2.5 text-ink placeholder:text-muted"
           >
             {service.variants.map((v) => (
               <option key={v.id} value={v.id}>
@@ -266,7 +266,7 @@ const BookingPanel = ({ offer }: { offer: AppointmentProductOffer }) => {
 
       {multiple ? (
         <div className="flex flex-col gap-2">
-          <span className="text-ui-fg-subtle txt-small">Who would you like?</span>
+          <span className="text-sm text-muted">Who would you like?</span>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Who would you like?">
             {[{ id: ANY, name: "Any professional", sub: "Earliest available", image: null as string | null }]
               .concat(
@@ -287,20 +287,20 @@ const BookingPanel = ({ offer }: { offer: AppointmentProductOffer }) => {
                     setWho(opt.id)
                     setChoice(null)
                   }}
-                  className={`flex min-w-[140px] flex-1 items-center gap-2 rounded-xl border-2 px-3 py-2 text-left ${
-                    who === opt.id ? "border-ui-fg-base bg-ui-bg-subtle" : "border-ui-border-base"
+                  className={`flex min-w-[140px] flex-1 items-center gap-2 rounded-[12px] border-[1.5px] px-3 py-2 text-left ${
+                    who === opt.id ? "border-brand bg-brand-soft" : "border-line bg-card"
                   }`}
                 >
                   {opt.id === ANY ? (
-                    <span className="bg-ui-bg-component flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-canvas text-ink">
                       ★
                     </span>
                   ) : (
                     <Avatar name={opt.name} image={opt.image} />
                   )}
                   <span className="flex flex-col">
-                    <span className="txt-compact-small-plus">{opt.name}</span>
-                    <span className="text-ui-fg-subtle txt-compact-xsmall">{opt.sub}</span>
+                    <span className="text-sm font-bold text-ink">{opt.name}</span>
+                    <span className="text-xs text-muted">{opt.sub}</span>
                   </span>
                 </button>
               ))}
@@ -309,23 +309,23 @@ const BookingPanel = ({ offer }: { offer: AppointmentProductOffer }) => {
       ) : null}
 
       {loading ? (
-        <p className="text-ui-fg-subtle txt-small">Loading available times...</p>
+        <p className="text-sm text-muted">Loading available times...</p>
       ) : loadError ? (
-        <p className="text-ui-fg-error txt-small">{loadError}</p>
+        <p className="text-sm text-brand">{loadError}</p>
       ) : !days.length ? (
-        <p className="text-ui-fg-subtle txt-small">
+        <p className="text-sm text-muted">
           No times are available in the next {WINDOW_DAYS} days. Please check back later.
         </p>
       ) : (
         <>
           {nextText ? (
-            <div className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+            <div className="rounded-[12px] bg-success-soft px-3 py-2 text-sm text-success">
               Next available: <b>{nextText}</b>
             </div>
           ) : null}
 
           <div className="flex flex-col gap-2">
-            <span className="text-ui-fg-subtle txt-small">Pick a day</span>
+            <span className="text-sm text-muted">Pick a day</span>
             <div className="flex gap-2 overflow-x-auto pb-1" role="list">
               {days.map((d) => (
                 <button
@@ -337,21 +337,21 @@ const BookingPanel = ({ offer }: { offer: AppointmentProductOffer }) => {
                     setDay(d)
                     setChoice(null)
                   }}
-                  className={`min-w-[64px] shrink-0 rounded-lg border-2 px-2 py-2 text-center ${
+                  className={`min-w-[64px] shrink-0 rounded-[12px] border-[1.5px] px-2 py-2 text-center text-ink ${
                     day === d
-                      ? "bg-ui-button-inverted text-ui-fg-on-inverted border-transparent"
-                      : "border-ui-border-base"
+                      ? "border-brand bg-brand-soft"
+                      : "border-line bg-card hover:border-brand"
                   }`}
                 >
-                  <div className="txt-compact-small-plus">{labelFor(d)}</div>
-                  <div className="txt-compact-xsmall opacity-70">{dayParts(d).date}</div>
+                  <div className="text-sm font-bold">{labelFor(d)}</div>
+                  <div className="text-xs text-muted">{dayParts(d).date}</div>
                 </button>
               ))}
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
-            <span className="text-ui-fg-subtle txt-small">Pick a time</span>
+            <span className="text-sm text-muted">Pick a time</span>
             <div className="grid grid-cols-3 gap-2">
               {daySlots.map((c) => (
                 <button
@@ -360,33 +360,33 @@ const BookingPanel = ({ offer }: { offer: AppointmentProductOffer }) => {
                   aria-pressed={choice?.slot.start === c.slot.start}
                   onClick={() => setChoice(c)}
                   data-testid="slot-button"
-                  className={`rounded-lg border-2 px-1 py-2 text-center text-sm ${
+                  className={`rounded-[12px] border-[1.5px] px-1 py-2 text-center text-sm font-bold text-ink ${
                     choice?.slot.start === c.slot.start
-                      ? "border-blue-600 bg-blue-600 text-white"
-                      : "border-ui-border-base"
+                      ? "border-brand bg-brand-soft"
+                      : "border-line bg-card hover:border-brand"
                   }`}
                 >
                   {timeOf(c.slot.start, tz)}
                 </button>
               ))}
             </div>
-            <p className="text-ui-fg-subtle txt-compact-xsmall">Times shown in {tz}.</p>
+            <p className="text-xs text-muted">Times shown in {tz}.</p>
           </div>
         </>
       )}
 
       {choice ? (
-        <div className="border-ui-border-base flex flex-col gap-3 border-t pt-4">
-          <div className="txt-small">
-            <div className="txt-compact-medium-plus">
+        <div className="flex flex-col gap-3 border-t border-line pt-4">
+          <div className="text-sm">
+            <div className="font-bold text-ink">
               {service.title} with {resourceName(choice.resourceId)}
               {who === ANY ? (
-                <span className="ml-2 rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">
+                <span className="ml-2 rounded-circle bg-success-soft px-2 py-0.5 text-xs font-bold text-success">
                   auto-assigned
                 </span>
               ) : null}
             </div>
-            <div className="text-ui-fg-subtle">
+            <div className="text-muted">
               {dayParts(dateKey(choice.slot.start, tz)).weekday},{" "}
               {dayParts(dateKey(choice.slot.start, tz)).date} · {timeOf(choice.slot.start, tz)} –{" "}
               {timeOf(choice.slot.end, tz)}
@@ -400,7 +400,7 @@ const BookingPanel = ({ offer }: { offer: AppointmentProductOffer }) => {
             onChange={(e) => setName(e.target.value)}
             maxLength={120}
             autoComplete="name"
-            className="border-ui-border-base rounded-md border px-3 py-2"
+            className="w-full rounded-rounded border border-line bg-card px-3 py-2.5 text-ink placeholder:text-muted"
           />
           <input
             placeholder="Email"
@@ -409,7 +409,7 @@ const BookingPanel = ({ offer }: { offer: AppointmentProductOffer }) => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
-            className="border-ui-border-base rounded-md border px-3 py-2"
+            className="w-full rounded-rounded border border-line bg-card px-3 py-2.5 text-ink placeholder:text-muted"
           />
           <input
             placeholder="Phone (optional)"
@@ -418,13 +418,13 @@ const BookingPanel = ({ offer }: { offer: AppointmentProductOffer }) => {
             onChange={(e) => setPhone(e.target.value)}
             maxLength={40}
             autoComplete="tel"
-            className="border-ui-border-base rounded-md border px-3 py-2"
+            className="w-full rounded-rounded border border-line bg-card px-3 py-2.5 text-ink placeholder:text-muted"
           />
         </div>
       ) : null}
 
       {submitError ? (
-        <p className="text-ui-fg-error txt-small" role="alert">
+        <p className="text-sm text-brand" role="alert">
           {submitError} Please pick another time.
         </p>
       ) : null}
@@ -434,15 +434,15 @@ const BookingPanel = ({ offer }: { offer: AppointmentProductOffer }) => {
         onClick={book}
         disabled={!!formProblem || submitting}
         data-testid="reserve-button"
-        className="bg-ui-button-inverted text-ui-fg-on-inverted w-full rounded-lg px-6 py-3 font-semibold disabled:opacity-40"
+        className="w-full rounded-large bg-brand px-6 py-3 font-extrabold text-brand-ink hover:opacity-90 disabled:opacity-40"
       >
         {submitting ? "Reserving..." : "Book now"}
       </button>
       {choice && formProblem && (name || email) ? (
-        <p className="text-ui-fg-subtle txt-small">{formProblem}</p>
+        <p className="text-sm text-muted">{formProblem}</p>
       ) : null}
 
-      <ul className="text-ui-fg-subtle txt-compact-xsmall flex flex-col gap-1">
+      <ul className="flex flex-col gap-1 text-xs text-muted">
         {cancelHours !== null ? (
           <li>
             ✓ Free cancellation up to {cancelHours} hour{cancelHours === 1 ? "" : "s"} before

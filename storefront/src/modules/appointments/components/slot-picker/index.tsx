@@ -1,6 +1,7 @@
 "use client"
 
 import { addAppointmentToCart, getAppointmentSlots } from "@lib/data/appointments"
+import RemoteImage from "../remote-image"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { AppointmentResource, AppointmentSlot } from "types/appointment"
@@ -59,6 +60,7 @@ const money = (value: number | null, currency: string | null) => {
 type Props = {
   resource: AppointmentResource
   initialProductId?: string
+  businessName?: string
 }
 
 /**
@@ -69,7 +71,7 @@ type Props = {
  * timezone (changeable). Choosing a slot holds it for the resource's hold time
  * while the shopper pays; the hold is taken by the server, never assumed here.
  */
-const SlotPicker = ({ resource, initialProductId }: Props) => {
+const SlotPicker = ({ resource, initialProductId, businessName }: Props) => {
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
 
@@ -200,227 +202,286 @@ const SlotPicker = ({ resource, initialProductId }: Props) => {
   }
 
   if (!selectedService) {
-    return <p className="text-ui-fg-subtle">This resource has no services to book.</p>
+    return <p className="text-muted">This resource has no services to book.</p>
   }
 
+  const field =
+    "w-full rounded-rounded border border-line bg-card px-3 py-2.5 text-ink placeholder:text-muted"
+  const card = "rounded-large bg-card p-5 shadow-lift"
+  const heading = "mb-3 font-display text-lg font-extrabold text-ink"
+
   return (
-    <div className="flex flex-col gap-10" data-testid="slot-picker">
-      {resource.services.length > 1 ? (
-        <div className="flex flex-col gap-2">
-          <label className="txt-medium-plus" htmlFor="service-select">
-            Service
-          </label>
-          <select
-            id="service-select"
-            value={productId}
-            onChange={(e) => {
-              const next = resource.services.find((s) => s.product_id === e.target.value)
-              setProductId(e.target.value)
-              setVariantId(next?.variants?.[0]?.id ?? "")
-            }}
-            className="border-ui-border-base w-full max-w-md rounded-md border px-3 py-2"
-          >
-            {resource.services.map((s) => (
-              <option key={s.product_id} value={s.product_id}>
-                {s.title} · {s.duration_minutes} min
-              </option>
-            ))}
-          </select>
+    <div
+      className="grid grid-cols-1 items-start gap-4 medium:grid-cols-[280px_minmax(0,1fr)_340px]"
+      data-testid="slot-picker"
+    >
+      {/* Left: who and what */}
+      <div className={`${card} flex flex-col gap-4`}>
+        <div className="flex items-center gap-3">
+          {resource.image_url ? (
+            <RemoteImage
+              src={resource.image_url}
+              width={56}
+              height={56}
+              className="h-14 w-14 shrink-0 rounded-[12px] object-cover"
+            />
+          ) : (
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-brand-soft font-display text-2xl font-extrabold text-brand">
+              {(resource.name ?? "?").slice(0, 1).toUpperCase()}
+            </div>
+          )}
+          <div className="min-w-0">
+            <h1 className="break-words font-display text-xl font-extrabold tracking-tight text-ink">
+              {resource.name}
+            </h1>
+            {businessName ? <p className="text-sm text-muted">{businessName}</p> : null}
+          </div>
         </div>
-      ) : null}
 
-      {selectedService.variants.length > 1 ? (
-        <div className="flex flex-col gap-2">
-          <label className="txt-medium-plus" htmlFor="variant-select">
-            Option
-          </label>
-          <select
-            id="variant-select"
-            value={variantId}
-            onChange={(e) => setVariantId(e.target.value)}
-            className="border-ui-border-base w-full max-w-md rounded-md border px-3 py-2"
-          >
-            {selectedService.variants.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.title}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
-
-      <div className="flex flex-col gap-2">
-        <label className="txt-medium-plus" htmlFor="tz-select">
-          Your timezone
-        </label>
-        <input
-          id="tz-select"
-          list="tz-options"
-          value={tz}
-          onChange={(e) => {
-            try {
-              new Intl.DateTimeFormat("en-US", { timeZone: e.target.value })
-              setTz(e.target.value)
-            } catch {
-              // ignore partial/invalid input while typing
-            }
-          }}
-          className="border-ui-border-base w-full max-w-md rounded-md border px-3 py-2"
-        />
-        <datalist id="tz-options">
-          {zones().map((z) => (
-            <option key={z} value={z} />
-          ))}
-        </datalist>
-        <p className="text-ui-fg-subtle txt-small">
-          {resource.name} is in {resource.timezone}; times below are shown in {tz}.
-        </p>
-      </div>
-
-      <section aria-label="Pick a day">
-        <h2 className="txt-large-plus mb-3">1. Pick a day</h2>
-        {loading ? (
-          <p className="text-ui-fg-subtle">Loading available times...</p>
-        ) : loadError ? (
-          <p className="text-ui-fg-error">{loadError}</p>
-        ) : !days.length ? (
-          <p className="text-ui-fg-subtle">
-            No times are available in the next {WINDOW_DAYS} days. Please check back later.
-          </p>
+        {resource.services.length > 1 ? (
+          <div className="flex flex-col gap-2">
+            <label className="font-bold text-ink" htmlFor="service-select">
+              Service
+            </label>
+            <select
+              id="service-select"
+              value={productId}
+              onChange={(e) => {
+                const next = resource.services.find((s) => s.product_id === e.target.value)
+                setProductId(e.target.value)
+                setVariantId(next?.variants?.[0]?.id ?? "")
+              }}
+              className={field}
+            >
+              {resource.services.map((s) => (
+                <option key={s.product_id} value={s.product_id}>
+                  {s.title} · {s.duration_minutes} min
+                </option>
+              ))}
+            </select>
+          </div>
         ) : (
-          <div className="flex flex-wrap gap-2" role="list">
-            {days.map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => {
-                  setDay(d)
-                  setSlot(null)
-                }}
-                aria-pressed={day === d}
-                className={`rounded-md border px-3 py-2 text-left ${
-                  day === d
-                    ? "bg-ui-button-inverted text-ui-fg-on-inverted"
-                    : "border-ui-border-base hover:bg-ui-bg-base-hover"
-                }`}
-              >
-                <div className="txt-compact-small-plus">{dayLabel(d)}</div>
-                <div className="txt-compact-xsmall opacity-70">
-                  {byDay.get(d)?.length} time{byDay.get(d)?.length === 1 ? "" : "s"}
-                </div>
-              </button>
-            ))}
+          <div className="rounded-[12px] border border-brand bg-brand-soft p-3">
+            <div className="font-bold text-ink">{selectedService.title}</div>
+            <div className="text-sm text-muted">{selectedService.duration_minutes} min</div>
           </div>
         )}
-      </section>
 
-      {day ? (
-        <section aria-label="Pick a time">
-          <h2 className="txt-large-plus mb-3">2. Pick a time — {dayLabel(day)}</h2>
-          <div className="grid grid-cols-2 gap-2 small:grid-cols-4 medium:grid-cols-6">
-            {daySlots.map((s) => (
-              <button
-                key={s.start}
-                type="button"
-                onClick={() => setSlot(s)}
-                aria-pressed={slot?.start === s.start}
-                data-testid="slot-button"
-                className={`rounded-md border px-3 py-2 ${
-                  slot?.start === s.start
-                    ? "bg-ui-button-inverted text-ui-fg-on-inverted"
-                    : "border-ui-border-base hover:bg-ui-bg-base-hover"
-                }`}
-              >
-                <div className="txt-compact-small-plus">{time(s.start, tz)}</div>
-                <div className="txt-compact-xsmall opacity-70">
-                  {s.capacity > 1 ? `${s.spots_left} left · ` : ""}
-                  {money(s.price, currency)}
-                </div>
-              </button>
+        {selectedService.variants.length > 1 ? (
+          <div className="flex flex-col gap-2">
+            <label className="font-bold text-ink" htmlFor="variant-select">
+              Option
+            </label>
+            <select
+              id="variant-select"
+              value={variantId}
+              onChange={(e) => setVariantId(e.target.value)}
+              className={field}
+            >
+              {selectedService.variants.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.title}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
+        <div className="flex flex-col gap-2">
+          <label className="font-bold text-ink" htmlFor="tz-select">
+            Your timezone
+          </label>
+          <input
+            id="tz-select"
+            list="tz-options"
+            value={tz}
+            onChange={(e) => {
+              try {
+                new Intl.DateTimeFormat("en-US", { timeZone: e.target.value })
+                setTz(e.target.value)
+              } catch {
+                // ignore partial/invalid input while typing
+              }
+            }}
+            className={field}
+          />
+          <datalist id="tz-options">
+            {zones().map((z) => (
+              <option key={z} value={z} />
             ))}
-          </div>
-        </section>
-      ) : null}
+          </datalist>
+          <p className="text-sm text-muted">
+            {resource.name} is in {resource.timezone}; times shown in {tz}.
+          </p>
+        </div>
+      </div>
 
-      {slot ? (
-        <section aria-label="Your details" className="flex max-w-xl flex-col gap-4">
-          <h2 className="txt-large-plus">3. Your details</h2>
-          <input
-            placeholder="Full name"
-            aria-label="Full name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={120}
-            autoComplete="name"
-            className="border-ui-border-base rounded-md border px-3 py-2"
-          />
-          <input
-            placeholder="Email"
-            aria-label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            className="border-ui-border-base rounded-md border px-3 py-2"
-          />
-          <input
-            placeholder="Phone (optional)"
-            aria-label="Phone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            maxLength={40}
-            autoComplete="tel"
-            className="border-ui-border-base rounded-md border px-3 py-2"
-          />
-          <textarea
-            placeholder="Anything we should know? (optional)"
-            aria-label="Notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            maxLength={1000}
-            rows={3}
-            className="border-ui-border-base rounded-md border px-3 py-2"
-          />
-
-          <div className="bg-ui-bg-subtle rounded-md p-4">
-            <div className="txt-medium-plus">
-              {selectedService.title} with {resource.name}
-            </div>
-            <div className="txt-small">
-              {dayLabel(dateKey(slot.start, tz))}, {time(slot.start, tz)} – {time(slot.end, tz)} ({tz})
-            </div>
-            <div className="txt-medium-plus mt-1">{money(slot.price, currency)}</div>
-            {holdMinutes ? (
-              <div className="text-ui-fg-subtle txt-small mt-2">
-                We&rsquo;ll hold this time for {holdMinutes} minutes while you check out.
-              </div>
-            ) : null}
-            {cancelHours !== null ? (
-              <div className="text-ui-fg-subtle txt-small">
-                Free cancellation up to {cancelHours} hour{cancelHours === 1 ? "" : "s"} before.
-              </div>
-            ) : null}
-          </div>
-
-          {submitError ? (
-            <p className="text-ui-fg-error" role="alert">
-              {submitError}
+      {/* Centre: day and time */}
+      <div className={`${card} flex min-w-0 flex-col gap-6`}>
+        <section aria-label="Pick a day">
+          <h2 className={heading}>1. Pick a day</h2>
+          {loading ? (
+            <p className="text-muted">Loading available times...</p>
+          ) : loadError ? (
+            <p className="text-brand">{loadError}</p>
+          ) : !days.length ? (
+            <p className="text-muted">
+              No times are available in the next {WINDOW_DAYS} days. Please check back later.
             </p>
-          ) : null}
-          <button
-            type="button"
-            onClick={reserve}
-            disabled={!!formProblem || submitting}
-            className="bg-ui-button-inverted text-ui-fg-on-inverted w-fit rounded-md px-6 py-3 disabled:opacity-50"
-            data-testid="reserve-button"
-          >
-            {submitting ? "Reserving..." : "Continue to checkout"}
-          </button>
-          {formProblem && (name || email) ? (
-            <p className="text-ui-fg-subtle txt-small">{formProblem}</p>
-          ) : null}
+          ) : (
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2" role="list">
+              {days.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => {
+                    setDay(d)
+                    setSlot(null)
+                  }}
+                  aria-pressed={day === d}
+                  className={`shrink-0 rounded-[12px] border-[1.5px] px-3 py-2 text-left ${
+                    day === d
+                      ? "border-brand bg-brand-soft text-ink"
+                      : "border-line bg-card text-ink hover:border-brand"
+                  }`}
+                >
+                  <div className="text-sm font-bold">{dayLabel(d)}</div>
+                  <div className="text-xs text-muted">
+                    {byDay.get(d)?.length} time{byDay.get(d)?.length === 1 ? "" : "s"}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </section>
-      ) : null}
+
+        {day ? (
+          <section aria-label="Pick a time">
+            <h2 className={heading}>2. Pick a time — {dayLabel(day)}</h2>
+            <div className="grid grid-cols-2 gap-2 xsmall:grid-cols-3 small:grid-cols-4 medium:grid-cols-3 large:grid-cols-4">
+              {daySlots.map((s) => (
+                <button
+                  key={s.start}
+                  type="button"
+                  onClick={() => setSlot(s)}
+                  aria-pressed={slot?.start === s.start}
+                  data-testid="slot-button"
+                  className={`rounded-[12px] border-[1.5px] px-3 py-2 text-center ${
+                    slot?.start === s.start
+                      ? "border-brand bg-brand-soft text-ink"
+                      : "border-line bg-card text-ink hover:border-brand"
+                  }`}
+                >
+                  <div className="text-sm font-bold">{time(s.start, tz)}</div>
+                  <div className="text-xs text-muted">
+                    {s.capacity > 1 ? `${s.spots_left} left · ` : ""}
+                    {money(s.price, currency)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
+
+      {/* Right: your booking */}
+      <aside
+        aria-label="Your booking"
+        className={`${card} flex flex-col gap-4 medium:sticky medium:top-24`}
+      >
+        <h2 className="font-display text-lg font-extrabold text-ink">Your booking</h2>
+
+        <div className="rounded-[12px] bg-canvas p-4">
+          <div className="font-bold text-ink">
+            {selectedService.title} with {resource.name}
+          </div>
+          {slot ? (
+            <>
+              <div className="mt-1 text-sm text-ink">
+                {dayLabel(dateKey(slot.start, tz))}, {time(slot.start, tz)} – {time(slot.end, tz)} (
+                {tz})
+              </div>
+              <div className="mt-1 font-extrabold text-ink">{money(slot.price, currency)}</div>
+            </>
+          ) : (
+            <div className="mt-1 text-sm text-muted">Pick a time to continue.</div>
+          )}
+          {slot && holdMinutes ? (
+            <div className="mt-2 text-sm text-muted">
+              We&rsquo;ll hold this time for {holdMinutes} minutes while you check out.
+            </div>
+          ) : null}
+          {slot && cancelHours !== null ? (
+            <div className="text-sm text-muted">
+              Free cancellation up to {cancelHours} hour{cancelHours === 1 ? "" : "s"} before.
+            </div>
+          ) : null}
+        </div>
+
+        {slot ? (
+          <section aria-label="Your details" className="flex flex-col gap-3">
+            <h3 className="font-bold text-ink">3. Your details</h3>
+            <input
+              placeholder="Full name"
+              aria-label="Full name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={120}
+              autoComplete="name"
+              className={field}
+            />
+            <input
+              placeholder="Email"
+              aria-label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              className={field}
+            />
+            <input
+              placeholder="Phone (optional)"
+              aria-label="Phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              maxLength={40}
+              autoComplete="tel"
+              className={field}
+            />
+            <textarea
+              placeholder="Anything we should know? (optional)"
+              aria-label="Notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              maxLength={1000}
+              rows={3}
+              className={field}
+            />
+          </section>
+        ) : null}
+
+        {submitError ? (
+          <p className="text-brand" role="alert">
+            {submitError}
+          </p>
+        ) : null}
+        {slot ? (
+          <>
+            <button
+              type="button"
+              onClick={reserve}
+              disabled={!!formProblem || submitting}
+              className="w-full rounded-large bg-brand px-6 py-3 font-extrabold text-brand-ink hover:opacity-90 disabled:opacity-50"
+              data-testid="reserve-button"
+            >
+              {submitting ? "Reserving..." : "Continue to checkout"}
+            </button>
+            {formProblem && (name || email) ? (
+              <p className="text-sm text-muted">{formProblem}</p>
+            ) : null}
+          </>
+        ) : null}
+      </aside>
     </div>
   )
 }

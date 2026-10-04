@@ -1,4 +1,3 @@
-import { getProductsById } from "@lib/data/products"
 import { getProductAppointmentOffer } from "@lib/data/appointments"
 import { getTicketProductAvailability } from "@lib/data/tickets"
 import { HttpTypes } from "@medusajs/types"
@@ -12,24 +11,21 @@ import { Text } from "@medusajs/ui"
  * Fetches real time pricing for a product and renders the product actions component.
  */
 export default async function ProductActionsWrapper({
-  id,
+  product,
   region,
 }: {
-  id: string
+  product: HttpTypes.StoreProduct
   region: HttpTypes.StoreRegion
 }) {
-  // Each lookup hits the backend (and its database) separately, so run them
-  // together rather than one after another. A failed lookup resolves to null
-  // and the page falls through to the normal flow.
-  const [[product], ticketAvailability, appointmentOffer] = await Promise.all([
-    getProductsById({ ids: [id], regionId: region.id }),
+  const id = product.id
+  // The product (with enquiry/EOI config) is already loaded by the page, so
+  // only the two probes remain; both are cached (including the "not a show /
+  // not an appointment" answer) and run together. A failed lookup resolves to
+  // null and the page falls through to the normal flow.
+  const [ticketAvailability, appointmentOffer] = await Promise.all([
     getTicketProductAvailability(id),
     getProductAppointmentOffer(id, region.id),
   ])
-
-  if (!product) {
-    return null
-  }
 
   // A show is bought by seat, not by variant, so it replaces the standard
   // actions entirely. Any other product returns no availability here and

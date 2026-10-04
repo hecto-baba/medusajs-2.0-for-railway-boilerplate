@@ -1,42 +1,48 @@
-"use client"
-
 import Back from "@modules/common/icons/back"
 import FastDelivery from "@modules/common/icons/fast-delivery"
 import Refresh from "@modules/common/icons/refresh"
 
-import Accordion from "./accordion"
 import { HttpTypes } from "@medusajs/types"
 
 type ProductTabsProps = {
   product: HttpTypes.StoreProduct
 }
 
-const ProductTabs = ({ product }: ProductTabsProps) => {
-  const tabs = [
-    {
-      label: "Product Information",
-      component: <ProductInfoTab product={product} />,
-    },
-    {
-      label: "Shipping & Returns",
-      component: <ShippingInfoTab />,
-    },
-  ]
+/**
+ * Server component: native <details> gives the same collapsible sections with
+ * no client JS (the previous Radix accordion shipped a client bundle for two
+ * static panels).
+ */
+const Section = ({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) => (
+  <details className="border-line group border-t py-3 last:border-b">
+    <summary className="flex w-full cursor-pointer list-none items-center justify-between px-1 [&::-webkit-details-marker]:hidden">
+      <span className="text-ink text-sm font-bold">{title}</span>
+      <span
+        aria-hidden
+        className="text-muted p-[6px] text-lg leading-none group-open:rotate-45"
+      >
+        +
+      </span>
+    </summary>
+    <div className="px-1">{children}</div>
+  </details>
+)
 
+const ProductTabs = ({ product }: ProductTabsProps) => {
   return (
     <div className="w-full">
-      <Accordion type="multiple">
-        {tabs.map((tab, i) => (
-          <Accordion.Item
-            key={i}
-            title={tab.label}
-            headingSize="medium"
-            value={tab.label}
-          >
-            {tab.component}
-          </Accordion.Item>
-        ))}
-      </Accordion>
+      <Section title="Product Information">
+        <ProductInfoTab product={product} />
+      </Section>
+      <Section title="Shipping & Returns">
+        <ShippingInfoTab />
+      </Section>
     </div>
   )
 }

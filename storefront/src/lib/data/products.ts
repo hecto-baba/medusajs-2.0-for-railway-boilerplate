@@ -4,7 +4,9 @@ import { cache } from "react"
 import { getRegion } from "./regions"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import { sortProducts } from "@lib/util/sort-products"
-import { getCacheDirectives, getAuthHeaders } from "./cookies"
+import { ListingFilters } from "@lib/util/listing-filters"
+import { getProductPrice } from "@lib/util/get-product-price"
+import { getAuthHeaders, getSharedCacheDirectives } from "./cookies"
 
 // See the note in regions.ts for why these are client.fetch calls rather than
 // the sdk.store.* helpers.
@@ -21,9 +23,9 @@ export const getProductsById = cache(async function ({
       query: {
         id: ids,
         region_id: regionId,
-        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,+variants.digital_product,+enquiry_configuration.*",
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,+variants.digital_product,+enquiry_configuration.*,+variants.eoi_configuration.*",
       },
-      ...(await getCacheDirectives("products")),
+      ...getSharedCacheDirectives("products", 60),
     })
     .then(({ products }) => products)
 })
@@ -38,9 +40,11 @@ export const getProductByHandle = cache(async function (
       query: {
         handle,
         region_id: regionId,
-        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,+variants.digital_product",
+        // Same field set as getProductsById so the page does not need a second
+        // /store/products?id= round trip just to learn enquiry/EOI config.
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+rental_configuration.*,+variants.digital_product,+enquiry_configuration.*,+variants.eoi_configuration.*",
       },
-      ...(await getCacheDirectives("products")),
+      ...getSharedCacheDirectives("products", 60),
     })
     .then(({ products }) => products[0])
 })
@@ -76,10 +80,10 @@ export const getProductsList = cache(async function ({
         limit,
         offset,
         region_id: region.id,
-        fields: "*variants.calculated_price,+variants.digital_product",
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+variants.digital_product,+rental_configuration.*,+enquiry_configuration.*",
         ...queryParams,
       },
-      ...(await getCacheDirectives("products")),
+      ...getSharedCacheDirectives("products", 60),
     })
     .then(({ products, count }) => {
       const nextPage = count > offset + limit ? pageParam + 1 : null
@@ -105,12 +109,14 @@ export const getProductsListWithSort = cache(async function ({
   sortBy = "created_at",
   countryCode,
   digitalFilter,
+  filters,
 }: {
   page?: number
   queryParams?: HttpTypes.StoreProductListParams
   sortBy?: SortOptions
   countryCode: string
   digitalFilter?: "only" | "exclude"
+  filters?: ListingFilters
 }): Promise<{
   response: { products: HttpTypes.StoreProduct[]; count: number }
   nextPage: number | null
@@ -138,6 +144,19 @@ export const getProductsListWithSort = cache(async function ({
     filteredProducts = products.filter(
       (p: any) => !p.variants?.some((v: any) => !!v.digital_product)
     )
+  }
+
+  // Price filters work on the cheapest variant. Done here, on the 100 products
+  // already loaded for sorting, because the list endpoint cannot filter by price.
+  if (filters?.onSale || filters?.minPrice !== undefined || filters?.maxPrice !== undefined) {
+    filteredProducts = filteredProducts.filter((product) => {
+      const price = getProductPrice({ product }).cheapestPrice
+      if (!price) return false
+      if (filters.onSale && !(price.original_price_number > price.calculated_price_number)) return false
+      if (filters.minPrice !== undefined && price.calculated_price_number < filters.minPrice) return false
+      if (filters.maxPrice !== undefined && price.calculated_price_number > filters.maxPrice) return false
+      return true
+    })
   }
 
   const sortedProducts = sortProducts(filteredProducts, sortBy)
