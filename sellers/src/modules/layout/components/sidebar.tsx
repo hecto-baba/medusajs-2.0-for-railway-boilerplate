@@ -105,7 +105,6 @@ const NAV_ITEMS: NavGroup[] = [
       { href: "/appointments/resources", label: "Resources" },
       { href: "/appointments/pricing-rules", label: "Pricing Rules" },
       { href: "/appointments/bookings", label: "Bookings" },
-      { href: "/my-schedule", label: "My Schedule" },
     ],
   },
   {

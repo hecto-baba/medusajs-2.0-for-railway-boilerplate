@@ -45,7 +45,6 @@ const SEGMENT_LABELS: Record<string, string> = {
   earnings: "Earnings",
   venues: "Venues",
   shows: "Shows",
-  "my-schedule": "My Schedule",
   dashboard: "Commerce Infrastructure",
   "commerce-infra": "Commerce Infrastructure",
   settings: "Settings",
