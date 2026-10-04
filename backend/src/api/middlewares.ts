@@ -97,6 +97,9 @@ import { GetVendorOrdersSchema } from "./vendors/orders/route";
 import { GetVendorPromotionsSchema } from "./vendors/promotions/route";
 import { GetVendorCampaignsSchema } from "./vendors/campaigns/route";
 import { PostVendorRentalConfigSchema } from "./vendors/products/[id]/rental-config/route";
+import { PostVendorEnquiryConfigSchema } from "./vendors/products/[id]/enquiry-config/route";
+import { PostVendorEnquiryReplyBodySchema } from "./vendors/enquiries/[id]/route";
+import { PostVendorEnquiryStatusBodySchema } from "./vendors/enquiries/[id]/status/route";
 import { PostVendorAppointmentConfigSchema } from "./vendors/products/[id]/appointment-config/route";
 import { PostVendorRentalStatusBodySchema } from "./vendors/rentals/[id]/route";
 import { PostVendorRentalDepositBodySchema } from "./vendors/rentals/[id]/deposit/route";
@@ -1116,6 +1119,39 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [
         validateAndTransformBody(PostVendorRentalConfigSchema)
+      ]
+    },
+    // Enquiries. /vendors/products/:id/enquiry-config and .../enquiries sit
+    // under "/vendors/products/:id/*" (authenticated above); the queue routes
+    // do not, so they authenticate explicitly. Every handler also runs an
+    // ownership check - authenticate() only proves the caller is *a* vendor.
+    ...[
+      "/vendors/enquiries",
+      "/vendors/enquiries/:id",
+      "/vendors/enquiries/:id/status",
+    ].map((matcher) => ({
+      matcher,
+      middlewares: [authenticate("vendor", ["session", "bearer"])],
+    })),
+    {
+      matcher: "/vendors/products/:id/enquiry-config",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorEnquiryConfigSchema)
+      ]
+    },
+    {
+      matcher: "/vendors/enquiries/:id",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorEnquiryReplyBodySchema)
+      ]
+    },
+    {
+      matcher: "/vendors/enquiries/:id/status",
+      methods: ["POST"],
+      middlewares: [
+        validateAndTransformBody(PostVendorEnquiryStatusBodySchema)
       ]
     },
     {

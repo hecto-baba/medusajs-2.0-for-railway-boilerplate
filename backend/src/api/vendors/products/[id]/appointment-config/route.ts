@@ -4,6 +4,8 @@ import type {
 } from "@medusajs/framework/http"
 import { MedusaError } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
+import { assertNoOtherSaleMode, withSaleModeLock } from "../../../../../lib/sale-mode"
+import { disableStockTracking } from "../../../../../lib/service-stock"
 import { isUniqueViolation } from "../../../../../modules/appointment-booking/lib/db-errors"
 import {
   computeReadiness,
@@ -176,14 +178,27 @@ export const POST = async (
     if (toDelete.length) await service.deleteServiceProviders(toDelete)
   }
 
-  try {
-    await apply()
-  } catch (err) {
-    // A concurrent save inserted a row between our read and write; the diff is
-    // idempotent, so recompute once from fresh state.
-    if (!isUniqueViolation(err)) throw err
-    await apply()
-  }
+  // One sale mode per product (e.g. not while enquiries are on). Only when
+  // resources are being offered - clearing the list must always work. The
+  // check and the write share one lock so another mode cannot switch on
+  // between them.
+  await withSaleModeLock(req.scope, [id], async () => {
+    if (wanted.size) {
+      await assertNoOtherSaleMode(req.scope, id, "appointment")
+    }
+
+    try {
+      await apply()
+    } catch (err) {
+      // A concurrent save inserted a row between our read and write; the diff is
+      // idempotent, so recompute once from fresh state.
+      if (!isUniqueViolation(err)) throw err
+      await apply()
+    }
+
+    // A service has no stock to count (see service-stock.ts).
+    if (wanted.size) await disableStockTracking(req.scope, [id])
+  })
 
   res.json(await loadConfig(req, id))
 }

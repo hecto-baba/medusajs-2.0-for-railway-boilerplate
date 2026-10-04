@@ -40,12 +40,9 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
       "updated_at",
     ],
     filters: { product_id: id },
+    // Newest first, ordered by the database and capped (see the seller route).
+    pagination: { take: 200, order: { created_at: "DESC" } },
   })
 
-  res.json({
-    enquiries: enquiries.sort(
-      (a, b) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime()
-    ),
-    count: enquiries.length,
-  })
+  res.json({ enquiries, count: enquiries.length })
 }

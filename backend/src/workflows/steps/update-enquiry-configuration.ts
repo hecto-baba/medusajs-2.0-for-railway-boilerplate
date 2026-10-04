@@ -2,6 +2,7 @@ import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
 import { PRODUCT_ENQUIRY_MODULE } from "../../modules/product-enquiry"
 import ProductEnquiryModuleService from "../../modules/product-enquiry/service"
 import { EnquiryFieldDefinition } from "../../utils/enquiry-field"
+import { assertNoOtherSaleMode, withSaleModeLock } from "../../lib/sale-mode"
 import { validateEnquiryFieldDefinitions } from "../../utils/validate-enquiry-fields"
 
 type UpdateEnquiryConfigurationInput = {
@@ -24,11 +25,22 @@ export const updateEnquiryConfigurationStep = createStep(
       input.id
     )
 
-    const updatedConfig = await productEnquiryModuleService.updateEnquiryConfigurations({
-      id: input.id,
-      status: input.status,
-      custom_fields: input.custom_fields,
-    })
+    const write = () =>
+      productEnquiryModuleService.updateEnquiryConfigurations({
+        id: input.id,
+        status: input.status,
+        custom_fields: input.custom_fields,
+      })
+
+    // Only a switch to "active" can create a conflict; re-saving fields on an
+    // already-active config must keep working. Check and write share one lock.
+    const updatedConfig =
+      input.status === "active" && existingConfig.status !== "active"
+        ? await withSaleModeLock(container, [existingConfig.product_id], async () => {
+            await assertNoOtherSaleMode(container, existingConfig.product_id, "enquiry")
+            return write()
+          })
+        : await write()
 
     return new StepResponse(updatedConfig, existingConfig)
   },

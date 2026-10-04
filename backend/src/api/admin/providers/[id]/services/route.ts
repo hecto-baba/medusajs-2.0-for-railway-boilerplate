@@ -5,6 +5,11 @@ import {
   loadOfferings,
   replaceOfferings,
 } from "../../../../../modules/appointment-booking/lib/resource-ops"
+import {
+  assertNoOtherSaleModeForProducts,
+  withSaleModeLock,
+} from "../../../../../lib/sale-mode"
+import { disableStockTracking } from "../../../../../lib/service-stock"
 import { PostServicesSchema } from "../../../../vendors/resources/schemas"
 import { getService, loadResource } from "../../helpers"
 
@@ -38,6 +43,13 @@ export const POST = async (
     }
   }
 
-  await replaceOfferings(service, resource, services)
+  // One sale mode per product (e.g. not while enquiries are on). Check and
+  // write share one lock so another mode cannot switch on between them.
+  await withSaleModeLock(req.scope, ids, async () => {
+    await assertNoOtherSaleModeForProducts(req.scope, ids, "appointment")
+    await replaceOfferings(service, resource, services)
+    // A service has no stock to count (see service-stock.ts).
+    await disableStockTracking(req.scope, ids)
+  })
   res.json({ services: await loadOfferings(req.scope, service, resource.id) })
 }

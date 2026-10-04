@@ -3,6 +3,8 @@ import { MedusaError } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import { APPOINTMENT_BOOKING_MODULE } from "../../../../../modules/appointment-booking"
 import type AppointmentBookingModuleService from "../../../../../modules/appointment-booking/service"
+import { assertNoOtherSaleMode, withSaleModeLock } from "../../../../../lib/sale-mode"
+import { disableStockTracking } from "../../../../../lib/service-stock"
 import { isUniqueViolation } from "../../../../../modules/appointment-booking/lib/db-errors"
 
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
@@ -105,15 +107,28 @@ export const POST = async (
     if (toDelete.length) await service.deleteServiceProviders(toDelete)
   }
 
-  try {
-    await apply()
-  } catch (err) {
-    // A concurrent save for the same product can create a row between our read
-    // and our write. The diff is cheap and idempotent, so recompute once from
-    // fresh state instead of surfacing a raw constraint error.
-    if (!isUniqueViolation(err)) throw err
-    await apply()
-  }
+  // One sale mode per product (e.g. not while enquiries are on). Only when
+  // providers are being offered - clearing the list must always work. The
+  // check and the write share one lock so another mode cannot switch on
+  // between them.
+  await withSaleModeLock(req.scope, [id], async () => {
+    if (provider_ids.length) {
+      await assertNoOtherSaleMode(req.scope, id, "appointment")
+    }
+
+    try {
+      await apply()
+    } catch (err) {
+      // A concurrent save for the same product can create a row between our read
+      // and our write. The diff is cheap and idempotent, so recompute once from
+      // fresh state instead of surfacing a raw constraint error.
+      if (!isUniqueViolation(err)) throw err
+      await apply()
+    }
+
+    // A service has no stock to count (see service-stock.ts).
+    if (provider_ids.length) await disableStockTracking(req.scope, [id])
+  })
 
   const service_providers = await service.listServiceProviders(
     { service_product_id: id },
