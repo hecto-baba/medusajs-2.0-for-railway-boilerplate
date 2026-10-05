@@ -40,10 +40,22 @@ export const GET = async (
         "currency_code",
         "email",
         "metadata",
+        "canceled_at",
+        "customer_id",
+        // Same totals the admin order page reads, so the seller sees the
+        // identical Summary (item / shipping / tax / discount / total).
         "total",
         "subtotal",
         "shipping_total",
         "tax_total",
+        "original_total",
+        "original_tax_total",
+        "item_subtotal",
+        "item_discount_total",
+        "shipping_subtotal",
+        "discount_total",
+        "shipping_discount_total",
+        "summary",
         "customer.*",
         "shipping_address.*",
         "billing_address.*",
@@ -53,9 +65,24 @@ export const GET = async (
         "items.adjustments",
         "items.variant",
         "items.variant.product",
+        "items.variant.options.*",
         "items.detail",
         "shipping_methods",
+        "shipping_methods.tax_lines.*",
         "payment_collections",
+        // Named fields only: a payment's `data` holds the gateway's own payload
+        // (for Stripe, the payment intent and its client secret).
+        "payment_collections.payments.id",
+        "payment_collections.payments.amount",
+        "payment_collections.payments.currency_code",
+        "payment_collections.payments.provider_id",
+        "payment_collections.payments.created_at",
+        "payment_collections.payments.captured_at",
+        "payment_collections.payments.canceled_at",
+        "payment_collections.payments.refunds.id",
+        "payment_collections.payments.refunds.amount",
+        "payment_collections.payments.refunds.created_at",
+        "payment_collections.payments.refunds.note",
         "fulfillments",
         "fulfillments.labels.*",
         "fulfillments.items.*",
@@ -80,15 +107,37 @@ export const GET = async (
 
   // Keep only this vendor's items, and withhold whole-order figures when the
   // order also holds other sellers' items (see ../helpers.ts).
-  const scoped = scopeOrderToVendor(order, vendorProductIds)
+  const scopedOrder = scopeOrderToVendor(order, vendorProductIds)
 
-  if (!scoped) {
+  if (!scopedOrder) {
     // Linked to the seller but none of the items are theirs.
     res.status(404).json({ message: "Order not found." })
     return
   }
 
+  // scopeOrderToVendor swaps the order total for the item subtotal, which
+  // drops shipping and tax. When every item is the seller's the real figures
+  // are theirs to see (and must match the admin page), so keep them; only a
+  // mixed order keeps the withheld/recomputed figures.
+  const scoped = scopedOrder.is_mixed
+    ? {
+        ...scopedOrder,
+        // The admin-page figures cover the whole order, other sellers' items
+        // included, so they are withheld like the totals above.
+        original_total: null,
+        original_tax_total: null,
+        item_subtotal: null,
+        item_discount_total: null,
+        shipping_subtotal: null,
+        shipping_discount_total: null,
+        summary: null,
+      }
+    : { ...order, items: scopedOrder.items, is_mixed: false }
+
   const [decorated] = await decorateSplitChildren(req.scope, [scoped])
 
-  res.json({ order: decorated })
+  // decorateSplitChildren swaps in the parent order's payment status for the
+  // list screens. This page shows the order exactly as the admin does, so it
+  // keeps the order's own payment collections (and their amounts).
+  res.json({ order: { ...decorated, payment_collections: scoped.payment_collections } })
 }

@@ -15,6 +15,7 @@ import {
 } from "@medusajs/ui"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useState, useMemo } from "react"
 import { OrderExportButton } from "./order-export-button"
 import {
@@ -159,6 +160,7 @@ const columns = [
 ]
 
 export const OrdersTable = () => {
+  const router = useRouter()
   const [search, setSearch] = useState("")
   const [sorting, setSorting] = useState<DataTableSortingState | null>({
     id: "display_id",
@@ -272,6 +274,7 @@ export const OrdersTable = () => {
     getRowId: (order) => order.id,
     rowCount: data?.count ?? 0,
     isLoading,
+    onRowClick: (_event, row) => router.push(`/orders/${row.id}`),
     search: {
       state: search,
       onSearchChange: (value) => {

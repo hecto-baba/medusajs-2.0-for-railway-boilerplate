@@ -9,19 +9,15 @@ import {
   refundVendorOrder,
   returnVendorOrderItems,
   shipVendorFulfillment,
-  type VendorFulfillment,
   type VendorOrderDetail,
 } from "@lib/data/vendor-client"
 import {
   Button,
   Checkbox,
-  Container,
   Drawer,
-  Heading,
   Input,
   Label,
   Select,
-  StatusBadge,
   Text,
   toast,
   usePrompt,
@@ -40,18 +36,22 @@ const num = (value: unknown): number => {
 
 type Action = null | "fulfil" | "ship" | "refund" | "return"
 
-const fulfilmentState = (fulfillment: VendorFulfillment) =>
-  fulfillment.canceled_at
-    ? { label: "Canceled", color: "red" as const }
-    : fulfillment.delivered_at
-      ? { label: "Delivered", color: "green" as const }
-      : fulfillment.shipped_at
-        ? { label: "Shipped", color: "blue" as const }
-        : { label: "Packed", color: "orange" as const }
-
-type OrderActionsProps = {
-  order: VendorOrderDetail
+export type OrderActionsApi = {
+  /** True while any action is in flight; buttons disable on it so a double click cannot send twice. */
+  busy: boolean
+  canceled: boolean
+  shared: boolean
+  unfulfilled: { item: NonNullable<VendorOrderDetail["items"]>[number]; left: number }[]
+  openFulfil: () => void
+  openShip: (fulfillmentId: string) => void
+  markDelivered: (fulfillmentId: string) => void
+  cancelFulfilment: (fulfillmentId: string) => void
+  openRefund: () => void
+  openReturn: () => void
+  cancelOrder: () => void
 }
+
+export { num }
 
 /**
  * Everything a seller can do to their own order: pack items, ship with tracking,
@@ -61,7 +61,7 @@ type OrderActionsProps = {
  * only makes them reachable. Cancel, refund and return are hidden on an older
  * order shared with other sellers.
  */
-export const OrderActions = ({ order }: OrderActionsProps) => {
+export const useOrderActions = (order: VendorOrderDetail) => {
   const queryClient = useQueryClient()
   const prompt = usePrompt()
 
@@ -78,7 +78,6 @@ export const OrderActions = ({ order }: OrderActionsProps) => {
   const [locationId, setLocationId] = useState("")
 
   const items = order.items ?? []
-  const fulfillments = order.fulfillments ?? []
   const methods = (order.shipping_methods ?? []).filter((method) => method.shipping_option_id)
   const canceled = order.status === "canceled" || order.status === "cancelled"
   const shared = !!order.is_mixed
@@ -253,85 +252,31 @@ export const OrderActions = ({ order }: OrderActionsProps) => {
     returnMutation.mutate()
   }
 
-  return (
+  const busy =
+    fulfilMutation.isPending ||
+    shipMutation.isPending ||
+    deliverMutation.isPending ||
+    cancelFulfilmentMutation.isPending ||
+    cancelOrderMutation.isPending ||
+    refundMutation.isPending ||
+    returnMutation.isPending
+
+  const api: OrderActionsApi = {
+    busy,
+    canceled,
+    shared,
+    unfulfilled,
+    openFulfil,
+    openShip,
+    markDelivered: (fulfillmentId: string) => deliverMutation.mutate(fulfillmentId),
+    cancelFulfilment: confirmCancelFulfilment,
+    openRefund: () => setAction("refund"),
+    openReturn,
+    cancelOrder: confirmCancelOrder,
+  }
+
+  const drawers = (
     <>
-      <Container className="p-6 flex flex-col gap-y-4" data-testid="order-fulfilment">
-        <div className="flex items-center justify-between">
-          <Heading level="h2">Fulfilment</Heading>
-          <Button size="small" variant="secondary" disabled={canceled || unfulfilled.length === 0} onClick={openFulfil}>
-            Fulfil items
-          </Button>
-        </div>
-
-        {fulfillments.length === 0 ? (
-          <Text size="small" className="text-ui-fg-subtle">
-            Nothing packed yet.
-          </Text>
-        ) : (
-          <div className="flex flex-col gap-y-3">
-            {fulfillments.map((fulfillment) => {
-              const state = fulfilmentState(fulfillment)
-              const done = !!fulfillment.canceled_at
-              return (
-                <div key={fulfillment.id} className="rounded-lg border p-3 flex flex-col gap-y-2">
-                  <div className="flex items-center justify-between">
-                    <StatusBadge color={state.color}>{state.label}</StatusBadge>
-                    <div className="flex items-center gap-x-2">
-                      {!done && !fulfillment.shipped_at && (
-                        <Button size="small" variant="secondary" onClick={() => openShip(fulfillment.id)}>
-                          Mark shipped
-                        </Button>
-                      )}
-                      {!done && fulfillment.shipped_at && !fulfillment.delivered_at && (
-                        <Button size="small" variant="secondary" onClick={() => deliverMutation.mutate(fulfillment.id)}>
-                          Mark delivered
-                        </Button>
-                      )}
-                      {!done && !fulfillment.delivered_at && (
-                        <Button size="small" variant="transparent" onClick={() => confirmCancelFulfilment(fulfillment.id)}>
-                          Cancel
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  {(fulfillment.items ?? []).map((item, index) => (
-                    <Text key={`${item.line_item_id}-${index}`} size="small" className="text-ui-fg-subtle">
-                      {num(item.quantity)} x {item.title ?? "Item"}
-                    </Text>
-                  ))}
-                  {(fulfillment.labels ?? []).map((label) => (
-                    <Text key={label.tracking_number} size="small">
-                      Tracking:{" "}
-                      {label.tracking_url ? (
-                        <a href={label.tracking_url} target="_blank" rel="noreferrer" className="text-ui-fg-interactive">
-                          {label.tracking_number}
-                        </a>
-                      ) : (
-                        label.tracking_number
-                      )}
-                    </Text>
-                  ))}
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {!shared && (
-          <div className="flex items-center gap-x-2 border-t pt-4">
-            <Button size="small" variant="secondary" disabled={canceled} onClick={() => setAction("refund")}>
-              Refund
-            </Button>
-            <Button size="small" variant="secondary" disabled={canceled} onClick={openReturn}>
-              Record a return
-            </Button>
-            <Button size="small" variant="danger" disabled={canceled} onClick={confirmCancelOrder}>
-              Cancel order
-            </Button>
-          </div>
-        )}
-      </Container>
-
       {/* Fulfil */}
       <Drawer open={action === "fulfil"} onOpenChange={(open) => !open && close()}>
         <Drawer.Content className="max-w-md">
@@ -497,4 +442,6 @@ export const OrderActions = ({ order }: OrderActionsProps) => {
       </Drawer>
     </>
   )
+
+  return { api, drawers }
 }

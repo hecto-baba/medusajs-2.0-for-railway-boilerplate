@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
@@ -28,6 +28,7 @@ import {
 import Link from "next/link"
 import {
   getVendorQuote,
+  sendVendorQuoteMessage,
   negotiateVendorQuote,
   updateVendorQuoteStatus,
   VendorQuoteItem,
@@ -62,6 +63,8 @@ export default function QuoteDetailPage() {
   const [carrierInput, setCarrierInput] = useState("Express Freight Delivery")
   const [trackingInput, setTrackingInput] = useState("")
   const [showDispatchForm, setShowDispatchForm] = useState(false)
+
+  const threadRef = useRef<HTMLDivElement>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ["vendor-quote", id],
@@ -224,22 +227,11 @@ export default function QuoteDetailPage() {
   const { mutateAsync: postMessage, isPending: isPostingMessage } = useMutation({
     mutationFn: () => {
       const selectedItem = items.find((i: any) => i.id === selectedItemId)
-      const currentMessages = quote?.metadata?.messages || []
-      return negotiateVendorQuote(id, {
-        metadata: {
-          messages: [
-            ...currentMessages,
-            {
-              id: `msg_${Date.now()}`,
-              text: messageText,
-              sender: "merchant",
-              item_id: selectedItemId === "general" ? null : selectedItemId,
-              item_title: selectedItem ? selectedItem.title : null,
-              created_at: new Date().toISOString(),
-            },
-          ],
-        },
-      } as any)
+      return sendVendorQuoteMessage(id, {
+        text: messageText,
+        item_id: selectedItemId === "general" ? null : selectedItemId,
+        item_title: selectedItem ? selectedItem.title : null,
+      })
     },
     onSuccess: () => {
       toast.success("Message Sent", { description: "Your note was added to the quote." })
@@ -357,6 +349,13 @@ export default function QuoteDetailPage() {
         return "orange"
     }
   }
+
+  // Keep the newest message in view
+  const messageCount = quote?.metadata?.messages?.length ?? 0
+  useEffect(() => {
+    const el = threadRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [messageCount])
 
   if (isLoading) {
     return (
@@ -1063,7 +1062,7 @@ export default function QuoteDetailPage() {
 
             {/* Message Thread History */}
             {messages.length > 0 ? (
-              <div className="space-y-3 mb-2 max-h-64 overflow-y-auto pr-1">
+              <div ref={threadRef} className="space-y-3 mb-2 max-h-64 overflow-y-auto pr-1">
                 {messages.map((msg: any) => {
                   const isMerchant = msg.sender === "merchant"
                   return (
@@ -1081,7 +1080,9 @@ export default function QuoteDetailPage() {
                         </span>
                         <span className="font-mono text-[11px]">
                           {msg.created_at
-                            ? new Date(msg.created_at).toLocaleTimeString([], {
+                            ? new Date(msg.created_at).toLocaleString([], {
+                                day: "numeric",
+                                month: "short",
                                 hour: "2-digit",
                                 minute: "2-digit",
                               })
