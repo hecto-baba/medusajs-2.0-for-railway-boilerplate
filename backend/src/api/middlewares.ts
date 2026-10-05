@@ -964,6 +964,12 @@ export default defineMiddlewares({
       ]
     },
     {
+      matcher: "/vendors/quotes/:id/*",
+      middlewares: [
+        authenticate("vendor", ["session", "bearer"])
+      ]
+    },
+    {
       matcher: "/vendors/search",
       methods: ["GET"],
       middlewares: [

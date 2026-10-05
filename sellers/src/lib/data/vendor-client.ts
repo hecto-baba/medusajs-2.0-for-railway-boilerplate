@@ -4317,6 +4317,11 @@ export const negotiateVendorQuote = (
   }
 ) => mutate<{ quote: VendorQuote }>(`quotes/${quoteId}`, "POST", body)
 
+export const sendVendorQuoteMessage = (
+  quoteId: string,
+  body: { text: string; item_id?: string | null; item_title?: string | null }
+) => mutate<{ message: any; messages: any[] }>(`quotes/${quoteId}/messages`, "POST", body)
+
 export const listVendorApprovals = (params?: {
   limit?: number
   offset?: number
