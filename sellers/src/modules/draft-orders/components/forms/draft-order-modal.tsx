@@ -6,10 +6,6 @@ import {
   listVendorProducts,
   listVendorRegions,
   listVendorSalesChannels,
-  type VendorCustomer,
-  type VendorProduct,
-  type VendorRegion,
-  type VendorSalesChannel,
 } from "@lib/data/vendor-client"
 import {
   Button,
@@ -26,7 +22,7 @@ import {
 } from "@medusajs/ui"
 import { Plus, Trash } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 
 type DraftOrderModalProps = {
   open: boolean

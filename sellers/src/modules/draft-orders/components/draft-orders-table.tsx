@@ -9,7 +9,6 @@ import {
   type VendorDraftOrder,
 } from "@lib/data/vendor-client"
 import {
-  Badge,
   Button,
   Container,
   createDataTableColumnHelper,
@@ -25,7 +24,7 @@ import {
   useDataTable,
   usePrompt,
 } from "@medusajs/ui"
-import { ArrowPath, Eye, Plus, Trash } from "@medusajs/icons"
+import { ArrowPath, Eye, Trash } from "@medusajs/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"

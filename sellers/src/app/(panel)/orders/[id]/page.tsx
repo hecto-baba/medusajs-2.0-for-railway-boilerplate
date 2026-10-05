@@ -12,5 +12,9 @@ type Props = {
 
 export default async function OrderDetailPage({ params }: Props) {
   const { id } = await params
-  return <OrderDetail id={id} />
+  return (
+    <div className="p-6">
+      <OrderDetail id={id} />
+    </div>
+  )
 }

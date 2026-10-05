@@ -1,40 +1,31 @@
 "use client"
 
-import { getVendorOrder } from "@lib/data/vendor-client"
-import {
-  Container,
-  Heading,
-  StatusBadge,
-  Table,
-  Text,
-} from "@medusajs/ui"
-import { ArrowLeft, Buildings, CreditCard, User } from "@medusajs/icons"
+import { getVendorOrder, type VendorOrderDetail } from "@lib/data/vendor-client"
+import { Container, Text } from "@medusajs/ui"
+import { ArrowLeft } from "@medusajs/icons"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
-import { OrderActions } from "./order-actions"
+import { useBreadcrumbTitle } from "@modules/layout"
+import { MetadataSection } from "@modules/customers/components/detail/metadata-section"
+import { useOrderActions } from "./order-actions"
+import { OrderActivitySection } from "./order-activity-section"
+import { OrderCustomerSection } from "./order-customer-section"
+import { OrderFulfillmentSection } from "./order-fulfillment-section"
+import { OrderGeneralSection } from "./order-general-section"
+import { OrderJsonSection } from "./order-json-section"
+import { OrderPaymentSection } from "./order-payment-section"
 import { OrderRentalsSection } from "./order-rentals-section"
+import { OrderSummarySection } from "./order-summary-section"
 
 type OrderDetailProps = {
   id: string
 }
 
-const ORDER_STATUS_COLOR: Record<string, "green" | "grey" | "red" | "orange"> = {
-  completed: "green",
-  pending: "orange",
-  canceled: "red",
-  cancelled: "red",
-  requires_action: "orange",
-}
-
 /**
- * A vendor's own view of a single order.
- *
- * Mirrors DraftOrderDetail's layout (back link, header container, items +
- * summary grid alongside customer/address cards) so it lines up visually
- * with the rest of the panel, then adds the rentals section beneath - the
- * vendor equivalent of the admin's order-detail-page rental widget, which
- * previously had nowhere to render in this app since no order-detail route
- * existed at all.
+ * A vendor's own view of a single order, laid out like the admin's order page:
+ * header, Summary, Payments and fulfilment in the main column; Customer and
+ * Activity in the side column. The seller extras (order actions, rentals) sit
+ * in the main column beneath the admin sections.
  */
 export const OrderDetail = ({ id }: OrderDetailProps) => {
   const { data, isLoading, error } = useQuery({
@@ -67,23 +58,17 @@ export const OrderDetail = ({ id }: OrderDetailProps) => {
     )
   }
 
-  const items = order.items || []
-  const currency = (order.currency_code || "USD").toUpperCase()
-  const shipping = order.shipping_address as any
-  const billing = order.billing_address as any
+  return <OrderDetailLoaded order={order} id={id} />
+}
+
+const OrderDetailLoaded = ({ order, id }: { order: VendorOrderDetail; id: string }) => {
+  const { api: actions, drawers } = useOrderActions(order)
+
+  // Breadcrumb reads "Orders > #36" like the admin, not the raw order id.
+  useBreadcrumbTitle(`#${order.display_id}`)
 
   return (
-    <div className="flex flex-col gap-y-6 p-8 max-w-7xl mx-auto">
-      <div>
-        <Link
-          href="/orders"
-          className="text-ui-fg-subtle hover:text-ui-fg-base inline-flex items-center gap-x-2 text-sm transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back to Orders</span>
-        </Link>
-      </div>
-
+    <div className="flex flex-col gap-y-3">
       {order.is_mixed && (
         <Container className="p-4" data-testid="legacy-shared-order-note">
           <Text size="small" className="text-ui-fg-subtle">
@@ -93,185 +78,23 @@ export const OrderDetail = ({ id }: OrderDetailProps) => {
         </Container>
       )}
 
-      <Container className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex flex-col gap-y-2">
-            <div className="flex items-center gap-x-3">
-              <Heading level="h1">Order #{order.display_id}</Heading>
-              <StatusBadge color={ORDER_STATUS_COLOR[order.status] ?? "grey"}>
-                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-              </StatusBadge>
-            </div>
-            <Text size="small" className="text-ui-fg-muted">
-              Placed on{" "}
-              {new Date(order.created_at).toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </Text>
-          </div>
-        </div>
-      </Container>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 flex flex-col gap-y-6">
-          <Container className="p-6 flex flex-col gap-y-4">
-            <Heading level="h2">Items</Heading>
-            <Text size="small" className="text-ui-fg-muted -mt-2">
-              Only your own products are shown; other vendors&apos; items on this
-              order are not visible here.
-            </Text>
-            <div className="border border-ui-border-base rounded-lg overflow-hidden">
-              <Table>
-                <Table.Header>
-                  <Table.Row>
-                    <Table.HeaderCell>Item</Table.HeaderCell>
-                    <Table.HeaderCell className="text-right">Qty</Table.HeaderCell>
-                    <Table.HeaderCell className="text-right">Unit Price</Table.HeaderCell>
-                    <Table.HeaderCell className="text-right">Total</Table.HeaderCell>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {items.map((it) => (
-                    <Table.Row key={it.id}>
-                      <Table.Cell>
-                        <div className="flex flex-col">
-                          <Text size="small" weight="plus">
-                            {it.title}
-                          </Text>
-                          {it.variant_title && (
-                            <Text size="xsmall" className="text-ui-fg-muted">
-                              {it.variant_title}
-                            </Text>
-                          )}
-                        </div>
-                      </Table.Cell>
-                      <Table.Cell className="text-right font-mono text-sm">
-                        {it.quantity}
-                      </Table.Cell>
-                      <Table.Cell className="text-right font-mono text-sm">
-                        {currency} {(it.unit_price ?? 0).toFixed(2)}
-                      </Table.Cell>
-                      <Table.Cell className="text-right font-mono font-medium text-sm">
-                        {currency} {((it.quantity ?? 1) * (it.unit_price ?? 0)).toFixed(2)}
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table>
-            </div>
-          </Container>
-
-          <OrderActions order={order} />
-
-          <Container className="p-6 flex flex-col gap-y-3">
-            <Heading level="h2">Order Summary</Heading>
-            <Text size="small" className="text-ui-fg-muted -mt-2">
-              Reflects only your share of this order.
-            </Text>
-            <div className="flex flex-col gap-y-2 text-sm border-t border-ui-border-base pt-3">
-              <div className="flex justify-between">
-                <Text className="text-ui-fg-subtle">Subtotal</Text>
-                <Text className="font-mono">
-                  {currency} {(order.subtotal ?? order.total ?? 0).toFixed(2)}
-                </Text>
-              </div>
-              <div className="flex justify-between border-t border-ui-border-base pt-2 font-bold text-base">
-                <Text weight="plus">Total</Text>
-                <Text weight="plus" className="font-mono">
-                  {currency} {(order.total ?? 0).toFixed(2)}
-                </Text>
-              </div>
-            </div>
-          </Container>
-
+      <div className="flex flex-col gap-x-4 gap-y-3 xl:flex-row xl:items-start">
+        <div className="flex w-full flex-col gap-y-3">
+          <OrderGeneralSection order={order} actions={actions} />
+          <OrderSummarySection order={order} actions={actions} />
+          <OrderPaymentSection order={order} />
+          <OrderFulfillmentSection order={order} actions={actions} />
           <OrderRentalsSection orderId={id} />
+          <MetadataSection metadata={order.metadata} />
+          <OrderJsonSection data={order} />
         </div>
 
-        <div className="flex flex-col gap-y-6">
-          <Container className="p-6 flex flex-col gap-y-3">
-            <div className="flex items-center gap-x-2">
-              <User className="text-ui-fg-muted h-5 w-5" />
-              <Heading level="h2">Customer</Heading>
-            </div>
-            <div className="flex flex-col gap-y-1 text-sm border-t border-ui-border-base pt-3">
-              <Text weight="plus">
-                {[order.customer?.first_name, order.customer?.last_name]
-                  .filter(Boolean)
-                  .join(" ") || "Guest"}
-              </Text>
-              <Text className="text-ui-fg-subtle">
-                {order.customer?.email || order.email || "No email"}
-              </Text>
-            </div>
-          </Container>
-
-          <Container className="p-6 flex flex-col gap-y-3">
-            <div className="flex items-center gap-x-2">
-              <Buildings className="text-ui-fg-muted h-5 w-5" />
-              <Heading level="h2">Shipping Address</Heading>
-            </div>
-            <div className="flex flex-col gap-y-1 text-sm border-t border-ui-border-base pt-3 text-ui-fg-subtle">
-              {shipping ? (
-                <>
-                  <Text weight="plus" className="text-ui-fg-base">
-                    {[shipping.first_name, shipping.last_name].filter(Boolean).join(" ")}
-                  </Text>
-                  {shipping.address_1 && <Text>{shipping.address_1}</Text>}
-                  {[shipping.city, shipping.postal_code].some(Boolean) && (
-                    <Text>
-                      {[shipping.city, shipping.postal_code].filter(Boolean).join(" ")}
-                    </Text>
-                  )}
-                  {shipping.country_code && (
-                    <Text className="uppercase">{shipping.country_code}</Text>
-                  )}
-                  {/* Tickets, appointments, digital, EOI and pickup rentals are
-                      ordered with contact details only, so a missing street is
-                      expected here, not an error. */}
-                  {!shipping.address_1 && (
-                    <Text className="text-ui-fg-muted">
-                      No delivery address - nothing to ship
-                    </Text>
-                  )}
-                </>
-              ) : (
-                <Text className="text-ui-fg-muted">No shipping address</Text>
-              )}
-            </div>
-          </Container>
-
-          <Container className="p-6 flex flex-col gap-y-3">
-            <div className="flex items-center gap-x-2">
-              <CreditCard className="text-ui-fg-muted h-5 w-5" />
-              <Heading level="h2">Billing Address</Heading>
-            </div>
-            <div className="flex flex-col gap-y-1 text-sm border-t border-ui-border-base pt-3 text-ui-fg-subtle">
-              {billing ? (
-                <>
-                  <Text weight="plus" className="text-ui-fg-base">
-                    {[billing.first_name, billing.last_name].filter(Boolean).join(" ")}
-                  </Text>
-                  {billing.address_1 && <Text>{billing.address_1}</Text>}
-                  {[billing.city, billing.postal_code].some(Boolean) && (
-                    <Text>
-                      {[billing.city, billing.postal_code].filter(Boolean).join(" ")}
-                    </Text>
-                  )}
-                  {billing.country_code && (
-                    <Text className="uppercase">{billing.country_code}</Text>
-                  )}
-                </>
-              ) : (
-                <Text className="text-ui-fg-muted">Same as shipping address</Text>
-              )}
-            </div>
-          </Container>
+        <div className="flex w-full max-w-[100%] flex-col gap-y-3 xl:mt-0 xl:max-w-[440px]">
+          <OrderCustomerSection order={order} />
+          <OrderActivitySection order={order} />
         </div>
       </div>
+      {drawers}
     </div>
   )
 }

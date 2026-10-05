@@ -89,6 +89,32 @@ export type VendorProduct = {
   variants?: VendorVariant[]
 }
 
+export type VendorOrderRefund = {
+  id: string
+  amount: number
+  created_at: string
+  note?: string | null
+}
+
+export type VendorOrderPayment = {
+  id: string
+  amount: number
+  currency_code: string
+  provider_id?: string | null
+  created_at: string
+  captured_at: string | null
+  canceled_at: string | null
+  refunds?: VendorOrderRefund[]
+}
+
+export type VendorOrderPaymentCollection = {
+  status: string
+  amount?: number
+  captured_amount?: number
+  refunded_amount?: number
+  payments?: VendorOrderPayment[]
+}
+
 export type VendorOrder = {
   id: string
   display_id: number
@@ -100,7 +126,7 @@ export type VendorOrder = {
   total: number
   customer?: { email: string | null } | null
   sales_channel?: { name: string | null } | null
-  payment_collections?: { status: string }[]
+  payment_collections?: VendorOrderPaymentCollection[]
   fulfillments?: VendorFulfillment[]
   // True for an older order that holds other sellers' items too: only this
   // seller's items are shown and whole-order figures are withheld.
@@ -112,6 +138,19 @@ export type VendorOrderDetail = VendorOrder & {
   subtotal: number
   shipping_total: number
   tax_total: number
+  // Admin-page figures. Null/absent on an older order shared with other
+  // sellers, where whole-order figures are withheld.
+  canceled_at?: string | null
+  metadata?: Record<string, unknown> | null
+  original_total?: number | null
+  original_tax_total?: number | null
+  item_subtotal?: number | null
+  item_discount_total?: number | null
+  shipping_subtotal?: number | null
+  discount_total?: number | null
+  shipping_discount_total?: number | null
+  summary?: { pending_difference?: number | null } | null
+  payment_collections?: VendorOrderPaymentCollection[]
   customer?: {
     email: string | null
     first_name?: string | null
@@ -125,6 +164,12 @@ export type VendorOrderDetail = VendorOrder & {
     variant_title?: string | null
     quantity: number
     unit_price: number
+    subtotal?: number | null
+    thumbnail?: string | null
+    requires_shipping?: boolean
+    variant_sku?: string | null
+    variant?: { options?: { value: string }[] } | null
+    adjustments?: { code?: string | null }[]
     metadata?: Record<string, unknown> | null
     // How many of this line are already packed (see fulfillments).
     detail?: { quantity?: number | { value?: string } ; fulfilled_quantity?: number | { value?: string } } | null
@@ -3707,10 +3752,12 @@ export const deleteVendorTaxRate = (id: string) =>
 
 export type VendorFulfillment = {
   id: string
+  created_at?: string | null
+  provider_id?: string | null
   shipped_at: string | null
   delivered_at: string | null
   canceled_at: string | null
-  labels?: { tracking_number: string; tracking_url?: string | null }[]
+  labels?: { tracking_number: string; tracking_url?: string | null; label_url?: string | null }[]
   items?: { line_item_id: string; title?: string; quantity: number }[]
 }
 
