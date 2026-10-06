@@ -18,7 +18,7 @@ export const GET = async (
     data: [vendorAdmin],
   } = await query.graph({
     entity: "vendor_admin",
-    fields: ["id", "email", "vendor.id", "vendor.orders.id"],
+    fields: ["id", "email", "vendor.id"],
     filters: { id: [req.auth_context.actor_id] },
   })
 
@@ -56,10 +56,34 @@ export const GET = async (
     }
   } catch {}
 
-  const vendorOrderIds = (vendorAdmin.vendor?.orders || []).map((o: any) => o.id).filter(Boolean)
-
   // Query deliveries
   try {
+    // Ask only for this seller's deliveries. The list used to fetch every delivery and
+    // filter afterwards, but the query returns just the first 15 rows by default, so
+    // once the system held more than 15 deliveries the newest ones never reached the seller.
+    const deliveryIds = new Set<string>()
+    if (restaurantIds.length) {
+      const { data: restaurants } = await query.graph({
+        entity: "restaurant",
+        fields: ["id", "deliveries.id"],
+        filters: { id: restaurantIds },
+      })
+      for (const restaurant of restaurants || []) {
+        for (const d of (restaurant as any).deliveries || []) {
+          if (d?.id) deliveryIds.add(d.id)
+        }
+      }
+    }
+
+    if (!deliveryIds.size) {
+      return res.json({ deliveries: [], count: 0, limit, offset })
+    }
+
+    const filters: Record<string, any> = { id: [...deliveryIds] }
+    if (status) {
+      filters.delivery_status = status
+    }
+
     const { data: deliveries, metadata } = await query.graph({
       entity: "delivery",
       fields: [
@@ -76,26 +100,14 @@ export const GET = async (
         "order.currency_code",
         "order.items.*",
       ],
+      filters,
+      // Ids are time-ordered, so descending puts the newest order first.
+      pagination: { skip: offset, take: limit, order: { id: "DESC" } },
     })
-
-    // Filter deliveries belonging to vendor's restaurant or vendor's order
-    let scopedDeliveries = (deliveries || []).filter((d: any) => {
-      if (d.restaurant?.id && restaurantIds.includes(d.restaurant.id)) {
-        return true
-      }
-      if (d.order?.id && vendorOrderIds.includes(d.order.id)) {
-        return true
-      }
-      return false
-    })
-
-    if (status) {
-      scopedDeliveries = scopedDeliveries.filter((d: any) => d.delivery_status === status)
-    }
 
     return res.json({
-      deliveries: scopedDeliveries.slice(offset, offset + limit),
-      count: scopedDeliveries.length,
+      deliveries: deliveries || [],
+      count: metadata?.count ?? (deliveries || []).length,
       limit,
       offset,
     })
