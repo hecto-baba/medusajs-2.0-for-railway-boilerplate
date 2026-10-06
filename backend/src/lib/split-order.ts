@@ -3,6 +3,7 @@ import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { createOrdersWorkflow } from "@medusajs/medusa/core-flows"
 import { MARKETPLACE_MODULE } from "../modules/marketplace"
 import { loadProductSellers } from "./cart-shipping"
+import { linkRestaurantDishesToSellers } from "./restaurant-dish-owner"
 import { round, toNumber } from "./money"
 
 /**
@@ -120,6 +121,12 @@ export const splitOrderBySeller = async (
 
   // The seller of each item; platform items have none.
   const productIds = items.map((item) => item.product_id).filter((id): id is string => !!id)
+  // Dishes added by an admin may not be linked to their restaurant's seller yet.
+  // This is a repair step: if it fails, carry on with the links that already exist
+  // rather than leave the seller without their order.
+  await linkRestaurantDishesToSellers(container, productIds).catch((error) => {
+    console.error("Could not link restaurant dishes to their seller:", error)
+  })
   const productSellers = await loadProductSellers(container, productIds)
   // A rental adds a separate "Security Deposit" line with no product. It belongs to
   // the seller of the rental item in the same rental group, not to the platform.

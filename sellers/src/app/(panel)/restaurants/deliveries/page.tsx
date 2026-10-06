@@ -44,6 +44,7 @@ const STATUS_FILTERS = [
   { label: "Ready for Pickup", value: VendorDeliveryStatus.READY_FOR_PICKUP },
   { label: "In Transit", value: VendorDeliveryStatus.IN_TRANSIT },
   { label: "Delivered", value: VendorDeliveryStatus.DELIVERED },
+  { label: "Rejected", value: VendorDeliveryStatus.RESTAURANT_DECLINED },
 ]
 
 export default function RestaurantDeliveriesPage() {
@@ -200,7 +201,10 @@ export default function RestaurantDeliveriesPage() {
                   <Table.Row key={delivery.id} className="hover:bg-ui-bg-subtle/50 transition-colors">
                     <Table.Cell className="font-medium">
                       <div className="font-semibold text-ui-fg-base">
-                        {order?.display_id ? `Order #${order.display_id}` : delivery.id.slice(0, 14)}
+                        {/* The customer's tracking page calls this delivery "#" + the last 8 characters of its id,
+                          so the seller sees the same code to match it by. */}
+                        {order?.display_id ? `Order #${order.display_id} · ` : ""}
+                        Delivery #{delivery.id.slice(-8)}
                       </div>
                       <div className="text-xs text-ui-fg-subtle mt-0.5">
                         {order?.items?.length || 1} {order?.items?.length === 1 ? "item" : "items"} ·{" "}
@@ -258,6 +262,28 @@ export default function RestaurantDeliveriesPage() {
                           >
                             Accept Order
                           </Button>
+                        )}
+
+                        {status === VendorDeliveryStatus.PENDING && (
+                          <Button
+                            size="small"
+                            variant="secondary"
+                            disabled={updateDeliveryMutation.isPending}
+                            onClick={() => {
+                              if (!window.confirm("Reject this order? The customer will not be served.")) return
+                              updateDeliveryMutation.mutate({
+                                id: delivery.id,
+                                status: VendorDeliveryStatus.RESTAURANT_DECLINED,
+                              })
+                            }}
+                            className="text-xs py-1 text-ui-fg-error"
+                          >
+                            Reject Order
+                          </Button>
+                        )}
+
+                        {status === VendorDeliveryStatus.RESTAURANT_DECLINED && (
+                          <span className="text-xs text-ui-fg-error font-semibold">Rejected</span>
                         )}
 
                         {status === VendorDeliveryStatus.RESTAURANT_ACCEPTED && (

@@ -48,7 +48,7 @@ const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
             <TrackOrderLink order={order} />
           </div>
         </div>
-        <Items items={order.items} />
+        <Items items={order.items} currencyCode={order.currency_code} />
         <SellerOrders sellerOrders={sellerOrders} />
         <ShippingDetails order={order} />
         <OrderSummary order={order} />

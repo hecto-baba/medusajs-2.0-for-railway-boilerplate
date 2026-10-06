@@ -55,7 +55,7 @@ export default function OrderCompletedTemplate({
           <h2 className="px-1 pt-2 font-display text-2xl font-extrabold tracking-tight">
             Summary
           </h2>
-          <Items items={order.items} />
+          <Items items={order.items} currencyCode={order.currency_code} />
           <SellerOrders sellerOrders={sellerOrders} />
           <div className="rounded-large bg-card p-5 shadow-lift">
             <CartTotals totals={order} />

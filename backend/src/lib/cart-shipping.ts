@@ -45,9 +45,12 @@ export const loadProductSellers = async (
   }
 
   const query = container.resolve(ContainerRegistrationKeys.QUERY)
+  // take: null returns every seller. The default is the first 15 rows, so dishes of a
+  // later seller were treated as "no seller" and their orders reached nobody.
   const { data: vendors } = await query.graph({
     entity: "vendor",
     fields: ["id", "name", "products.id"],
+    pagination: { take: null },
   })
 
   const wanted = new Set(productIds)
