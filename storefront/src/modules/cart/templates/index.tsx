@@ -24,7 +24,10 @@ const CartTemplate = ({
                   <Divider />
                 </>
               )}
-              <ItemsTemplate items={cart?.items} />
+              <ItemsTemplate
+                items={cart?.items}
+                currencyCode={cart?.currency_code}
+              />
             </div>
             <div className="relative">
               <div className="sticky top-32 flex flex-col gap-y-8">

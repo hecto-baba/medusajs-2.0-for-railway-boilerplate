@@ -3,7 +3,8 @@ import { getPercentageDiff } from "./get-precentage-diff"
 import { convertToLocale } from "./money"
 
 export const getPricesForVariant = (variant: any) => {
-  if (!variant?.calculated_price?.calculated_amount) {
+  // 0 is a valid price (free item); only a missing amount means "no price".
+  if (variant?.calculated_price?.calculated_amount == null) {
     return null
   }
 

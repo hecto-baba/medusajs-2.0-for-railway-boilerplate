@@ -24,9 +24,10 @@ import { useState, useEffect, useTransition } from "react"
 type ItemProps = {
   item: HttpTypes.StoreCartLineItem
   type?: "full" | "preview"
+  currencyCode?: string
 }
 
-const Item = ({ item, type = "full" }: ItemProps) => {
+const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
   const [updating, setUpdating] = useState(false)
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -110,7 +111,11 @@ const Item = ({ item, type = "full" }: ItemProps) => {
         {type === "full" && <Table.Cell className="hidden small:table-cell" />}
         <Table.Cell className="!pr-0">
           <span className="!pr-0 flex flex-col items-end h-full justify-center">
-            <LineItemPrice item={item} style="tight" />
+            <LineItemPrice
+              item={item}
+              style="tight"
+              currencyCode={currencyCode}
+            />
           </span>
         </Table.Cell>
       </Table.Row>

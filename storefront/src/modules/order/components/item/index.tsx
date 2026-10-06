@@ -11,9 +11,10 @@ import Thumbnail from "@modules/products/components/thumbnail"
 
 type ItemProps = {
   item: HttpTypes.StoreCartLineItem | HttpTypes.StoreOrderLineItem
+  currencyCode?: string
 }
 
-const Item = ({ item }: ItemProps) => {
+const Item = ({ item, currencyCode }: ItemProps) => {
   const isDeposit = !!item.metadata?.is_rental_deposit
 
   // Same reasoning as the cart row: a deposit line has no catalog
@@ -36,7 +37,11 @@ const Item = ({ item }: ItemProps) => {
         </Table.Cell>
         <Table.Cell className="!pr-0">
           <span className="!pr-0 flex flex-col items-end h-full justify-center">
-            <LineItemPrice item={item} style="tight" />
+            <LineItemPrice
+              item={item}
+              style="tight"
+              currencyCode={currencyCode}
+            />
           </span>
         </Table.Cell>
       </Table.Row>
